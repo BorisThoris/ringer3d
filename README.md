@@ -7,16 +7,17 @@ Knuckle down on the ring line, flick your shooter into the cross of 13 marbles, 
 - **Five arenas** with their own feel: Schoolyard (asphalt), Zen Garden (grippy sand), Neon Rooftop (fast tile), Glacier Hall (ice), and the Caldera.
 - **Tower (story mode)**: pick a marble, climb eight opponents with their own personalities, beat the Black Taw, unlock fighters and endings.
 - **Fair bots**: six skill levels from Rookie to Legend.
-- **Online**: server browser, private rooms with 4-letter codes, 2–4 players, peer-to-peer matches with bots filling empty seats.
+- **Online, no server required**: server browser, private rooms with 4-letter codes, 2–4 players. Games are found through public Nostr relays and matches run directly between devices over WebRTC; bots take dropped seats. An optional self-hosted lobby server is also supported.
 - **Pass and play** for 2–4 players on one device.
+- **Real glass marbles**: twisted cat's-eye blades, swirl ribbons, onionskins, aventurine galaxies, clearies with bubbles, dispersion and coloured caustics, plus a 3D close-up you can spin in the marble picker and versus screen.
 - Zero downloaded assets: textures, marbles and audio are all generated procedurally, so the app stays small and loads offline as a PWA.
 
 ## Quick start
 
 ```bash
 npm install
-npm run dev          # game at http://localhost:5173
-npm run server       # lobby server at ws://localhost:8787 (needed for Online only)
+npm run dev          # game at http://localhost:5173 (online works out of the box, peer to peer)
+npm run server       # optional lobby server at ws://localhost:8787 (Settings → Online connection)
 ```
 
 Production, single process (serves the game and runs the lobby):
@@ -74,12 +75,17 @@ Bots only see what you see (marble positions) and output the same shot a human d
 
 ### Online architecture
 
-- **Lobby server** (`server/index.mjs`, WebSocket): room list for the server browser, 4-letter join codes, WebRTC signaling, and a relay fallback.
-- **Matches are peer to peer** over WebRTC data channels (star topology: the host orders turns and validates that shots come from the player whose turn it is). If a direct connection fails behind strict NATs, a link automatically falls back to relaying through the lobby server.
+Two connection modes, chosen in Settings → Online connection. Both run the match itself peer to peer.
+
+- **Peer to peer (default, nothing to deploy).** The server browser reads small room listings (Nostr kind 30078 events with an expiry tag) that hosts post to several public relays every 20 seconds; private rooms are never posted. Players with the same room code meet through [Trystero](https://github.com/dmotz/trystero) over the same relays, which performs the WebRTC handshake. After that, game messages go directly between devices (`src/net/p2pMatchmaker.ts`).
+- **Lobby server (optional).** `server/index.mjs` provides the room list, codes, WebRTC signaling and a relay fallback for players behind very strict NATs where a direct connection can't be made (`src/net/serverMatchmaker.ts`). Configure STUN/TURN for clients with the server's `ICE_SERVERS` env var, e.g. `ICE_SERVERS='[{"urls":"turn:turn.example.com","username":"u","credential":"p"}]'`.
+- Star topology over the data channels: the host orders turns and validates that shots come from the player whose turn it is. After every shot peers compare layout hashes; on mismatch the host sends a snapshot and the peer resyncs. `match.shotLog` records each shot with before/after hashes for replays and debugging.
 - If a guest drops mid-match, a bot takes over their seat on the host. If the host leaves, the match ends for everyone.
-- Configure STUN/TURN for clients with the server's `ICE_SERVERS` env var, e.g. `ICE_SERVERS='[{"urls":"turn:turn.example.com","username":"u","credential":"p"}]'`.
+- `npm run e2e:online` (with the app served on :8787) plays a match between two browser profiles; CI runs it in both modes.
 
 ## Deploying
+
+Online play works without deploying anything. To host the web build, push to `main` and the Pages workflow publishes it. To run your own lobby server as well:
 
 **Docker** (game + lobby on one port):
 
@@ -93,12 +99,12 @@ Put it behind HTTPS (any reverse proxy); the client automatically uses `wss://` 
 ## Mobile (Capacitor)
 
 ```bash
-VITE_LOBBY_URL=wss://your-lobby.example.com npm run mobile:sync
+npm run mobile:sync
 npm run android      # opens Android Studio
 npm run ios          # opens Xcode (macOS)
 ```
 
-Native builds can't infer the lobby address from the page URL, so set `VITE_LOBBY_URL` (a `wss://` URL — Android blocks plain `ws://` from the app's secure origin). Players can also change it in Settings. Haptics and fullscreen status bar handling use Capacitor plugins on device.
+Online uses peer-to-peer mode by default, so mobile builds need no extra configuration. Only if you use the optional lobby server: set `VITE_LOBBY_URL` to its `wss://` address (Android blocks plain `ws://` from the app's secure origin), or enter it in Settings. Haptics and fullscreen status bar handling use Capacitor plugins on device.
 
 ## Desktop (Tauri)
 
@@ -115,7 +121,8 @@ Every push builds and checks all targets on GitHub Actions (`.github/workflows/`
 
 - **Build all platforms**: typecheck, tests and web build; Android debug APK; iOS simulator app; desktop installers for Linux, Windows and macOS. Builds are downloadable as run artifacts.
 - **Device smoke tests**: boots an Android emulator and an iPhone simulator, installs and launches the app, fails if it crashes or logs an uncaught JS error, and publishes screenshots and logs to the `ci-screens` branch.
-- **Deploy web to GitHub Pages** (on `main`): enable Pages with source "GitHub Actions" in the repository settings. Set the repository variable `LOBBY_URL` to your lobby's `wss://` address to enable Online play on the hosted page.
+- **Online e2e**: two browser profiles find each other in the server browser, connect and play; runs in peer-to-peer and lobby-server modes.
+- **Deploy web to GitHub Pages** (on `main`): enable Pages with source "GitHub Actions" in the repository settings. Online works there in peer-to-peer mode; set the repository variable `LOBBY_URL` only if you run the optional lobby server.
 
 ## Tuning
 

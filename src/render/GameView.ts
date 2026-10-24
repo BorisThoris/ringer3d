@@ -7,7 +7,7 @@ import { WORLD } from '../core/constants';
 import { placementPoint, SHOOTER_ID, type Layout } from '../core/physics';
 import type { Match } from '../core/match';
 import { ARENAS, type ArenaId } from '../game/arenas';
-import { MARBLES, MIB_ACCENTS, type MarbleLook } from '../game/marbles';
+import { MIB_LOOKS, type MarbleLook } from '../game/marbles';
 import { buildArena, type BuiltArena } from './arenaBuilder';
 import { buildMarble, disposeObject, type Quality } from './marbleMesh';
 import { radialGlowTexture } from './textures';
@@ -58,6 +58,10 @@ export class GameView {
   private targetMeshes = new Map<number, THREE.Group>();
   private shooterMeshes: THREE.Group[] = [];
   private activeShooter: THREE.Group | null = null;
+  /** Ground caustic for each glass marble (kept flat, follows position only). */
+  private caustics = new Map<THREE.Object3D, THREE.Mesh>();
+  private sunDir = new THREE.Vector3(0, 1, 0);
+  private causticStrength = 1;
   private visualQuat = new Map<number, THREE.Quaternion>();
   private prevBodyQuat = new Map<number, THREE.Quaternion>();
   private lastSim: unknown = null;
@@ -178,6 +182,9 @@ export class GameView {
     this.envTex = this.pmrem.fromScene(this.arena.envScene, 0.02).texture;
     this.scene.environment = this.envTex;
     this.scene.environmentIntensity = def.props === 'city' || def.props === 'volcano' ? 0.8 : 1;
+    this.sunDir.set(...def.sun.dir).normalize();
+    // Lamp-lit night arenas throw weaker sunlight caustics.
+    this.causticStrength = Math.min(1, def.sun.intensity / 3);
     this.bloom.strength = def.ring.glow > 1 ? 0.75 : 0.35;
     this.bloom.enabled = this.quality !== 'low';
   }
@@ -188,24 +195,60 @@ export class GameView {
     this.match = match;
     this.looks = looks;
     for (const t of match.layout.targets) {
-      const accent = MIB_ACCENTS[t.id % MIB_ACCENTS.length];
-      const base = `#${new THREE.Color(MARBLES.mib.base).lerp(new THREE.Color(accent), 0.22).getHexString()}`;
-      const look = { ...MARBLES.mib, base, accent, accent2: accent };
-      const m = buildMarble(look, WORLD.targetRadius, this.quality, t.id * 1.37);
+      const look = MIB_LOOKS[(t.id * 5) % MIB_LOOKS.length];
+      const m = this.addMarble(look, WORLD.targetRadius, t.id * 1.37 + 0.5);
       m.position.set(t.x, t.y, t.z);
-      this.marbleRoot.add(m);
       this.targetMeshes.set(t.id, m);
       const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(t.id, t.id * 2.1, t.id * 0.7));
       this.visualQuat.set(t.id, q);
     }
     this.shooterMeshes = looks.map((look, i) => {
-      const m = buildMarble(look, WORLD.shooterRadius, this.quality, i + 7);
+      const m = this.addMarble(look, WORLD.shooterRadius, i + 7);
       m.visible = false;
-      this.marbleRoot.add(m);
       return m;
     });
     this.visualQuat.set(SHOOTER_ID, new THREE.Quaternion());
     this.lastSim = null;
+  }
+
+  private addMarble(look: MarbleLook, radius: number, seed: number): THREE.Group {
+    const { group, caustic } = buildMarble(look, radius, this.quality, seed);
+    this.marbleRoot.add(group);
+    if (caustic && this.quality !== 'low') {
+      this.marbleRoot.add(caustic);
+      this.caustics.set(group, caustic);
+    }
+    return group;
+  }
+
+  private removeMarble(g: THREE.Object3D) {
+    this.marbleRoot.remove(g);
+    disposeObject(g);
+    const c = this.caustics.get(g);
+    if (c) {
+      this.marbleRoot.remove(c);
+      (c.material as THREE.Material).dispose();
+      this.caustics.delete(g);
+    }
+  }
+
+  /** Caustics land on the far side from the sun, stretched when the sun is low. */
+  private updateCaustics() {
+    const d = this.sunDir;
+    const sx = d.y > 0.05 ? -d.x / d.y : 0;
+    const sz = d.y > 0.05 ? -d.z / d.y : 0;
+    const slen = Math.min(1.6, Math.hypot(sx, sz));
+    const ang = Math.atan2(sz, sx);
+    for (const [g, c] of this.caustics) {
+      const radius = g.userData.radius ?? WORLD.targetRadius;
+      const lift = Math.max(0, g.position.y - radius);
+      const off = radius * (0.55 + slen * 0.6) + lift * slen;
+      c.visible = g.visible;
+      c.position.set(g.position.x + Math.cos(ang) * off, 0.012, g.position.z + Math.sin(ang) * off);
+      (c.material as THREE.MeshBasicMaterial).opacity = (0.55 * this.causticStrength * g.scale.x) / (1 + lift * 0.3);
+      c.scale.set(1 + slen * 0.35, 1, 1);
+      c.rotation.z = -ang;
+    }
   }
 
   unbindMatch() {
@@ -215,11 +258,8 @@ export class GameView {
   }
 
   private clearMarbles() {
-    for (const m of [...this.targetMeshes.values(), ...this.shooterMeshes]) {
-      this.marbleRoot.remove(m);
-      disposeObject(m);
-    }
-    for (const l of this.leaving) this.marbleRoot.remove(l.obj);
+    for (const m of [...this.targetMeshes.values(), ...this.shooterMeshes]) this.removeMarble(m);
+    for (const l of this.leaving) this.removeMarble(l.obj);
     this.leaving = [];
     this.targetMeshes.clear();
     this.shooterMeshes = [];
@@ -359,8 +399,7 @@ export class GameView {
     }
     this.leaving = this.leaving.filter((l) => {
       if (l.t >= 0.6) {
-        this.marbleRoot.remove(l.obj);
-        disposeObject(l.obj);
+        this.removeMarble(l.obj);
         return false;
       }
       return true;
@@ -371,6 +410,7 @@ export class GameView {
       const p = this.aim.power;
       shooter.scale.set(1 + p * 0.06, 1 - p * 0.08, 1 + p * 0.06);
     } else if (shooter) shooter.scale.setScalar(1);
+    this.updateCaustics();
   }
 
   private syncLayout(layout: Layout, shooter: THREE.Group | null) {

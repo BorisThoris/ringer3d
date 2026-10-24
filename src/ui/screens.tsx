@@ -6,7 +6,7 @@ import { MARBLES } from '../game/marbles';
 import { progress, settings, type GuideMode } from '../game/settings';
 import { fighter, FIGHTERS } from '../game/story';
 import type { Quality } from '../render/marbleMesh';
-import { ArenaPicker, Chips, MarbleChip, MarblePicker, Screen, tap } from './components';
+import { ArenaPicker, Chips, Marble3D, MarbleChip, MarblePicker, Screen, tap } from './components';
 
 export const PLAYABLE_MARBLES = Object.keys(MARBLES).filter((m) => m !== 'mib' && m !== 'obsidian');
 
@@ -104,6 +104,9 @@ export function QuickPlay({ onBack, onStart }: { onBack: () => void; onStart: (a
       <div className="section-title">Field</div>
       <ArenaPicker value={arena} onChange={setArena} />
       <div className="section-title">Your shooter</div>
+      <div className="taw-preview">
+        <Marble3D id={st.marble} size={150} />
+      </div>
       <MarblePicker value={st.marble} onChange={(m) => settings.set({ marble: m })} options={PLAYABLE_MARBLES} />
       <button
         className="btn primary"
@@ -197,6 +200,9 @@ export function SettingsScreen({ onBack }: { onBack: () => void }) {
         <input value={s.playerName} maxLength={14} onChange={(e) => settings.set({ playerName: e.target.value })} />
       </label>
       <div className="section-title">Shooter</div>
+      <div className="taw-preview">
+        <Marble3D id={s.marble} size={150} />
+      </div>
       <MarblePicker value={s.marble} onChange={(m) => settings.set({ marble: m })} options={PLAYABLE_MARBLES} />
       <div className="section-title">Aim guide</div>
       <Chips<GuideMode>
@@ -237,11 +243,28 @@ export function SettingsScreen({ onBack }: { onBack: () => void }) {
           Vibration {s.haptics ? 'on' : 'off'}
         </button>
       </div>
+      <div className="section-title">Online connection</div>
+      <Chips<'p2p' | 'server'>
+        label="Online connection"
+        value={s.netMode}
+        options={[
+          { id: 'p2p', label: 'Peer to peer' },
+          { id: 'server', label: 'Lobby server' },
+        ]}
+        onChange={(m) => settings.set({ netMode: m })}
+      />
+      <p className="lede" style={{ margin: 0 }}>
+        {s.netMode === 'p2p'
+          ? 'No server needed: games are found through public relays and matches run directly between devices.'
+          : 'Uses your own Ringer lobby server, which can also relay games for players on very strict networks.'}
+      </p>
+      {s.netMode === 'server' && (
       <label className="field">
         Lobby server
         <input value={s.lobbyUrl} onChange={(e) => settings.set({ lobbyUrl: e.target.value.trim() })} spellCheck={false} />
         <span className="hint">Used for the server browser and to connect players. Matches themselves run peer to peer.</span>
       </label>
+      )}
       <button
         className="btn danger small"
         onClick={() => {

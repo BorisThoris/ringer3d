@@ -3,18 +3,22 @@ import { BOT_PROFILES } from '../ai/profiles';
 import { ARENAS, type ArenaId } from '../game/arenas';
 import { settings } from '../game/settings';
 import { FIGHTERS } from '../game/story';
-import { LobbyClient } from '../net/lobby';
+import { P2PMatchmaker } from '../net/p2pMatchmaker';
 import type { RoomInfo } from '../net/protocol';
 import { OnlineRoom } from '../net/room';
+import { ServerMatchmaker } from '../net/serverMatchmaker';
+import type { Matchmaker } from '../net/transport';
 import { ArenaPicker, Chips, MarbleChip, Screen, tap } from './components';
 
-let sharedLobby: LobbyClient | null = null;
-function lobbyFor(url: string): LobbyClient {
-  if (!sharedLobby || sharedLobby.url !== url) {
-    sharedLobby?.close();
-    sharedLobby = new LobbyClient(url);
+let shared: { key: string; mm: Matchmaker } | null = null;
+/** One matchmaker per connection mode; switching mode in Settings swaps it. */
+function matchmakerFor(mode: 'p2p' | 'server', url: string): Matchmaker {
+  const key = mode === 'p2p' ? 'p2p' : `server:${url}`;
+  if (!shared || shared.key !== key) {
+    shared?.mm.close();
+    shared = { key, mm: mode === 'p2p' ? new P2PMatchmaker() : new ServerMatchmaker(url) };
   }
-  return sharedLobby;
+  return shared.mm;
 }
 
 export function OnlineHub({ onBack, onRoom }: { onBack: () => void; onRoom: (r: OnlineRoom) => void }) {
@@ -32,14 +36,18 @@ export function OnlineHub({ onBack, onRoom }: { onBack: () => void; onRoom: (r: 
   const refresh = useCallback(async () => {
     setError(null);
     try {
-      const lobby = lobbyFor(st.lobbyUrl);
-      await lobby.connect();
-      setRooms(await lobby.listRooms());
+      const mm = matchmakerFor(st.netMode, st.lobbyUrl);
+      await mm.connect();
+      setRooms(await mm.listRooms());
     } catch (e) {
       setRooms(null);
-      setError(`${(e as Error).message} Check the lobby server address in Settings, or start one with “npm run server”.`);
+      setError(
+        st.netMode === 'p2p'
+          ? `Couldn't reach the public relays used to find games (${(e as Error).message}). Check your connection; joining by code may still work.`
+          : `${(e as Error).message} Check the lobby server address in Settings, or switch the connection to peer to peer.`,
+      );
     }
-  }, [st.lobbyUrl]);
+  }, [st.lobbyUrl, st.netMode]);
 
   useEffect(() => {
     void refresh();
@@ -51,7 +59,7 @@ export function OnlineHub({ onBack, onRoom }: { onBack: () => void; onRoom: (r: 
     setBusy(true);
     setError(null);
     try {
-      const room = await OnlineRoom.join(lobbyFor(st.lobbyUrl), { ...opts, name: st.playerName, marble: st.marble });
+      const room = await OnlineRoom.join(matchmakerFor(st.netMode, st.lobbyUrl), { ...opts, name: st.playerName, marble: st.marble });
       onRoom(room);
     } catch (e) {
       setError((e as Error).message);
@@ -64,7 +72,7 @@ export function OnlineHub({ onBack, onRoom }: { onBack: () => void; onRoom: (r: 
     setBusy(true);
     setError(null);
     try {
-      const room = await OnlineRoom.host(lobbyFor(st.lobbyUrl), {
+      const room = await OnlineRoom.host(matchmakerFor(st.netMode, st.lobbyUrl), {
         roomName: roomName.trim() || `${st.playerName}'s ring`,
         arena,
         maxPlayers: +maxPlayers,
@@ -138,7 +146,7 @@ export function OnlineHub({ onBack, onRoom }: { onBack: () => void; onRoom: (r: 
               </div>
             )}
             {open.map((r) => (
-              <button key={r.id} className="list-item clickable" disabled={busy} onClick={() => void join({ roomId: r.id })}>
+              <button key={r.id} className="list-item clickable" disabled={busy} onClick={() => void join({ roomId: r.id, code: r.code })}>
                 <span className="grow">
                   <b>{r.name}</b>
                   <small>
@@ -202,7 +210,7 @@ export function RoomLobby({ room, onLeave }: { room: OnlineRoom; onLeave: () => 
   const s = room.state.use((x) => x);
   const [ready, setReady] = useState(false);
   const [botSkill, setBotSkill] = useState<'casual' | 'skilled' | 'expert'>('skilled');
-  const myId = room.lobby.peerId;
+  const myId = room.myId;
 
   return (
     <Screen

@@ -1,5 +1,5 @@
 /** Visual identity of a marble. Purely cosmetic: every marble plays identically (fairness). */
-export type MarbleCore = 'catseye' | 'swirl' | 'solid' | 'galaxy' | 'steelie' | 'onyx' | 'opal' | 'neon';
+export type MarbleCore = 'catseye' | 'swirl' | 'solid' | 'galaxy' | 'steelie' | 'onyx' | 'opal' | 'neon' | 'onionskin' | 'clearie';
 
 export interface MarbleLook {
   id: string;
@@ -30,5 +30,14 @@ export const MARBLES: Record<string, MarbleLook> = {
   mib: { id: 'mib', name: 'Mib', core: 'catseye', base: '#f4f7fb', accent: '#4dd2ff', accent2: '#ffffff', clarity: 0.92, glow: 0 },
 };
 
-/** Variety for the mibs so the cross looks hand-picked rather than cloned. */
-export const MIB_ACCENTS = ['#4dd2ff', '#ff5a5a', '#ffd23f', '#43e97b', '#b06bff', '#ff8a3d', '#3df5d0'];
+/** The 13 targets: a mixed bag, as in any real bag of marbles. */
+export const MIB_LOOKS: MarbleLook[] = [
+  { id: 'mib-a', name: 'Mib', core: 'catseye', base: '#eaf6ff', accent: '#1f7bff', accent2: '#5ad1ff', clarity: 0.95, glow: 0.1 },
+  { id: 'mib-b', name: 'Mib', core: 'catseye', base: '#fff4e6', accent: '#ff5a36', accent2: '#ffd23f', clarity: 0.95, glow: 0.1 },
+  { id: 'mib-c', name: 'Mib', core: 'catseye', base: '#e9ffe9', accent: '#17b35a', accent2: '#c2ff7a', clarity: 0.95, glow: 0.1 },
+  { id: 'mib-d', name: 'Mib', core: 'swirl', base: '#f2e9ff', accent: '#8a4dff', accent2: '#ff7ad9', clarity: 0.9, glow: 0.1 },
+  { id: 'mib-e', name: 'Mib', core: 'clearie', base: '#9fe8ff', accent: '#ffffff', accent2: '#ffffff', clarity: 1, glow: 0 },
+  { id: 'mib-f', name: 'Mib', core: 'swirl', base: '#e6fbff', accent: '#00b3c7', accent2: '#004e7c', clarity: 0.9, glow: 0.1 },
+  { id: 'mib-g', name: 'Mib', core: 'clearie', base: '#ffd9a8', accent: '#ffffff', accent2: '#ffffff', clarity: 1, glow: 0 },
+  { id: 'mib-h', name: 'Mib', core: 'onionskin', base: '#fff6ea', accent: '#c2185b', accent2: '#ffd23f', clarity: 0.9, glow: 0.1 },
+];

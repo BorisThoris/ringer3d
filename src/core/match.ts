@@ -52,6 +52,8 @@ export class Match {
   /** The in-flight simulation while phase === 'rolling'. */
   sim: ShotSim | null = null;
   lastShot: Shot | null = null;
+  /** Every shot with the layout it was taken from: a replay record and a desync detective. */
+  shotLog: { n: number; player: number; shot: Shot; before: string; first: boolean; after?: string }[] = [];
   private listeners: ((e: MatchEvent) => void)[] = [];
 
   constructor(config: MatchConfig) {
@@ -98,6 +100,7 @@ export class Match {
     const shot = quantizeShot(rawShot);
     if (shot.power <= 0) return false;
     this.lastShot = shot;
+    this.shotLog.push({ n: this.shotsTaken, player: this.current, shot, before: layoutHash(this.layout), first: this.firstShotOfTurn });
     this.sim = new ShotSim(this.layout, this.config.surface, shot, this.firstShotOfTurn);
     this.phase = 'rolling';
     this.shotsTaken++;
@@ -120,6 +123,8 @@ export class Match {
   private resolve() {
     const sim = this.sim!;
     const after = sim.resultLayout();
+    const log = this.shotLog[this.shotLog.length - 1];
+    if (log) log.after = layoutHash(after);
     sim.free();
     this.sim = null;
 

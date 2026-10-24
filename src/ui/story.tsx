@@ -3,7 +3,7 @@ import { BOT_PROFILES } from '../ai/profiles';
 import { ARENAS } from '../game/arenas';
 import { progress } from '../game/settings';
 import { buildTower, fighter, FIGHTERS } from '../game/story';
-import { MarbleChip, Screen, tap } from './components';
+import { Marble3D, MarbleChip, Screen, tap } from './components';
 
 export function StorySelect({ onBack, onChoose }: { onBack: () => void; onChoose: (fighterId: string) => void }) {
   const p = progress.use((x) => x);
@@ -36,7 +36,7 @@ export function StorySelect({ onBack, onChoose }: { onBack: () => void; onChoose
         })}
       </div>
       <div className="fighter-detail">
-        <MarbleChip id={f.marble} size={84} style={unlocked ? undefined : { filter: 'grayscale(1) brightness(0.45)' }} />
+        {unlocked ? <Marble3D id={f.marble} size={120} /> : <MarbleChip id={f.marble} size={84} style={{ filter: 'grayscale(1) brightness(0.45)' }} />}
         <div>
           <h3>{unlocked ? f.name : '???'}</h3>
           <div className="title">{unlocked ? f.title : 'Beat them in the Tower to unlock'}</div>
@@ -114,13 +114,13 @@ export function Versus({ fighterId, stage, onGo }: { fighterId: string; stage: n
       }}
     >
       <div className="side">
-        <MarbleChip id={me.marble} size={120} />
+        <Marble3D id={me.marble} size={170} />
         <h3>{me.name}</h3>
         <small style={{ color: 'var(--chalk-dim)' }}>{me.title}</small>
       </div>
       <div className="vs">vs</div>
       <div className="side right">
-        <MarbleChip id={opp.marble} size={120} />
+        <Marble3D id={opp.marble} size={170} />
         <h3>{opp.name}</h3>
         <small style={{ color: 'var(--chalk-dim)' }}>{opp.title}</small>
       </div>

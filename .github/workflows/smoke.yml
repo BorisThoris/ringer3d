@@ -72,3 +72,38 @@ jobs:
         if: always()
         run: bash .github/scripts/publish-screens.sh ios
         env: { GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
+
+  online:
+    name: Online e2e · ${{ matrix.mode }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [p2p, server]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci && npm run build
+      - name: Serve the app (and the lobby, used by server mode)
+        run: |
+          nohup node server/index.mjs > server.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf localhost:8787/health && break; sleep 1; done
+      - name: Two browsers play each other
+        run: |
+          mkdir -p smoke
+          NET_MODE=${{ matrix.mode }} CHROME_PATH=$(which google-chrome) node scripts/e2e-online.mjs 2>&1 | tee smoke/online-${{ matrix.mode }}.txt
+          exit ${PIPESTATUS[0]}
+      - name: Collect screenshots
+        if: always()
+        run: mkdir -p smoke && cp e2e-out/*.png smoke/ 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: online-${{ matrix.mode }}
+          path: smoke
+      - name: Publish screenshots
+        if: always()
+        run: bash .github/scripts/publish-screens.sh online-${{ matrix.mode }}
+        env: { GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }

@@ -1,7 +1,9 @@
-import type { CSSProperties, ReactNode } from 'react';
+import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 import { ARENA_LIST, type ArenaId } from '../game/arenas';
 import { MARBLES, type MarbleLook } from '../game/marbles';
 import { sound } from '../render/audio';
+import { MarblePreview } from '../render/preview';
+import { settings } from '../game/settings';
 
 export function marbleGradient(look: MarbleLook): string {
   switch (look.core) {
@@ -13,6 +15,10 @@ export function marbleGradient(look: MarbleLook): string {
     case 'onyx':
     case 'neon':
       return `radial-gradient(circle at 60% 60%, ${look.accent} 0%, transparent 28%), radial-gradient(circle at 35% 35%, ${look.accent2} 0%, transparent 18%), radial-gradient(circle at 40% 35%, ${look.base} 0%, #000 100%)`;
+    case 'onionskin':
+      return `repeating-conic-gradient(from 10deg, ${look.accent} 0 12deg, ${look.accent2} 12deg 24deg, #fff6ea 24deg 36deg)`;
+    case 'clearie':
+      return `radial-gradient(circle at 40% 35%, #ffffff, ${look.base} 75%)`;
     case 'opal':
       return `conic-gradient(from 40deg, ${look.accent}, ${look.accent2}, ${look.base}, ${look.accent})`;
     case 'swirl':
@@ -142,4 +148,32 @@ export function Chips<T extends string>({ value, options, onChange, label }: { v
       ))}
     </div>
   );
+}
+
+/**
+ * A live 3D close-up of one marble (drag to spin). Falls back to the flat swatch on
+ * "Battery saver" graphics to keep extra WebGL contexts off low-end phones.
+ */
+export function Marble3D({ id, size = 120, accent, style }: { id: string; size?: number; accent?: string; style?: CSSProperties }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  const preview = useRef<MarblePreview | null>(null);
+  const quality = settings.use((s) => s.quality);
+  const look = MARBLES[id] ?? MARBLES.ember;
+
+  useEffect(() => {
+    if (quality === 'low' || !ref.current) return;
+    preview.current = new MarblePreview(ref.current, look, accent ?? look.accent, quality === 'high' ? 'high' : 'low');
+    return () => {
+      preview.current?.dispose();
+      preview.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quality, accent]);
+
+  useEffect(() => {
+    preview.current?.setLook(look);
+  }, [look]);
+
+  if (quality === 'low') return <MarbleChip id={id} size={size * 0.7} style={style} />;
+  return <canvas ref={ref} aria-label={`${look.name} marble`} style={{ width: size, height: size, flex: 'none', ...style }} />;
 }

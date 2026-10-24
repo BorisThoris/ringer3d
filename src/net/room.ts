@@ -1,9 +1,8 @@
 import type { PlayerInfo } from '../core/types';
 import type { ArenaId } from '../game/arenas';
 import { createStore } from '../game/store';
-import type { LobbyClient } from './lobby';
-import { PeerLink } from './peer';
 import { PROTOCOL_VERSION, type OnlineMatchConfig, type PeerMsg, type RoomInfo, type RosterEntry } from './protocol';
+import type { Link, LinkMode, Matchmaker } from './transport';
 
 export interface RoomState {
   room: RoomInfo | null;
@@ -11,7 +10,7 @@ export interface RoomState {
   arena: ArenaId;
   started: boolean;
   error: string | null;
-  links: Record<string, PeerLink['mode']>;
+  links: Record<string, LinkMode>;
 }
 
 /** What the game session needs from an online room once the match is running. */
@@ -34,10 +33,10 @@ const MAX_PLAYERS = 4;
 const SHOOTER_POOL = ['ember', 'tide', 'jade', 'volt', 'rime', 'nova', 'ironside', 'pip'];
 
 export class OnlineRoom implements NetGame {
-  readonly lobby: LobbyClient;
+  readonly mm: Matchmaker;
   readonly isHost: boolean;
   readonly state = createStore<RoomState>({ room: null, roster: [], arena: 'schoolyard', started: false, error: null, links: {} });
-  private links = new Map<string, PeerLink>();
+  private links = new Map<string, Link>();
   private hostId = '';
   private seats: Record<string, number> = {};
   mySeat = -1;
@@ -49,11 +48,11 @@ export class OnlineRoom implements NetGame {
   readonly me: { name: string; marble: string };
   private botCounter = 0;
 
-  private constructor(lobby: LobbyClient, isHost: boolean, me: { name: string; marble: string }) {
-    this.lobby = lobby;
+  private constructor(mm: Matchmaker, isHost: boolean, me: { name: string; marble: string }) {
+    this.mm = mm;
     this.isHost = isHost;
     this.me = me;
-    this.offLobby = lobby.on((m) => {
+    this.offLobby = mm.on((m) => {
       switch (m.t) {
         case 'peer-joined':
           if (this.isHost) this.acceptPeer(m.peerId, m.name);
@@ -72,29 +71,30 @@ export class OnlineRoom implements NetGame {
     });
   }
 
+  get myId() {
+    return this.mm.myId;
+  }
+
   static async host(
-    lobby: LobbyClient,
+    mm: Matchmaker,
     opts: { roomName: string; arena: ArenaId; maxPlayers: number; private: boolean; name: string; marble: string },
   ): Promise<OnlineRoom> {
-    await lobby.connect();
-    const room = new OnlineRoom(lobby, true, { name: opts.name, marble: opts.marble });
-    const res = await lobby.request(
-      { t: 'create', name: opts.roomName, hostName: opts.name, arena: opts.arena, maxPlayers: Math.min(MAX_PLAYERS, opts.maxPlayers), private: opts.private, version: PROTOCOL_VERSION },
-      'created',
-    );
-    room.hostId = lobby.peerId;
+    await mm.connect();
+    const room = new OnlineRoom(mm, true, { name: opts.name, marble: opts.marble });
+    const info = await mm.host({ name: opts.roomName, hostName: opts.name, arena: opts.arena, maxPlayers: Math.min(MAX_PLAYERS, opts.maxPlayers), private: opts.private });
+    room.hostId = mm.myId;
     room.state.set({
-      room: res.room,
+      room: info,
       arena: opts.arena,
-      roster: [{ peerId: lobby.peerId, name: opts.name, marble: opts.marble, ready: true, isHost: true }],
+      roster: [{ peerId: mm.myId, name: opts.name, marble: opts.marble, ready: true, isHost: true }],
     });
     return room;
   }
 
-  static async join(lobby: LobbyClient, opts: { roomId?: string; code?: string; name: string; marble: string }): Promise<OnlineRoom> {
-    await lobby.connect();
-    const room = new OnlineRoom(lobby, false, { name: opts.name, marble: opts.marble });
-    const res = await lobby.request({ t: 'join', roomId: opts.roomId, code: opts.code?.toUpperCase(), name: opts.name, version: PROTOCOL_VERSION }, 'joined');
+  static async join(mm: Matchmaker, opts: { roomId?: string; code?: string; name: string; marble: string }): Promise<OnlineRoom> {
+    await mm.connect();
+    const room = new OnlineRoom(mm, false, { name: opts.name, marble: opts.marble });
+    const res = await mm.join({ roomId: opts.roomId, code: opts.code, name: opts.name });
     room.hostId = res.hostId;
     room.state.set({ room: res.room, arena: res.room.arena });
     const link = room.makeLink(res.hostId, false);
@@ -102,8 +102,8 @@ export class OnlineRoom implements NetGame {
     return room;
   }
 
-  private makeLink(peerId: string, initiator: boolean): PeerLink {
-    const link = new PeerLink(this.lobby, peerId, initiator);
+  private makeLink(peerId: string, initiator: boolean): Link {
+    const link = this.mm.link(peerId, initiator);
     this.links.set(peerId, link);
     link.onMessage = (m) => this.handle(peerId, m);
     link.onState = (mode) => this.state.set((s) => ({ links: { ...s.links, [peerId]: mode } }));
@@ -158,7 +158,7 @@ export class OnlineRoom implements NetGame {
   private pushRoster() {
     const s = this.state.get();
     this.broadcast({ t: 'roster', roster: s.roster, arena: s.arena });
-    this.lobby.send({ t: 'update', players: s.roster.length, started: s.started, arena: s.arena });
+    this.mm.update({ players: s.roster.length, started: s.started, arena: s.arena });
   }
 
   get canStart(): boolean {
@@ -182,10 +182,10 @@ export class OnlineRoom implements NetGame {
     });
     const config: OnlineMatchConfig = { seed: (Math.random() * 2 ** 31) | 0, arena: s.arena, players };
     this.seats = seats;
-    this.mySeat = seats[this.lobby.peerId];
+    this.mySeat = seats[this.mm.myId];
     this.state.set({ started: true });
     this.broadcast({ t: 'start', config, seats });
-    this.lobby.send({ t: 'update', players: s.roster.length, started: true, arena: s.arena });
+    this.mm.update({ players: s.roster.length, started: true, arena: s.arena });
     this.startCbs.forEach((f) => f(config, seats));
     return config;
   }
@@ -240,7 +240,7 @@ export class OnlineRoom implements NetGame {
           return;
         case 'start':
           this.seats = m.seats;
-          this.mySeat = m.seats[this.lobby.peerId];
+          this.mySeat = m.seats[this.mm.myId];
           this.state.set({ started: true, arena: m.config.arena });
           this.startCbs.forEach((f) => f(m.config, m.seats));
           return;
@@ -309,7 +309,7 @@ export class OnlineRoom implements NetGame {
   }
 
   leave() {
-    this.lobby.send({ t: 'leave' });
+    this.mm.leave();
     for (const l of this.links.values()) l.close();
     this.links.clear();
     this.offLobby();
