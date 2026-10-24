@@ -10,6 +10,7 @@ import { collectErrors, flick, launch, logger, matchInfo } from './lib.mjs';
 const out = process.argv[2] ?? 'online-out';
 const say = logger(out);
 const PORT = 8790;
+const AUTOPLAY = process.argv.includes('--autoplay');
 const url = `http://localhost:${PORT}/`;
 
 const server = spawn(process.execPath, ['server/index.ts'], { env: { ...process.env, PORT: String(PORT) }, stdio: 'pipe' });
@@ -36,7 +37,9 @@ async function player(name) {
   ctx.setDefaultTimeout(180000);
   const page = await ctx.newPage();
   collectErrors(page, errors, name);
-  await page.goto(url);
+  // `--autoplay`: each device's seat is played by its own fair bot, so the
+  // match finishes; the network, rules and rendering are all the real thing.
+  await page.goto(AUTOPLAY ? `${url}?autoplay` : url);
   await page.waitForFunction(() => !!window.__ringer, null, { timeout: 60000 });
   return page;
 }
@@ -81,7 +84,7 @@ try {
   const t0 = Date.now();
   let flicks = 0;
   let shotsTaken = false;
-  while (Date.now() - t0 < 25 * 60 * 1000) {
+  while (Date.now() - t0 < 50 * 60 * 1000) {
     const [h, g] = await Promise.all(pages.map(matchInfo));
     if (h?.phase === 'over' && g?.phase === 'over') break;
     for (const [i, info] of [h, g].entries()) {
@@ -110,6 +113,7 @@ try {
   // the time budget, so it is reported, not required.
   const same = JSON.stringify([h.captured, h.shots, h.order, h.lag]) === JSON.stringify([g.captured, g.shots, g.order, g.lag]);
   say('finished', h.phase === 'over', 'shots', h.shots);
+  if (AUTOPLAY && (h.phase !== 'over' || g.phase !== 'over')) errors.push(`autoplay match did not finish: host ${h.phase}, guest ${g.phase}`);
   if (h.shots < 30 && h.phase !== 'over') errors.push(`too few shots to judge sync: ${h.shots}`);
   if (!same) errors.push(`host and guest disagree: ${JSON.stringify(h)} vs ${JSON.stringify(g)}`);
   ok = errors.length === 0;

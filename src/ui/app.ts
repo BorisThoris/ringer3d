@@ -31,6 +31,7 @@ interface QuickSetup {
 }
 
 const PLAYER_COLORS = ['#5ad1ff', '#ff5a7a', '#5cff9d', '#ffd23f'];
+const AUTOPLAY = typeof location !== 'undefined' && new URLSearchParams(location.search).has('autoplay');
 const SETTINGS_KEY = 'ringer3d.settings.v1';
 
 /** A cheap CSS stand-in for a marble, for lists where a live 3D view would be overkill. */
@@ -211,6 +212,9 @@ export class App {
     arena: string,
     opts: { majority?: boolean; lag?: boolean; attract?: boolean; role?: Role; seed?: number; net?: Partial<MatchEvents> } = {},
   ): void {
+    // `?autoplay`: this device's seats are played by a fair bot (demos, kiosks,
+    // and end-to-end tests that need a match to actually finish).
+    if (AUTOPLAY) players = players.map((p) => (p.controller.kind === 'local' ? { ...p, controller: { kind: 'bot', profile: BOT_PROFILES.sharp } } : p));
     this.match?.dispose();
     this.scene.userYaw = 0;
     this.scene.userZoom = 1;
