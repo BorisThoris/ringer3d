@@ -999,3 +999,46 @@ button {
     margin: auto auto auto 6vw;
   }
 }
+
+/* Short screens (small phones, landscape): keep the whole main menu on screen. */
+.menu {
+  max-height: 100%;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.menu::-webkit-scrollbar {
+  display: none;
+}
+@media (max-height: 760px) {
+  .menu {
+    gap: 8px;
+  }
+  .logo {
+    font-size: clamp(2.4rem, 8.5vh, 4.2rem);
+  }
+  .logo small {
+    margin-top: 6px;
+    font-size: var(--t-sm);
+  }
+  .menu-card {
+    grid-template-columns: 38px 1fr auto;
+    padding: 9px 12px;
+    gap: 12px;
+  }
+  .menu-card.hero {
+    padding: 11px 12px;
+  }
+  .menu-card .marble {
+    width: 38px !important;
+    height: 38px !important;
+  }
+  .menu-card h3 {
+    font-size: var(--t-lg);
+  }
+  .menu-card p {
+    font-size: var(--t-xs);
+  }
+  .menu-foot .btn {
+    min-height: 40px;
+  }
+}
