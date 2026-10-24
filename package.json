@@ -2,23 +2,45 @@
   "name": "ringer3d",
   "private": true,
   "version": "0.1.0",
-  "description": "Ringer, the classic marble game, rebuilt as a modern 3D game for web, mobile and PC.",
   "type": "module",
+  "description": "Ringer 3D \u2014 a modern take on the classic playground marble game.",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
+    "preview": "vite preview --host",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "server": "node server/index.mjs",
+    "start": "npm run build && node server/index.mjs",
+    "desktop:dev": "tauri dev",
+    "desktop:build": "tauri build",
+    "mobile:sync": "npm run build && cap sync",
+    "android": "npm run mobile:sync && cap open android",
+    "ios": "npm run mobile:sync && cap open ios"
   },
   "dependencies": {
-    "@dimforge/rapier3d-compat": "0.19.3",
-    "three": "0.180.0"
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.4",
+    "@dimforge/rapier3d-deterministic-compat": "^0.21.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "three": "^0.186.1",
+    "ws": "^8.22.0"
   },
   "devDependencies": {
-    "@types/three": "0.180.0",
-    "typescript": "5.9.3",
-    "vite": "7.1.12",
-    "vitest": "3.2.4"
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/cli": "^8.5.3",
+    "@capacitor/ios": "^8.5.3",
+    "@tauri-apps/cli": "^2.12.4",
+    "@types/node": "^22.20.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/three": "^0.186.0",
+    "@types/ws": "^8.18.2",
+    "@vitejs/plugin-react": "^6.1.2",
+    "typescript": "~5.9",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
   }
 }

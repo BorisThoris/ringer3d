@@ -1,0 +1,326 @@
+import { useCallback, useEffect, useState } from 'react';
+import { BOT_PROFILES } from '../ai/profiles';
+import { ARENAS, type ArenaId } from '../game/arenas';
+import { settings } from '../game/settings';
+import { FIGHTERS } from '../game/story';
+import { LobbyClient } from '../net/lobby';
+import type { RoomInfo } from '../net/protocol';
+import { OnlineRoom } from '../net/room';
+import { ArenaPicker, Chips, MarbleChip, Screen, tap } from './components';
+
+let sharedLobby: LobbyClient | null = null;
+function lobbyFor(url: string): LobbyClient {
+  if (!sharedLobby || sharedLobby.url !== url) {
+    sharedLobby?.close();
+    sharedLobby = new LobbyClient(url);
+  }
+  return sharedLobby;
+}
+
+export function OnlineHub({ onBack, onRoom }: { onBack: () => void; onRoom: (r: OnlineRoom) => void }) {
+  const st = settings.use((s) => s);
+  const [tab, setTab] = useState<'browse' | 'host'>('browse');
+  const [rooms, setRooms] = useState<RoomInfo[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [code, setCode] = useState('');
+  const [roomName, setRoomName] = useState(`${st.playerName}'s ring`);
+  const [arena, setArena] = useState<ArenaId>('schoolyard');
+  const [maxPlayers, setMaxPlayers] = useState<'2' | '3' | '4'>('2');
+  const [priv, setPriv] = useState(false);
+
+  const refresh = useCallback(async () => {
+    setError(null);
+    try {
+      const lobby = lobbyFor(st.lobbyUrl);
+      await lobby.connect();
+      setRooms(await lobby.listRooms());
+    } catch (e) {
+      setRooms(null);
+      setError(`${(e as Error).message} Check the lobby server address in Settings, or start one with “npm run server”.`);
+    }
+  }, [st.lobbyUrl]);
+
+  useEffect(() => {
+    void refresh();
+    const t = setInterval(() => void refresh(), 5000);
+    return () => clearInterval(t);
+  }, [refresh]);
+
+  const join = async (opts: { roomId?: string; code?: string }) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const room = await OnlineRoom.join(lobbyFor(st.lobbyUrl), { ...opts, name: st.playerName, marble: st.marble });
+      onRoom(room);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const host = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const room = await OnlineRoom.host(lobbyFor(st.lobbyUrl), {
+        roomName: roomName.trim() || `${st.playerName}'s ring`,
+        arena,
+        maxPlayers: +maxPlayers,
+        private: priv,
+        name: st.playerName,
+        marble: st.marble,
+      });
+      onRoom(room);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const open = rooms?.filter((r) => !r.started && r.players < r.maxPlayers) ?? [];
+  const full = rooms?.filter((r) => r.started || r.players >= r.maxPlayers) ?? [];
+
+  return (
+    <Screen title="Online" onBack={onBack}>
+      <Chips
+        label="Online mode"
+        value={tab}
+        options={[
+          { id: 'browse', label: 'Find a room' },
+          { id: 'host', label: 'Host a room' },
+        ]}
+        onChange={setTab}
+      />
+      {error && <div className="notice">{error}</div>}
+
+      {tab === 'browse' ? (
+        <>
+          <form
+            className="row"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (code.length === 4) void join({ code });
+            }}
+          >
+            <label className="field" style={{ flex: 2 }}>
+              Room code
+              <input className="code-input" value={code} maxLength={4} placeholder="ABCD" onChange={(e) => setCode(e.target.value.replace(/[^a-z]/gi, '').toUpperCase())} />
+            </label>
+            <button className="btn primary" style={{ alignSelf: 'flex-end' }} disabled={code.length !== 4 || busy}>
+              Join
+            </button>
+          </form>
+          <div className="screen-head">
+            <div className="section-title" style={{ flex: 1, margin: 0 }}>
+              Open rooms
+            </div>
+            <button
+              className="btn small ghost"
+              onClick={() => {
+                tap();
+                void refresh();
+              }}
+            >
+              Refresh
+            </button>
+          </div>
+          <div className="list">
+            {rooms === null && !error && <div className="list-item">Looking for rooms…</div>}
+            {rooms !== null && open.length === 0 && (
+              <div className="list-item">
+                <span className="grow">
+                  <b>No open rooms right now</b>
+                  <small>Host one and share the code with a friend.</small>
+                </span>
+              </div>
+            )}
+            {open.map((r) => (
+              <button key={r.id} className="list-item clickable" disabled={busy} onClick={() => void join({ roomId: r.id })}>
+                <span className="grow">
+                  <b>{r.name}</b>
+                  <small>
+                    {ARENAS[r.arena]?.name ?? r.arena} · hosted by {r.hostName}
+                  </small>
+                </span>
+                <span className="pill ok">
+                  {r.players}/{r.maxPlayers}
+                </span>
+              </button>
+            ))}
+            {full.map((r) => (
+              <div key={r.id} className="list-item" style={{ opacity: 0.5 }}>
+                <span className="grow">
+                  <b>{r.name}</b>
+                  <small>{r.started ? 'Match in progress' : 'Full'}</small>
+                </span>
+                <span className="pill">
+                  {r.players}/{r.maxPlayers}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <>
+          <label className="field">
+            Room name
+            <input value={roomName} maxLength={28} onChange={(e) => setRoomName(e.target.value)} />
+          </label>
+          <div className="section-title">Players</div>
+          <Chips
+            label="Max players"
+            value={maxPlayers}
+            options={[
+              { id: '2', label: '2' },
+              { id: '3', label: '3' },
+              { id: '4', label: '4' },
+            ]}
+            onChange={setMaxPlayers}
+          />
+          <div className="chips">
+            <button className="chip" aria-pressed={priv} onClick={() => setPriv(!priv)}>
+              {priv ? 'Private · code only' : 'Public · listed in the browser'}
+            </button>
+          </div>
+          <div className="section-title">Field</div>
+          <ArenaPicker value={arena} onChange={setArena} />
+          <button className="btn primary" disabled={busy} onClick={() => void host()}>
+            {busy ? 'Creating…' : 'Create room'}
+          </button>
+        </>
+      )}
+    </Screen>
+  );
+}
+
+const BOT_NAMES = FIGHTERS.filter((f) => f.id !== 'obsidian');
+
+export function RoomLobby({ room, onLeave }: { room: OnlineRoom; onLeave: () => void }) {
+  const s = room.state.use((x) => x);
+  const [ready, setReady] = useState(false);
+  const [botSkill, setBotSkill] = useState<'casual' | 'skilled' | 'expert'>('skilled');
+  const myId = room.lobby.peerId;
+
+  return (
+    <Screen
+      title={s.room?.name ?? 'Room'}
+      onBack={() => {
+        room.leave();
+        onLeave();
+      }}
+    >
+      {s.room && (
+        <div className="list-item">
+          <span className="grow">
+            <small>Room code</small>
+            <b className="code-input" style={{ fontSize: 'var(--t-2xl)', letterSpacing: '0.25em' }}>
+              {s.room.code}
+            </b>
+          </span>
+          <button
+            className="btn small"
+            onClick={() => {
+              tap();
+              void navigator.clipboard?.writeText(s.room!.code);
+            }}
+          >
+            Copy
+          </button>
+        </div>
+      )}
+      {s.error && <div className="notice">{s.error}</div>}
+
+      <div className="section-title">Players</div>
+      <div className="list">
+        {s.roster.map((r) => (
+          <div key={r.peerId} className="list-item">
+            <MarbleChip id={r.marble} size={36} />
+            <span className="grow">
+              <b>
+                {r.name}
+                {r.peerId === myId ? ' (you)' : ''}
+              </b>
+              <small>
+                {r.isHost ? 'Host' : r.isBot ? `Bot · ${BOT_PROFILES[r.botProfile ?? 'skilled'].label}` : s.links[r.peerId] === 'relay' ? 'Connected via relay' : s.links[r.peerId] === 'direct' ? 'Connected peer to peer' : room.isHost ? 'Connecting…' : 'Player'}
+              </small>
+            </span>
+            <span className={`pill ${r.ready ? 'ok' : 'wait'}`}>{r.ready ? 'Ready' : 'Not ready'}</span>
+            {room.isHost && !r.isHost && (
+              <button className="btn icon ghost" aria-label={`Remove ${r.name}`} onClick={() => room.removeEntry(r.peerId)}>
+                ✕
+              </button>
+            )}
+          </div>
+        ))}
+        {Array.from({ length: Math.max(0, (s.room?.maxPlayers ?? 2) - s.roster.length) }, (_, i) => (
+          <div key={`empty-${i}`} className="list-item" style={{ opacity: 0.5 }}>
+            <span className="grow">
+              <small>Waiting for a player — share the code</small>
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {room.isHost ? (
+        <>
+          {s.roster.length < (s.room?.maxPlayers ?? 2) && (
+            <div className="row" style={{ alignItems: 'center' }}>
+              <Chips
+                label="Bot skill"
+                value={botSkill}
+                options={[
+                  { id: 'casual', label: 'Casual' },
+                  { id: 'skilled', label: 'Skilled' },
+                  { id: 'expert', label: 'Expert' },
+                ]}
+                onChange={setBotSkill}
+              />
+              <button
+                className="btn small"
+                onClick={() => {
+                  tap();
+                  const f = BOT_NAMES[(s.roster.length * 3) % BOT_NAMES.length];
+                  room.addBot(botSkill, f.name, f.marble);
+                }}
+              >
+                Add bot
+              </button>
+            </div>
+          )}
+          <div className="section-title">Field</div>
+          <ArenaPicker value={s.arena} onChange={(a) => room.setArena(a)} />
+          <button
+            className="btn primary"
+            disabled={!room.canStart}
+            onClick={() => {
+              tap();
+              room.start();
+            }}
+          >
+            {s.roster.length < 2 ? 'Waiting for players' : room.canStart ? 'Start match' : 'Waiting for everyone to be ready'}
+          </button>
+        </>
+      ) : (
+        <>
+          <p className="lede" style={{ margin: 0 }}>
+            Field: {ARENAS[s.arena].name}. The host starts the match once everyone is ready.
+          </p>
+          <button
+            className={`btn ${ready ? '' : 'primary'}`}
+            onClick={() => {
+              tap();
+              const r = !ready;
+              setReady(r);
+              room.setReady(r);
+            }}
+          >
+            {ready ? 'Not ready' : "I'm ready"}
+          </button>
+        </>
+      )}
+    </Screen>
+  );
+}
