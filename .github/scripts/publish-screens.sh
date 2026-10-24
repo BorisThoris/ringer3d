@@ -3,8 +3,8 @@
 set -uo pipefail
 PLATFORM=$1
 [ -d smoke ] || exit 0
-git config user.name "github-actions"
-git config user.email "github-actions@users.noreply.github.com"
+git config --global user.name "github-actions"
+git config --global user.email "github-actions@users.noreply.github.com"
 TMP=$(mktemp -d)
 cp -r smoke "$TMP/$PLATFORM"
 for attempt in 1 2 3; do
