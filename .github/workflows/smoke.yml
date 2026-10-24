@@ -1,0 +1,74 @@
+name: Device smoke tests
+
+# Boots real Android/iOS simulators, installs the app, launches it, checks it stays up without
+# JavaScript errors, and publishes screenshots to the ci-screens branch.
+on:
+  push:
+    branches: [main, full-game]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Android emulator
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - run: npm ci && npm run build && npx cap sync android
+      - working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - name: Run on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          disable-animations: true
+          script: bash .github/scripts/android-smoke.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: android-smoke, path: smoke }
+      - name: Publish screenshots
+        if: always()
+        run: bash .github/scripts/publish-screens.sh android
+        env: { GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
+
+  ios:
+    name: iOS simulator
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci && npm run build && npx cap sync ios
+      - name: Build for simulator
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+      - name: Boot, install, launch
+        run: bash .github/scripts/ios-smoke.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: ios-smoke, path: smoke }
+      - name: Publish screenshots
+        if: always()
+        run: bash .github/scripts/publish-screens.sh ios
+        env: { GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
