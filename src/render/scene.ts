@@ -31,6 +31,7 @@ export class Scene3D {
   private arenaRoot = new THREE.Group();
   private sun = new THREE.DirectionalLight();
   private sunDir = new THREE.Vector3(0.5, 1, 0.35).normalize();
+  private envCache = new Map<string, THREE.Texture>();
   private hemi = new THREE.HemisphereLight();
   private ringMesh?: THREE.Mesh;
   private lagLine?: THREE.Mesh;
@@ -203,16 +204,20 @@ export class Scene3D {
     this.sun.intensity = a.sun.intensity;
     this.sunDir.set(...a.sun.dir).normalize();
     // Reflections come from this arena's own sky and key light.
-    const lamp = a.sun.intensity < 1.5 && a.lamps.length ? a.lamps[0] : null;
-    const env = buildEnvironment(this.renderer, {
-      top: a.sky[0],
-      horizon: a.sky[1],
-      ground: new THREE.Color(a.groundTint).multiplyScalar(0.35).getStyle(),
-      key: lamp ? [lamp.pos[0] / 200, Math.max(0.4, lamp.pos[1] / 200), lamp.pos[2] / 200] : a.sun.dir,
-      keyColor: lamp ? lamp.color : a.sun.color,
-      keyStrength: 3 + a.sun.intensity * 1.2,
-    });
-    this.scene.environment?.dispose();
+    // Baked once per arena: rebuilding it is the slowest part of loading a field.
+    let env = this.envCache.get(a.id);
+    if (!env) {
+      const lamp = a.sun.intensity < 1.5 && a.lamps.length ? a.lamps[0] : null;
+      env = buildEnvironment(this.renderer, {
+        top: a.sky[0],
+        horizon: a.sky[1],
+        ground: new THREE.Color(a.groundTint).multiplyScalar(0.35).getStyle(),
+        key: lamp ? [lamp.pos[0] / 200, Math.max(0.4, lamp.pos[1] / 200), lamp.pos[2] / 200] : a.sun.dir,
+        keyColor: lamp ? lamp.color : a.sun.color,
+        keyStrength: 3 + a.sun.intensity * 1.2,
+      });
+      this.envCache.set(a.id, env);
+    }
     this.scene.environment = env;
     this.causticStrength = Math.min(1, a.sun.intensity / 3);
     this.hemi.color.set(a.ambient.sky);

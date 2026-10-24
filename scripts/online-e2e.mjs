@@ -27,7 +27,8 @@ for (let i = 0; i < 50; i++) {
 const browser = await launch();
 const errors = [];
 async function player(name) {
-  const ctx = await browser.newContext({ viewport: { width: 820, height: 640 } });
+  // Small viewports: both players share one software-GL process.
+  const ctx = await browser.newContext({ viewport: { width: 560, height: 420 } });
   await ctx.addInitScript((n) => {
     localStorage.setItem('ringer3d.settings.v1', JSON.stringify({ quality: 'low', soundOn: false, playerName: n }));
   }, name);
@@ -66,7 +67,9 @@ try {
   say('link', link);
   await shot(hostPage, '02-room-host');
   await shot(guestPage, '03-room-guest');
-  await hostPage.getByRole('button', { name: 'Start' }).click();
+  // Starting builds the arena and bakes its reflections: in software GL that
+  // blocks the page longer than a click's default wait, so click directly.
+  await hostPage.evaluate(() => document.querySelector('[data-start]').click());
 
   await guestPage.waitForFunction(() => window.__ringer?.match?.role === 'client', null, { timeout: 20000 });
   say('match started on both');

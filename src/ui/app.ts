@@ -113,7 +113,9 @@ export class App {
   }
 
   private frame = (now: number): void => {
-    const dt = Math.min(0.05, (now - this.last) / 1000);
+    // Timers (banners, bot thinking) follow real time even on a slow device;
+    // the physics caps its own catch-up, so a long frame cannot explode it.
+    const dt = Math.min(0.25, (now - this.last) / 1000);
     this.last = now;
     this.match?.update(dt);
     this.streamAim(now);

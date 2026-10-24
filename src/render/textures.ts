@@ -29,8 +29,19 @@ function finish(c: HTMLCanvasElement, repeat: number, srgb = true): THREE.Canvas
 
 export type GroundStyle = 'dirt' | 'pavement' | 'carpet' | 'stone';
 
-/** Colour + bump pair for a ground style. */
+const groundCache = new Map<string, { map: THREE.Texture; bump: THREE.Texture }>();
+
+/** Colour + bump pair for a ground style (drawn once, then reused). */
 export function groundTextures(style: GroundStyle, tint: string): { map: THREE.Texture; bump: THREE.Texture } {
+  const key = `${style}:${tint}`;
+  const hit = groundCache.get(key);
+  if (hit) return hit;
+  const made = drawGround(style, tint);
+  groundCache.set(key, made);
+  return made;
+}
+
+function drawGround(style: GroundStyle, tint: string): { map: THREE.Texture; bump: THREE.Texture } {
   const size = 512;
   const [c, g] = canvas(size);
   const [b, bg] = canvas(size);
