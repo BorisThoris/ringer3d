@@ -5,3 +5,6 @@ dist/
 coverage/
 test-results/
 playwright-report/
+release/
+android/local.properties
+

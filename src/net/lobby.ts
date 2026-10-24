@@ -67,11 +67,21 @@ export class LobbyClient {
     return this.ws?.readyState === WebSocket.OPEN;
   }
 
-  connect(name: string, timeoutMs = 6000): Promise<void> {
+  /** Connect, retrying once: a busy phone can miss the first handshake window. */
+  async connect(name: string, timeoutMs = 15000): Promise<void> {
     if (this.connected) {
       this.send({ t: 'hello', name, version: PROTOCOL_VERSION });
-      return Promise.resolve();
+      return;
     }
+    try {
+      await this.connectOnce(name, timeoutMs);
+    } catch {
+      this.ws?.close();
+      await this.connectOnce(name, timeoutMs);
+    }
+  }
+
+  private connectOnce(name: string, timeoutMs: number): Promise<void> {
     return new Promise((resolve, reject) => {
       let ws: WebSocket;
       try {
@@ -96,7 +106,7 @@ export class LobbyClient {
           clearTimeout(timer);
           this.you = e.you;
           this.send({ t: 'hello', name, version: PROTOCOL_VERSION });
-          this.pinger = window.setInterval(() => this.send({ t: 'ping', at: performance.now() }), 5000);
+          this.pinger = setInterval(() => this.send({ t: 'ping', at: performance.now() }), 5000) as unknown as number;
           resolve();
         }
         if (e.t === 'pong') this.rtt = Math.round(performance.now() - e.at);

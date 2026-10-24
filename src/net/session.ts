@@ -85,8 +85,9 @@ export class NetSession {
       peer,
       this.isHost,
       (m) => this.receive(m, peer),
-      () => {
-        if (!this.isHost && l.mode !== 'connecting') this.send({ k: 'me', name: this.me.name, taw: this.me.taw });
+      // `mode`, not `l.mode`: without WebRTC the link reports relay from inside its constructor.
+      (mode) => {
+        if (!this.isHost && mode !== 'connecting') this.send({ k: 'me', name: this.me.name, taw: this.me.taw });
         this.events.onLinks?.();
       },
     );

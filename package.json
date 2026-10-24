@@ -1,9 +1,12 @@
 {
   "name": "ringer3d",
+  "productName": "Ringer 3D",
   "private": true,
   "version": "0.1.0",
   "description": "Ringer, the classic marble game, rebuilt as a modern 3D game for web, mobile and PC.",
+  "author": "BorisThoris",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -12,16 +15,36 @@
     "typecheck": "tsc --noEmit",
     "serve": "node server/index.ts",
     "dev:server": "node --watch server/index.ts",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "desktop": "electron .",
+    "desktop:pack": "electron-builder --win --dir",
+    "desktop:dist": "electron-builder",
+    "android:sync": "cap sync android",
+    "android:apk": "cap sync android && cd android && gradlew assembleDebug"
+  },
+  "build": {
+    "appId": "com.boristhoris.ringer3d",
+    "productName": "Ringer 3D",
+    "directories": { "output": "release" },
+    "files": ["dist/**", "electron/**", "package.json"],
+    "win": { "target": ["nsis", "portable"], "signAndEditExecutable": false },
+    "mac": { "target": "dmg", "category": "public.app-category.games" },
+    "linux": { "target": ["AppImage"], "category": "Game" }
   },
   "dependencies": {
+    "@capacitor/android": "^6.2.1",
+    "@capacitor/core": "^6.2.1",
+    "@capacitor/haptics": "^6.0.2",
     "@dimforge/rapier3d-compat": "0.19.3",
     "three": "0.180.0",
     "ws": "^8.18.3"
   },
   "devDependencies": {
+    "@capacitor/cli": "^6.2.1",
     "@types/three": "0.180.0",
     "@types/ws": "^8.18.1",
+    "electron": "^38.8.6",
+    "electron-builder": "^26.0.12",
     "playwright-core": "^1.56.1",
     "typescript": "5.9.3",
     "vite": "7.1.12",

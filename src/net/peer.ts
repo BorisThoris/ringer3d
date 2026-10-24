@@ -17,7 +17,7 @@ export class PeerLink {
   mode: LinkMode = 'connecting';
   private pc: RTCPeerConnection | null = null;
   private dc: RTCDataChannel | null = null;
-  private fallback = 0;
+  private fallback: ReturnType<typeof setTimeout> | undefined;
   private closed = false;
 
   constructor(
@@ -45,7 +45,7 @@ export class PeerLink {
     } else {
       this.pc.ondatachannel = (e) => this.wire(e.channel);
     }
-    this.fallback = window.setTimeout(() => {
+    this.fallback = setTimeout(() => {
       if (this.mode === 'connecting') this.setMode('relay');
     }, P2P_TIMEOUT);
   }

@@ -4,20 +4,45 @@ Ringer, the classic playground marble game, rebuilt as a modern 3D game for
 the web, phones and PC. Knuckle down on the ring line, flick your taw, and
 knock the thirteen marbles of the cross out of the ring.
 
+- **Story:** an eight-rung tower, Mortal Kombat style, from Pip Tumble in the
+  schoolyard to the Taw King in the moonlit courtyard. Versus screens, taunts,
+  and every fighter you beat gives you their marble.
+- **Quick Match:** fair bots (Rookie to Master) or 2–4 player pass-and-play.
+- **Online:** server browser, private rooms with codes, peer-to-peer play
+  (WebRTC) with a relay fallback, fair bots to fill seats or replace a player
+  who drops.
+- **Four fields** with their own physics: Schoolyard dirt, Rooftop pavement at
+  dusk, Grandma's carpet, Moonlit Courtyard flagstones.
+- **Glass marbles:** real refraction, dispersion and tint around 3D interiors
+  (cat's-eye vanes, swirls, onionskins, aventurine, clearies, steelies),
+  coloured caustics, per-field reflections, bloom. Twelve taws to collect.
+- Runs in any modern browser, as an installable PWA, as an Android/iOS app
+  (Capacitor) and as a desktop app (Electron).
+
 ## Play
 
 ```bash
 npm install
-npm run dev        # http://localhost:5181
+npm run dev                  # http://localhost:5181 (single player)
+npm run dev:server           # in a second terminal: the lobby for online play
 ```
+
+Production, one process serving the game and the lobby:
+
+```bash
+npm run build
+npm run serve                # http://localhost:8787, PORT to change
+```
+
+### Controls
 
 - **Flick:** drag anywhere and pull back like a slingshot. Longer pull, harder
   flick; release to shoot, drag back to the start to cancel.
-- **Knuckle down:** at the start of a turn, drag your shooter (or use the
-  ⟲ ⟳ buttons) to pick your spot on the ring line.
+- **Knuckle down:** at the start of a turn, drag your shooter (or use ⟲ ⟳) to
+  pick your spot on the ring line.
 - **Spin:** tap the white ball. Low = backspin (stop after contact), high = follow.
-- **Camera:** two fingers orbit and pinch-zoom; right-drag and wheel on desktop.
-  The ◎ button cycles aim / overhead / follow views.
+- **Camera:** two fingers orbit and pinch-zoom; right-drag and wheel on
+  desktop. ◎ cycles aim / overhead / follow.
 - **Keyboard:** ←/→ fine aim (Shift = finer), ↑/↓ power, Space shoots,
   Alt+←/→ slides along the line.
 
@@ -30,19 +55,7 @@ npm run dev        # http://localhost:5181
 5. Knock at least one out **and** keep your shooter inside the ring: shoot
    again from where it stopped.
 6. A miss, or your shooter leaving the ring, ends your turn (you keep what you won).
-7. When the ring is empty, most marbles wins. Optional tournament rule:
-   first to 7.
-
-## Modes
-
-- **Story:** an eight-rung tower, Mortal Kombat style, from Pip Tumble in the
-  schoolyard to the Taw King in the moonlit courtyard. Versus splash, taunts,
-  win and loss lines; progress is saved on the device.
-- **Quick Match:** against a Rookie / Regular / Sharp / Master bot, or 2–4
-  player pass-and-play on one device.
-- **Fields:** Schoolyard (dirt), Rooftop at Dusk (fast pavement), Grandma's
-  Parlour (slow carpet), Moonlit Courtyard (flagstones). The surface changes
-  how far marbles roll.
+7. When the ring is empty, most marbles wins. Tournament option: first to 7.
 
 ## Fair bots
 
@@ -52,58 +65,97 @@ Bots see what you see and shoot the way you shoot (`src/bots/bot.ts`):
   physics ahead to test a shot.
 - They answer with the same `ShotInput` (aim, power, spin) a flick produces,
   under the same limits.
-- Their plan is geometry: ghost-ball aiming, blockers, and a feel for how far
+- Their plan is geometry (ghost-ball aiming, blockers) plus a feel for how far
   a marble rolls on this surface, measured once per surface the way a player
   learns it by practising (`src/sim/calibration.ts`).
-- Every shot then gets hand noise on aim and power. Difficulty is that noise
-  plus judgement, never a hidden advantage.
+- Every shot gets hand noise on aim and power. Difficulty is that noise plus
+  judgement, never a hidden advantage. Story fighters are tuned the same way.
+
+## Online
+
+```
+ guest ──WebRTC data channel──► host ◄──WebRTC── guest
+   │                              │                │
+   └────── lobby (WebSocket): server browser, codes, signalling, relay ──┘
+```
+
+- The **host** runs the match: seating, bots, and the authoritative result of
+  every shot. Shots travel as inputs (aim, power, spin); every device replays
+  them for the visuals, then snaps to the host's settled positions. Physics
+  drift between devices can never split the game (`src/game/online.test.ts`
+  plays a whole match with a deliberately wrong client and checks both agree).
+- Links are peer-to-peer over WebRTC (public STUN). If a network blocks that,
+  messages fall back to the lobby's relay automatically.
+- The host checks every move comes from the device that owns that seat. A
+  player who leaves is replaced by a fair bot; if the host leaves, the room closes.
+- **LAN party:** one player runs `npm run serve`; everyone opens Online →
+  Server and enters that PC's address (e.g. `192.168.1.20:8787`).
+- **Builds for stores/desktop** point at a server with
+  `VITE_LOBBY_URL=wss://your-host/lobby npm run build`.
+
+## Apps
+
+**Android** (Capacitor 6, JDK 17, Android SDK 34+):
+
+```bash
+npm run build
+npx cap sync android
+cd android && gradlew assembleDebug        # app/build/outputs/apk/debug/app-debug.apk
+```
+
+Set `RINGER_BUILD_DIR` to put Gradle's build output on another drive.
+
+**iOS:** `npx cap add ios` on a Mac, then open `ios/App` in Xcode.
+
+**Desktop** (Electron):
+
+```bash
+npm run build
+npm run desktop              # run it
+npm run desktop:pack         # unpacked app in release/
+npm run desktop:dist         # installers (NSIS + portable on Windows, dmg, AppImage)
+```
 
 ## Architecture
 
 | Layer | What it is |
 |---|---|
-| `src/core` | Ringer rules as a pure state machine. No three.js, no physics. Unit tested. |
-| `src/sim` | Rapier physics in metres at 240 Hz with CCD, plus the rolling resistance Rapier lacks. Settles, reports hits. |
-| `src/bots` | Fair bots (see above). Headless bot-vs-bot matches run in the tests. |
-| `src/game` | A match: rules + physics + bots, stages (lag, aim, roll, banner), events for the UI. |
-| `src/render` | three.js scene: glass marbles, procedural arenas and textures, aim guide, camera rig. |
+| `src/core` | Ringer rules as a pure state machine. No three.js, no physics. |
+| `src/sim` | Rapier physics in metres at 240 Hz with CCD, plus the rolling resistance Rapier lacks; per-surface roll calibration. |
+| `src/bots` | Fair bots. Headless bot-vs-bot matches run in the tests. |
+| `src/game` | A match: rules + physics + bots + online roles (solo / host / client). |
+| `src/net` | Wire protocol, lobby client, WebRTC peer links with relay fallback, room sessions. |
+| `server/` | Node lobby + static server (`node server/index.ts`, no build step). |
+| `src/render` | three.js: glass marbles, per-arena reflection environments, procedural fields, camera rig, marble previews. |
 | `src/input` | Touch-first slingshot controls, placement, orbit/zoom, keyboard. |
-| `src/ui` | Menus, story tower, versus screen, HUD, results. Plain DOM over the canvas. |
-| `src/audio` | Synthesised sound: glass clacks, rolling rumble, chimes. No audio files. |
-
-Stack: TypeScript, Vite, three.js, Rapier (`@dimforge/rapier3d-compat`), all
-in one codebase so web, mobile and desktop ship the same game.
+| `src/ui` | Menus, story tower, versus, taw picker, online rooms, HUD, results. |
+| `src/audio` | Synthesised sound effects; music tracks in `public/music`. |
+| `src/platform` | Haptics (native in the apps, vibration on the web). |
 
 ## Tests
 
 ```bash
-npm test           # rules, physics, bots (incl. full bot-vs-bot matches)
+npm test                     # rules, physics, bots, lobby protocol, online sync
 npm run typecheck
 npm run build
-node scripts/smoke.mjs <outDir>   # headless play-through with screenshots
 ```
 
-On the dev PC the smoke script runs inside the isolated window station:
-`D:\gha-runners\headless-tools\Start-IsolatedProcess.ps1 -FilePath node.exe
--ArgumentString '"scripts/smoke.mjs" "D:\agent-work\ringer3d\<date>-smoke"'
--WorkingDirectory <repo>`.
+Headless browser checks (Playwright with software WebGL). On the dev PC run
+them in the isolated window station, never on the desktop:
 
-## Roadmap
+```powershell
+powershell -File scripts/run-isolated.ps1 smoke      D:\agent-work\ringer3d\<date>-smoke
+powershell -File scripts/run-isolated.ps1 visual     D:\agent-work\ringer3d\<date>-visual
+powershell -File scripts/run-isolated.ps1 online-e2e D:\agent-work\ringer3d\<date>-online
+```
 
-Done in this first milestone: rules, physics, fair bots, four fields, story
-tower, quick match, pass-and-play, HUD, sound, web build.
+- `smoke` plays real flicks through the UI on a phone and a desktop viewport.
+- `visual` shoots every taw close up, the versus screen and each field.
+- `online-e2e` starts the server; one browser hosts, the other finds the ring
+  in the server browser, they connect and play first-to-7, and both must agree.
 
-Next:
+## Credits
 
-- **Online multiplayer.** Peer-to-peer over WebRTC data channels, with a small
-  signalling + lobby service (a Cloudflare Worker with a Durable Object) that
-  also powers the **server browser** and room codes. Shots travel as inputs;
-  every peer replays them locally for the visuals, and the host's settled
-  positions are authoritative (`MarbleSim.applyRest`), because Rapier's
-  compat build is not guaranteed bit-identical across devices. The hook is
-  already in place: `Controller { kind: 'remote' }` and `MatchEvents.onShot`.
-- **Mobile apps.** Capacitor wrappers for iOS and Android (the build already
-  uses relative asset paths and safe-area insets).
-- **PC app.** Tauri or Electron shell for a Steam/desktop build.
-- Music (local ACE-Step renders), fighter portraits, more fields, replays,
-  haptics on mobile, settings for aim-guide length and camera.
+Music was generated locally with ACE-Step 1.5 (MIT; trained on licensed and
+royalty-free data). Everything else (textures, marbles, sound effects) is
+procedural code in this repository.

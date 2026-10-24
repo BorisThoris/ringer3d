@@ -10,6 +10,7 @@
  *   wheel zooms, arrows/A-D fine-aim, W-S power, Space shoots.
  */
 import type { Match } from '../game/match';
+import { tap } from '../platform/haptics';
 import type { Scene3D } from '../render/scene';
 
 type Drag =
@@ -132,8 +133,10 @@ export class Controls {
       this.scene.frame('aim', m.aim.from, m.aim.yaw);
       return;
     }
-    if (m.aim.power >= 0.03) m.fireLocal();
-    else m.setAim(m.aim.yaw, 0);
+    if (m.aim.power >= 0.03) {
+      tap(m.aim.power > 0.7 ? 'heavy' : 'medium');
+      m.fireLocal();
+    } else m.setAim(m.aim.yaw, 0);
     this.onAimChange?.();
   };
 

@@ -3,6 +3,7 @@
  * glass over the canvas, rebuilt per screen, with per-frame updates only for
  * the few things that move (power meter, hint, popups).
  */
+import { music } from '../audio/music';
 import { sfx } from '../audio/sfx';
 import { BOT_PROFILES } from '../bots/bot';
 import { currentPlayer, standings } from '../core/rules';
@@ -11,6 +12,7 @@ import { Match, type MatchEvents, type MatchPlayer, type Role } from '../game/ma
 import { LobbyClient, customServer, lobbyUrl, normaliseServer, setCustomServer } from '../net/lobby';
 import type { GameMsg, RoomInfo, SeatInfo } from '../net/protocol';
 import { NetSession } from '../net/session';
+import { tap } from '../platform/haptics';
 import { Controls } from '../input/controls';
 import { ARENAS, arenaById } from '../render/arenas';
 import { Scene3D } from '../render/scene';
@@ -68,9 +70,17 @@ export class App {
     this.controls = new Controls(canvas, this.scene);
     this.controls.onAimChange = () => this.tickHud();
     this.loadSettings();
+    music.setEnabled(this.soundOn);
     window.addEventListener('resize', () => this.scene.resize());
     // Audio unlocks on the first gesture anywhere.
-    window.addEventListener('pointerdown', () => sfx.unlock(), { once: false, capture: true });
+    window.addEventListener(
+      'pointerdown',
+      () => {
+        sfx.unlock();
+        music.unlock();
+      },
+      { capture: true },
+    );
     ui.addEventListener('click', (e) => {
       if ((e.target as HTMLElement).closest('button')) sfx.tick();
     });
@@ -146,6 +156,7 @@ export class App {
   }
 
   private tawPicker(): void {
+    music.play('menu');
     const taws = this.taws();
     const locked = TAWS.length + LADDER.length - taws.length;
     let i = ((this.playerLook % taws.length) + taws.length) % taws.length;
@@ -202,6 +213,7 @@ export class App {
     this.scene.userYaw = 0;
     this.scene.userZoom = 1;
     sfx.setMuted(opts.attract ? true : !this.soundOn);
+    if (!opts.attract) music.play(this.mode.kind === 'story' && LADDER[this.mode.rung]?.id === 'tawking' ? 'boss' : 'match');
     this.scene.setShooterLook(this.myTaw());
     const m = new Match(
       this.scene,
@@ -211,7 +223,10 @@ export class App {
         : {
             onChange: () => this.renderPills(),
             onBanner: (t, s, tone) => this.banner(t, s, tone),
-            onKnock: (_p, x, z) => this.popup('+1', x, z),
+            onKnock: (_p, x, z) => {
+              this.popup('+1', x, z);
+              tap('heavy');
+            },
             onOver: () => this.result(),
             ...opts.net,
           },
@@ -235,6 +250,7 @@ export class App {
   }
 
   home(): void {
+    music.play('menu');
     this.mode = { kind: 'attract' };
     if (!this.match || this.controls.match) this.attract();
     const progress = loadProgress();
@@ -259,12 +275,14 @@ export class App {
     this.on('[data-go="taw"]', () => this.tawPicker());
     this.on('[data-go="sound"]', () => {
       this.soundOn = !this.soundOn;
+      music.setEnabled(this.soundOn);
       this.saveSettings();
       this.home();
     });
   }
 
   private quickSetup(): void {
+    music.play('menu');
     const q = this.quick;
     const opp: [QuickSetup['opponent'], string][] = [
       ['rookie', 'Rookie'],
@@ -347,6 +365,7 @@ export class App {
   }
 
   private storyTower(): void {
+    music.play('menu');
     const prog = loadProgress();
     this.show(`
       <div class="screen">
@@ -424,6 +443,7 @@ export class App {
   }
 
   private async online(): Promise<void> {
+    music.play('menu');
     this.leaveSession();
     this.show(`
       <div class="screen">
@@ -911,6 +931,7 @@ export class App {
     });
     overlay.querySelector('[data-sound]')!.addEventListener('click', (e) => {
       this.soundOn = !this.soundOn;
+      music.setEnabled(this.soundOn);
       sfx.setMuted(!this.soundOn);
       this.saveSettings();
       (e.currentTarget as HTMLElement).textContent = this.soundOn ? 'Sound on' : 'Sound off';
