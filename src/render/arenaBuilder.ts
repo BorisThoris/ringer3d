@@ -41,6 +41,40 @@ export function buildArena(arena: Arena, quality: Quality): BuiltArena {
   root.add(sky);
   envScene.add(sky.clone());
 
+  // ---- Reflection highlights (baked into the env map only) ---------------------------------
+  // Glass is mostly what it reflects: a soft sun/lamp disc, softbox strips and a ring of small
+  // horizon lights give marbles crisp highlights from any angle. Ported from the parallel
+  // implementation's reflection environments.
+  {
+    const softDisc = (color: THREE.Color, strength: number) => {
+      const c = document.createElement('canvas');
+      c.width = c.height = 128;
+      const g = c.getContext('2d')!;
+      const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(0.55, 'rgba(255,255,255,0.9)');
+      grad.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = grad;
+      g.fillRect(0, 0, 128, 128);
+      return new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), color: color.clone().multiplyScalar(strength), transparent: true, side: THREE.DoubleSide, depthWrite: false });
+    };
+    const key = new THREE.Vector3(...arena.sun.dir).normalize();
+    const place = (pos: THREE.Vector3, w: number, h: number, strength: number, color: string) => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), softDisc(new THREE.Color(color), strength));
+      m.position.copy(pos);
+      m.lookAt(0, 0, 0);
+      envScene.add(m);
+    };
+    place(key.clone().multiplyScalar(40), 14, 14, 2 + arena.sun.intensity * 1.3, arena.sun.color);
+    const side = new THREE.Vector3(-key.z, 0.35, key.x).normalize();
+    place(side.clone().multiplyScalar(38), 4, 22, 2.2, '#ffffff');
+    place(side.clone().multiplyScalar(-38).setY(14), 3, 16, 1.2, '#ffffff');
+    for (let i = 0; i < 7; i++) {
+      const a = (i / 7) * Math.PI * 2 + 0.4;
+      place(new THREE.Vector3(Math.cos(a) * 34, 6 + (i % 3) * 7, Math.sin(a) * 34), 2.4, 2.4, 2.6, i % 2 ? '#ffe2b8' : '#d8ecff');
+    }
+  }
+
   // ---- Lights ---------------------------------------------------------------------------
   const hemi = new THREE.HemisphereLight(arena.ambient.sky, arena.ambient.ground, arena.ambient.intensity);
   root.add(hemi);

@@ -50,8 +50,9 @@ function sphere(r: number, seg: number) {
 /** A cat's-eye blade: flame-shaped along the y axis, twisted a little and gently curved. */
 function vaneGeometry(r: number, twist: number): THREE.BufferGeometry {
   const shape = new THREE.Shape();
-  const L = r * 0.8;
-  const W = r * 0.2;
+  // A broad, flame-shaped blade; several of them fan out like a propeller.
+  const L = r * 0.74;
+  const W = r * 0.26;
   shape.moveTo(0, -L);
   shape.bezierCurveTo(W, -L * 0.5, W * 1.15, L * 0.45, 0, L);
   shape.bezierCurveTo(-W * 1.15, L * 0.45, -W, -L * 0.5, 0, -L);
@@ -141,13 +142,14 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
       emissive: new THREE.Color(color),
       emissiveIntensity: glow,
     });
-  const glowK = Math.max(0.08, look.glow);
+  const glowK = Math.max(0.25, look.glow);
 
   // ---- Opaque marbles ----------------------------------------------------------------------
   if (look.core === 'steelie') {
     const s = new THREE.Mesh(
       sphere(r, seg),
-      new THREE.MeshPhysicalMaterial({ color: look.base, metalness: 1, roughness: 0.12, clearcoat: 0.6, clearcoatRoughness: 0.05, envMapIntensity: 1.6 }),
+      // Chrome is nothing but reflection: push the environment hard.
+      new THREE.MeshPhysicalMaterial({ color: look.base, metalness: 1, roughness: 0.04, clearcoat: 0.6, clearcoatRoughness: 0.05, envMapIntensity: 3 }),
     );
     s.castShadow = true;
     group.add(s);
@@ -181,8 +183,8 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
       const onion = look.core === 'onionskin';
       const n = onion ? 7 : 4;
       for (let i = 0; i < n; i++) {
-        const curve = new SpiralCurve(r * (onion ? 1.05 : 0.95), 0.6 + rand() * 0.8, (i / n) * Math.PI * 2, (rand() - 0.5) * 0.6);
-        group.add(new THREE.Mesh(ribbonGeometry(curve, r * (onion ? 0.22 : 0.14 + rand() * 0.08)), interior(colors[i % 2], glowK)));
+        const curve = new SpiralCurve(r * (onion ? 0.95 : 0.85), 0.6 + rand() * 0.8, (i / n) * Math.PI * 2, (rand() - 0.5) * 0.6);
+        group.add(new THREE.Mesh(ribbonGeometry(curve, r * (onion ? 0.15 : 0.07 + rand() * 0.05)), interior(colors[i % 2], glowK)));
       }
       if (onion) group.add(new THREE.Mesh(sphere(r * 0.55, 24), interior('#f6f1e6', 0.05)));
       break;
@@ -190,8 +192,8 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
     case 'galaxy': {
       // Deep core with aventurine flecks that catch the light (and the bloom).
       group.add(new THREE.Mesh(sphere(r * 0.55, 24), interior(look.base, 0.05)));
-      const flake = cached(`flake-${r}`, () => new THREE.OctahedronGeometry(r * 0.045, 0));
-      const count = quality === 'low' ? 30 : 70;
+      const flake = cached(`flake-${r}`, () => new THREE.OctahedronGeometry(r * 0.018, 0));
+      const count = quality === 'low' ? 90 : 240;
       const inst = new THREE.InstancedMesh(
         flake,
         new THREE.MeshStandardMaterial({ color: look.accent2, emissive: new THREE.Color(look.accent2), emissiveIntensity: 2.2, metalness: 0.6, roughness: 0.2 }),
@@ -203,13 +205,13 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
       for (let i = 0; i < count; i++) {
         do p.set(rand() * 2 - 1, rand() * 2 - 1, rand() * 2 - 1);
         while (p.lengthSq() > 1);
-        p.multiplyScalar(r * 0.82);
+        p.multiplyScalar(r * 0.7);
         q.setFromEuler(new THREE.Euler(rand() * 6, rand() * 6, rand() * 6));
         m.compose(p, q, new THREE.Vector3(1, 1, 1).multiplyScalar(0.5 + rand()));
         inst.setMatrixAt(i, m);
       }
       group.add(inst);
-      group.add(new THREE.Mesh(ribbonGeometry(new SpiralCurve(r * 0.9, 1.2, rand() * 6, 0.4), r * 0.18), interior(look.accent, 0.35)));
+      group.add(new THREE.Mesh(ribbonGeometry(new SpiralCurve(r * 0.8, 1.2, rand() * 6, 0.4), r * 0.09), interior(look.accent, 0.45)));
       break;
     }
     case 'neon': {
@@ -237,6 +239,10 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
           new THREE.MeshPhysicalMaterial({ color: look.accent, iridescence: 1, roughness: 0.3, emissive: new THREE.Color(look.accent2).multiplyScalar(look.glow) }),
         ),
       );
+      break;
+    case 'clearie':
+      // A single faint wisp, like a stretched air line in the glass.
+      group.add(new THREE.Mesh(ribbonGeometry(new SpiralCurve(r * 0.7, 0.35, rand() * 6, 0.9), r * 0.035), interior(look.accent, 0.5)));
       break;
     default:
       break;
@@ -271,17 +277,18 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
         })
       : new THREE.MeshPhysicalMaterial({
           color: '#ffffff',
-          roughness: 0.03,
+          roughness: 0,
           transmission: look.clarity,
-          thickness: r * 1.6,
-          ior: 1.52,
+          // three's transmission is screen-space: thickness sets how far the refracted image
+          // shifts. A full diameter smears the interior to the rim; ~0.6r gives a real
+          // marble's gentle magnification.
+          thickness: r * 0.6,
+          ior: 1.5,
           attenuationColor: tint,
-          attenuationDistance: look.core === 'clearie' ? r * 2.2 : r * 5,
-          dispersion: quality === 'high' ? 0.25 : 0,
-          clearcoat: 1,
-          clearcoatRoughness: 0.03,
+          attenuationDistance: look.core === 'clearie' ? r * 2.6 : r * 7,
+          dispersion: quality === 'high' ? 0.35 : 0,
           specularIntensity: 1,
-          envMapIntensity: 1.8,
+          envMapIntensity: 1.15,
           iridescence: look.core === 'opal' ? 1 : look.core === 'galaxy' ? 0.4 : 0,
           iridescenceIOR: 1.6,
         });
