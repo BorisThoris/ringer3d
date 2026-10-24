@@ -7,8 +7,46 @@ import { PROTOCOL_VERSION, type LobbyEvent, type LobbyRequest, type RoomInfo, ty
 type Handler<E extends LobbyEvent['t']> = (e: Extract<LobbyEvent, { t: E }>) => void;
 export type Joined = Extract<LobbyEvent, { t: 'joined' }>;
 
-/** Where the lobby lives: an explicit build-time URL, else the page's own host. */
+const SERVER_KEY = 'ringer3d.server.v1';
+
+/** A server the player typed in (LAN play, self-hosting). Empty = default. */
+export function customServer(): string {
+  try {
+    return localStorage.getItem(SERVER_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+export function setCustomServer(s: string): void {
+  try {
+    if (s.trim()) localStorage.setItem(SERVER_KEY, s.trim());
+    else localStorage.removeItem(SERVER_KEY);
+  } catch {
+    /* session only */
+  }
+}
+
+/** `192.168.1.5:8787`, `https://ringer.example.com` or a ws URL -> a lobby ws URL. */
+export function normaliseServer(s: string): string {
+  let v = s.trim();
+  if (!/^[a-z]+:\/\//i.test(v)) v = `ws://${v}`;
+  v = v.replace(/^http/i, 'ws');
+  const u = new URL(v);
+  if (u.pathname === '/' || u.pathname === '') u.pathname = '/lobby';
+  return u.toString();
+}
+
+/** Where the lobby lives: the player's own choice, a build-time URL, else the page's own host. */
 export function lobbyUrl(): string {
+  const custom = customServer();
+  if (custom) {
+    try {
+      return normaliseServer(custom);
+    } catch {
+      /* fall through to the default */
+    }
+  }
   const env = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_LOBBY_URL;
   if (env) return env;
   if (typeof location === 'undefined' || location.protocol === 'file:') return 'ws://localhost:8787/lobby';

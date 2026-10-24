@@ -61,7 +61,8 @@ export function groundTextures(style: GroundStyle, tint: string): { map: THREE.T
 
   if (style === 'dirt') {
     speck(2600, 1, 5, ['#6b4a2f', '#8a6440', '#a07a52', '#5a3d26'], '#9a9a9a');
-    speck(350, 2, 7, ['#b9a184', '#7d7468', '#cfc2ad'], '#c8c8c8');
+    // Pebbles: fewer and smaller, so marbles still read against the dirt.
+    speck(220, 1.5, 4.5, ['#a48c70', '#7d7468', '#b8ab96'], '#c8c8c8');
   } else if (style === 'pavement') {
     speck(9000, 0.6, 2.2, ['#3a3d42', '#55595f', '#6c7076', '#2c2e31', '#8d9096'], '#b0b0b0');
     g.strokeStyle = 'rgba(20,20,22,0.55)';

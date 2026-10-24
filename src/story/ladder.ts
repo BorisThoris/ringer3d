@@ -107,7 +107,7 @@ export const LADDER: Fighter[] = [
     name: 'The Chalk Ghost',
     title: 'Haunter of the Line',
     arena: 'courtyard',
-    look: { name: 'Ghostlight Clearie', base: '#cfefff', swirl: ['#9fe8ff'], pattern: 'clearie' },
+    look: { name: 'Ghostlight Clearie', base: '#7fd6ff', swirl: ['#e8fbff'], pattern: 'clearie' },
     profile: p('ghost', 0.007, 0.038, 0.9, 0, true),
     intro: 'Every ring ever drawn... I have played in it.',
     defeat: 'Rub me out, then. I\'ll be drawn again.',

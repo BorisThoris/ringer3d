@@ -120,6 +120,8 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .seat-name { flex: 1; font-weight: 700; }
 .mini { width: 30px; height: 30px; border-radius: 10px; background: rgba(255, 255, 255, 0.08); }
 .room .row .btn { flex: 1; }
+.server-box { margin-top: 14px; color: var(--muted); }
+.server-box summary { cursor: pointer; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
 
 /* ---------- taw picker ---------- */
 .taw-panel { text-align: left; }

@@ -8,7 +8,7 @@ import { BOT_PROFILES } from '../bots/bot';
 import { currentPlayer, standings } from '../core/rules';
 import { DEFAULT_CONFIG } from '../core/types';
 import { Match, type MatchEvents, type MatchPlayer, type Role } from '../game/match';
-import { LobbyClient } from '../net/lobby';
+import { LobbyClient, customServer, lobbyUrl, normaliseServer, setCustomServer } from '../net/lobby';
 import type { GameMsg, RoomInfo, SeatInfo } from '../net/protocol';
 import { NetSession } from '../net/session';
 import { Controls } from '../input/controls';
@@ -57,6 +57,7 @@ export class App {
   private soundOn = true;
   private quality: Quality | null = null;
   private previews: MarblePreview[] = [];
+  private sceneHidden = false;
   private lobby: LobbyClient | null = null;
   private session: NetSession | null = null;
   private playerName = 'Player';
@@ -107,7 +108,8 @@ export class App {
     this.match?.update(dt);
     this.streamAim(now);
     if (this.mode.kind !== 'attract') this.tickHud();
-    this.scene.render(dt);
+    // Nothing of the 3D scene shows behind an opaque screen: save the GPU (and the battery).
+    if (!this.sceneHidden) this.scene.render(dt);
     requestAnimationFrame(this.frame);
   };
 
@@ -116,6 +118,7 @@ export class App {
   private show(html: string): HTMLElement {
     for (const p of this.previews) p.dispose();
     this.previews = [];
+    this.sceneHidden = false;
     this.ui.innerHTML = html;
     this.hudEls = {};
     return this.ui;
@@ -384,6 +387,7 @@ export class App {
         <div class="arena">${esc(arenaById(f.arena).name)}${f.majority ? ' · first to 7' : ''} · tap to start</div>
       </div>`);
     this.mountPreviews([me, f.look], ['#5ad1ff', '#ff5a7a']);
+    this.sceneHidden = true;
     sfx.whomp();
     const go = () => this.playStory(rung, f);
     const t = setTimeout(go, 4200);
@@ -438,6 +442,13 @@ export class App {
           </div>
           <div class="label row"><span>Server browser</span><span class="spacer"></span><span class="net-status" data-status>Connecting…</span></div>
           <div class="rooms" data-rooms><div class="empty">Looking for rings…</div></div>
+          <details class="server-box"><summary>Server</summary>
+            <div class="row" style="margin-top:8px">
+              <input class="field" data-server placeholder="${esc(new URL(lobbyUrl()).host)} (default)" value="${esc(customServer())}" aria-label="Server address" />
+              <button class="btn" data-server-save style="width:auto;flex:none;justify-content:center">Use</button>
+            </div>
+            <p class="sub" style="margin:8px 0 0;font-size:13px">LAN party: one player runs <b>npm run serve</b>, everyone enters that PC's address, e.g. 192.168.1.20:8787. Leave empty for the default.</p>
+          </details>
         </div>
       </div>`);
     this.on('[data-back]', () => {
@@ -449,6 +460,18 @@ export class App {
       this.playerName = nameEl.value.trim().slice(0, 20) || 'Player';
       this.saveSettings();
       this.lobby?.connect(this.playerName).catch(() => {});
+    });
+    this.on('[data-server-save]', () => {
+      const v = (this.ui.querySelector('[data-server]') as HTMLInputElement).value;
+      try {
+        if (v.trim()) normaliseServer(v);
+      } catch {
+        this.toast('That does not look like a server address.');
+        return;
+      }
+      setCustomServer(v);
+      this.leaveSession(true);
+      void this.online();
     });
     const status = this.ui.querySelector('[data-status]') as HTMLElement;
     try {

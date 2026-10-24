@@ -3,7 +3,6 @@
  * decides anything about the game.
  */
 import * as THREE from 'three';
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
@@ -13,6 +12,7 @@ import type { BodyPose } from '../sim/physics';
 import { SHOOTER_ID } from '../sim/physics';
 import { arenaById, type ArenaDef } from './arenas';
 import { createMarble, TARGET_LOOKS, TAWS, type MarbleLook, type MarbleMesh, type Quality } from './marble';
+import { buildEnvironment, STUDIO } from './environment';
 import { chalkTexture, groundTextures } from './textures';
 
 export type CameraMode = 'aim' | 'follow' | 'top' | 'lag' | 'showcase';
@@ -70,9 +70,7 @@ export class Scene3D {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-    const pmrem = new THREE.PMREMGenerator(this.renderer);
-    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    pmrem.dispose();
+    this.scene.environment = buildEnvironment(this.renderer, STUDIO);
 
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
@@ -204,6 +202,18 @@ export class Scene3D {
     this.sun.color.set(a.sun.color);
     this.sun.intensity = a.sun.intensity;
     this.sunDir.set(...a.sun.dir).normalize();
+    // Reflections come from this arena's own sky and key light.
+    const lamp = a.sun.intensity < 1.5 && a.lamps.length ? a.lamps[0] : null;
+    const env = buildEnvironment(this.renderer, {
+      top: a.sky[0],
+      horizon: a.sky[1],
+      ground: new THREE.Color(a.groundTint).multiplyScalar(0.35).getStyle(),
+      key: lamp ? [lamp.pos[0] / 200, Math.max(0.4, lamp.pos[1] / 200), lamp.pos[2] / 200] : a.sun.dir,
+      keyColor: lamp ? lamp.color : a.sun.color,
+      keyStrength: 3 + a.sun.intensity * 1.2,
+    });
+    this.scene.environment?.dispose();
+    this.scene.environment = env;
     this.causticStrength = Math.min(1, a.sun.intensity / 3);
     this.hemi.color.set(a.ambient.sky);
     this.hemi.groundColor.set(a.ambient.ground);

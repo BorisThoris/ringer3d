@@ -52,8 +52,9 @@ function cached<T extends THREE.BufferGeometry>(key: string, make: () => T): T {
 /** A cat's-eye vane: a flame-shaped blade along the y axis, twisted a little. */
 function vaneGeometry(r: number, twist: number): THREE.BufferGeometry {
   const shape = new THREE.Shape();
-  const L = r * 0.8;
-  const W = r * 0.2;
+  // A broad, flame-shaped blade; several of them fan out like a propeller.
+  const L = r * 0.74;
+  const W = r * 0.26;
   shape.moveTo(0, -L);
   shape.bezierCurveTo(W, -L * 0.5, W * 1.15, L * 0.45, 0, L);
   shape.bezierCurveTo(-W * 1.15, L * 0.45, -W, -L * 0.5, 0, -L);
@@ -144,7 +145,8 @@ export function createMarble(look: MarbleLook, radius: number, quality: Quality,
   };
 
   if (look.pattern === 'steelie') {
-    const m = own(new THREE.MeshPhysicalMaterial({ color: look.base, metalness: 1, roughness: 0.12, clearcoat: 0.6, clearcoatRoughness: 0.05, envMapIntensity: 1.6 }));
+    // Chrome is nothing but reflection: push the environment hard.
+    const m = own(new THREE.MeshPhysicalMaterial({ color: look.base, metalness: 1, roughness: 0.04, clearcoat: 0.6, clearcoatRoughness: 0.05, envMapIntensity: 3 }));
     const s = new THREE.Mesh(cached(`sphere-${r}`, () => new THREE.SphereGeometry(r, 48, 32)), m);
     s.castShadow = true;
     group.add(s);
@@ -167,7 +169,7 @@ export function createMarble(look: MarbleLook, radius: number, quality: Quality,
     const n = 3 + Math.floor(rand() * 2);
     const g = cached(`vane-${r}`, () => vaneGeometry(r, 1.1));
     for (let i = 0; i < n; i++) {
-      const v = new THREE.Mesh(g, interiorMat(look.swirl[i % look.swirl.length], 0.12));
+      const v = new THREE.Mesh(g, interiorMat(look.swirl[i % look.swirl.length], 0.3));
       v.rotation.y = (i / n) * Math.PI + rand() * 0.15;
       v.castShadow = true;
       group.add(v);
@@ -175,9 +177,9 @@ export function createMarble(look: MarbleLook, radius: number, quality: Quality,
   } else if (look.pattern === 'swirl' || look.pattern === 'onionskin') {
     const n = look.pattern === 'onionskin' ? 7 : 4;
     for (let i = 0; i < n; i++) {
-      const curve = new SpiralCurve(r * (look.pattern === 'onionskin' ? 1.05 : 0.95), 0.6 + rand() * 0.8, (i / n) * Math.PI * 2, (rand() - 0.5) * 0.6);
-      const g = own(ribbonGeometry(curve, r * (look.pattern === 'onionskin' ? 0.22 : 0.14 + rand() * 0.08)));
-      group.add(new THREE.Mesh(g, interiorMat(look.swirl[i % look.swirl.length], 0.1)));
+      const curve = new SpiralCurve(r * (look.pattern === 'onionskin' ? 0.95 : 0.85), 0.6 + rand() * 0.8, (i / n) * Math.PI * 2, (rand() - 0.5) * 0.6);
+      const g = own(ribbonGeometry(curve, r * (look.pattern === 'onionskin' ? 0.15 : 0.07 + rand() * 0.05)));
+      group.add(new THREE.Mesh(g, interiorMat(look.swirl[i % look.swirl.length], 0.25)));
     }
     if (look.pattern === 'onionskin') {
       // Opaque-ish milky core the streaks wrap around.
@@ -186,8 +188,8 @@ export function createMarble(look: MarbleLook, radius: number, quality: Quality,
   } else if (look.pattern === 'galaxy') {
     // Deep core with aventurine flecks that catch the light (and the bloom).
     group.add(new THREE.Mesh(cached(`core-${r}`, () => new THREE.SphereGeometry(r * 0.55, 24, 16)), interiorMat(look.swirl[2] ?? '#0b0f2a', 0.05)));
-    const flake = cached(`flake-${r}`, () => new THREE.OctahedronGeometry(r * 0.045, 0));
-    const count = 70;
+    const flake = cached(`flake-${r}`, () => new THREE.OctahedronGeometry(r * 0.018, 0));
+    const count = 240;
     const inst = new THREE.InstancedMesh(
       flake,
       own(new THREE.MeshStandardMaterial({ color: look.swirl[0], emissive: new THREE.Color(look.swirl[0]), emissiveIntensity: 2.2, metalness: 0.6, roughness: 0.2 })),
@@ -199,14 +201,18 @@ export function createMarble(look: MarbleLook, radius: number, quality: Quality,
     for (let i = 0; i < count; i++) {
       do p.set(rand() * 2 - 1, rand() * 2 - 1, rand() * 2 - 1);
       while (p.lengthSq() > 1);
-      p.multiplyScalar(r * 0.82);
+      p.multiplyScalar(r * 0.7);
       q.setFromEuler(new THREE.Euler(rand() * 6, rand() * 6, rand() * 6));
       m.compose(p, q, new THREE.Vector3(1, 1, 1).multiplyScalar(0.5 + rand()));
       inst.setMatrixAt(i, m);
     }
     group.add(inst);
-    const ribbon = own(ribbonGeometry(new SpiralCurve(r * 0.9, 1.2, rand() * 6, 0.4), r * 0.18));
-    group.add(new THREE.Mesh(ribbon, interiorMat(look.swirl[1] ?? look.swirl[0], 0.35)));
+    const ribbon = own(ribbonGeometry(new SpiralCurve(r * 0.8, 1.2, rand() * 6, 0.4), r * 0.09));
+    group.add(new THREE.Mesh(ribbon, interiorMat(look.swirl[1] ?? look.swirl[0], 0.45)));
+  } else if (look.pattern === 'clearie') {
+    // A single faint wisp, like a stretched air line in the glass.
+    const wisp = own(ribbonGeometry(new SpiralCurve(r * 0.7, 0.35, rand() * 6, 0.9), r * 0.035));
+    group.add(new THREE.Mesh(wisp, interiorMat(look.swirl[0] ?? '#ffffff', 0.5)));
   }
 
   // Bubbles: every glass marble has a few, clearies a few more.
@@ -227,17 +233,18 @@ export function createMarble(look: MarbleLook, radius: number, quality: Quality,
           new THREE.MeshPhysicalMaterial({
             color: '#ffffff',
             metalness: 0,
-            roughness: 0.03,
+            roughness: 0,
             transmission: 1,
-            thickness: r * 1.6,
-            ior: 1.52,
+            // three's transmission is screen-space: thickness sets how far the
+            // refracted image shifts. A full diameter smears the interior to the
+            // rim; ~0.6r gives a real marble's gentle magnification.
+            thickness: r * 0.6,
+            ior: 1.5,
             attenuationColor: tint,
-            attenuationDistance: look.pattern === 'clearie' ? r * 2.2 : r * 5,
-            dispersion: 0.25,
-            clearcoat: 1,
-            clearcoatRoughness: 0.03,
+            attenuationDistance: look.pattern === 'clearie' ? r * 2.6 : r * 7,
+            dispersion: 0.35,
             specularIntensity: 1,
-            envMapIntensity: 1.8,
+            envMapIntensity: 1.15,
             iridescence: look.pattern === 'galaxy' ? 0.4 : 0,
           }),
         )

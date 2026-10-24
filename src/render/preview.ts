@@ -4,7 +4,7 @@
  * under a key light with a soft reflection beneath it.
  */
 import * as THREE from 'three';
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { buildEnvironment, STUDIO } from './environment';
 import { createMarble, type MarbleLook, type MarbleMesh } from './marble';
 
 export class MarblePreview {
@@ -20,13 +20,14 @@ export class MarblePreview {
   private lastX = 0;
 
   constructor(private canvas: HTMLCanvasElement, look: MarbleLook, accent = '#5ad1ff') {
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    // Opaque, with a real backdrop: transmission refracts what is behind the
+    // marble, and a transparent canvas would refract as flat milky grey.
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    this.scene.background = new THREE.Color('#0c1120');
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    const pmrem = new THREE.PMREMGenerator(this.renderer);
-    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    pmrem.dispose();
+    this.scene.environment = buildEnvironment(this.renderer, { ...STUDIO, keyColor: '#ffffff', horizon: accent === '#ff5a7a' ? '#4a2234' : STUDIO.horizon });
 
     const key = new THREE.DirectionalLight('#ffffff', 2.4);
     key.position.set(2, 4, 3);
