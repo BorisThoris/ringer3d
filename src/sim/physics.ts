@@ -91,7 +91,8 @@ export class MarbleSim {
     this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
     this.world.timestep = STEP;
     this.events = new RAPIER.EventQueue(true);
-    this.playfieldRadius = config.ringRadius * 2.4;
+    // Room for the lag lane (which runs well outside the ring) plus overshoot.
+    this.playfieldRadius = config.ringRadius * 3.2;
     const ground = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -0.5, 0));
     const groundCol = this.world.createCollider(
       RAPIER.ColliderDesc.cuboid(20, 0.5, 20)
@@ -262,6 +263,16 @@ export class MarbleSim {
     const targets: Record<MarbleId, Vec2 | null> = {};
     for (const id of targetIds) targets[id] = this.lost.has(id) ? null : this.pos(id);
     return { shooterPos: this.lost.has(SHOOTER_ID) ? null : this.pos(SHOOTER_ID), targets };
+  }
+
+  /** Sum of ground speeds of everything on the board, cm/s (drives the rolling sound). */
+  totalSpeed(): number {
+    let total = 0;
+    for (const { body } of this.bodies.values()) {
+      const v = body.linvel();
+      total += Math.hypot(v.x, v.z) / CM;
+    }
+    return total;
   }
 
   pos(id: MarbleId): Vec2 | null {

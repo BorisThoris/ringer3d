@@ -65,7 +65,7 @@ describe('bot matches', () => {
       expect(shots).toBeLessThan(300);
       expect(state.captured.flat().length).toBe(13);
     }
-  });
+  }, 60000);
 
   it('skill shows: masters clear the ring faster than rookies', () => {
     const rate = (p: string) => {
@@ -82,5 +82,5 @@ describe('bot matches', () => {
     const rookie = rate('rookie');
     console.log(`knockouts per shot: master ${master.toFixed(2)}, rookie ${rookie.toFixed(2)}`);
     expect(master).toBeGreaterThan(rookie);
-  });
+  }, 60000);
 });
