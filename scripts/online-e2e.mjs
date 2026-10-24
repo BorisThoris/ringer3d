@@ -32,6 +32,8 @@ async function player(name) {
   await ctx.addInitScript((n) => {
     localStorage.setItem('ringer3d.settings.v1', JSON.stringify({ quality: 'low', soundOn: false, playerName: n }));
   }, name);
+  // Software GL renders two games on the CPU: give every action room.
+  ctx.setDefaultTimeout(180000);
   const page = await ctx.newPage();
   collectErrors(page, errors, name);
   await page.goto(url);
