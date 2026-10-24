@@ -109,6 +109,14 @@ npm run desktop:dev      # native window with hot reload
 npm run desktop:build    # installers for the current OS (Windows .msi/.exe, macOS .dmg, Linux .deb/.AppImage)
 ```
 
+## Continuous integration
+
+Every push builds and checks all targets on GitHub Actions (`.github/workflows/`):
+
+- **Build all platforms**: typecheck, tests and web build; Android debug APK; iOS simulator app; desktop installers for Linux, Windows and macOS. Builds are downloadable as run artifacts.
+- **Device smoke tests**: boots an Android emulator and an iPhone simulator, installs and launches the app, fails if it crashes or logs an uncaught JS error, and publishes screenshots and logs to the `ci-screens` branch.
+- **Deploy web to GitHub Pages** (on `main`): enable Pages with source "GitHub Actions" in the repository settings. Set the repository variable `LOBBY_URL` to your lobby's `wss://` address to enable Online play on the hosted page.
+
 ## Tuning
 
 - Physics constants: `src/core/constants.ts` (ring size, shot speed, step rate) and each arena's `surface` in `src/game/arenas.ts` (rolling resistance, friction, bounce).
