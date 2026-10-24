@@ -122,7 +122,7 @@ Every push builds and checks all targets on GitHub Actions (`.github/workflows/`
 - **Build all platforms**: typecheck, tests and web build; Android debug APK; iOS simulator app; desktop installers for Linux, Windows and macOS. Builds are downloadable as run artifacts.
 - **Device smoke tests**: boots an Android emulator and an iPhone simulator, installs and launches the app, fails if it crashes or logs an uncaught JS error, and publishes screenshots and logs to the `ci-screens` branch.
 - **Online e2e**: two browser profiles find each other in the server browser, connect and play; runs in peer-to-peer and lobby-server modes.
-- **Deploy web to GitHub Pages** (on `main`): enable Pages with source "GitHub Actions" in the repository settings. Online works there in peer-to-peer mode; set the repository variable `LOBBY_URL` only if you run the optional lobby server.
+- **Deploy web to GitHub Pages** (on `main`): enable Pages with source "GitHub Actions" in the repository settings and set the repository variable `PAGES_ENABLED=true` (or run the workflow manually). Online works there in peer-to-peer mode; set the repository variable `LOBBY_URL` only if you run the optional lobby server.
 
 ## Tuning
 
