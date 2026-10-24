@@ -1,128 +1,143 @@
-/**
- * A link to one other player: a WebRTC data channel when the networks allow
- * it (true peer-to-peer), or the lobby's relay when they do not. Messages go
- * out over whichever is up; incoming relay messages are always accepted, so
- * a link that upgrades to P2P mid-match loses nothing.
- */
 import type { LobbyClient } from './lobby';
-import type { GameMsg } from './protocol';
+import type { PeerMsg } from './protocol';
 
-export type LinkMode = 'connecting' | 'p2p' | 'relay';
+type SignalData =
+  | { kind: 'offer'; sdp: RTCSessionDescriptionInit }
+  | { kind: 'answer'; sdp: RTCSessionDescriptionInit }
+  | { kind: 'ice'; candidate: RTCIceCandidateInit };
 
-const ICE: RTCIceServer[] = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }];
-/** Give WebRTC this long before falling back to the relay. */
-const P2P_TIMEOUT = 7000;
-
+/**
+ * A peer-to-peer link to one remote player over a WebRTC data channel.
+ * If a direct connection can't be established (strict NATs), it transparently falls back to
+ * relaying messages through the lobby server so the game still works.
+ */
 export class PeerLink {
-  mode: LinkMode = 'connecting';
-  private pc: RTCPeerConnection | null = null;
+  readonly remoteId: string;
+  private pc: RTCPeerConnection;
   private dc: RTCDataChannel | null = null;
-  private fallback: ReturnType<typeof setTimeout> | undefined;
-  private closed = false;
+  private lobby: LobbyClient;
+  private queue: PeerMsg[] = [];
+  private offLobby: () => void;
+  private fallbackTimer: ReturnType<typeof setTimeout>;
+  private pendingIce: RTCIceCandidateInit[] = [];
+  mode: 'connecting' | 'direct' | 'relay' | 'closed' = 'connecting';
+  onMessage: (m: PeerMsg) => void = () => {};
+  onState: (mode: PeerLink['mode']) => void = () => {};
 
-  constructor(
-    private lobby: LobbyClient,
-    readonly peer: string,
-    initiator: boolean,
-    private onMessage: (m: GameMsg) => void,
-    private onMode: (mode: LinkMode) => void,
-  ) {
-    if (typeof RTCPeerConnection === 'undefined') {
-      this.setMode('relay');
-      return;
-    }
-    this.pc = new RTCPeerConnection({ iceServers: ICE });
+  constructor(lobby: LobbyClient, remoteId: string, initiator: boolean) {
+    this.lobby = lobby;
+    this.remoteId = remoteId;
+    this.pc = new RTCPeerConnection({ iceServers: lobby.iceServers });
     this.pc.onicecandidate = (e) => {
-      if (e.candidate) this.lobby.send({ t: 'signal', to: peer, data: { candidate: e.candidate.toJSON() } });
+      if (e.candidate) this.signal({ kind: 'ice', candidate: e.candidate.toJSON() });
     };
     this.pc.onconnectionstatechange = () => {
-      const s = this.pc?.connectionState;
-      if ((s === 'failed' || s === 'disconnected') && this.mode !== 'relay') this.setMode('relay');
+      const s = this.pc.connectionState;
+      if ((s === 'failed' || s === 'disconnected') && this.mode !== 'relay' && this.mode !== 'closed') this.useRelay();
     };
     if (initiator) {
-      this.wire(this.pc.createDataChannel('game', { ordered: true }));
-      void this.offer();
+      this.attach(this.pc.createDataChannel('game', { ordered: true }));
+      void this.makeOffer();
     } else {
-      this.pc.ondatachannel = (e) => this.wire(e.channel);
+      this.pc.ondatachannel = (e) => this.attach(e.channel);
     }
-    this.fallback = setTimeout(() => {
-      if (this.mode === 'connecting') this.setMode('relay');
-    }, P2P_TIMEOUT);
+    this.offLobby = lobby.on((m) => {
+      if (m.t === 'signal' && m.from === remoteId) void this.handleSignal(m.data as SignalData);
+      if (m.t === 'relay' && m.from === remoteId) {
+        if (this.mode === 'connecting') this.useRelay();
+        this.onMessage(m.data);
+      }
+    });
+    this.fallbackTimer = setTimeout(() => {
+      if (this.mode === 'connecting') this.useRelay();
+    }, 7000);
   }
 
-  private setMode(m: LinkMode): void {
-    if (this.mode === m) return;
-    this.mode = m;
-    this.onMode(m);
-  }
-
-  private wire(dc: RTCDataChannel): void {
+  private attach(dc: RTCDataChannel) {
     this.dc = dc;
     dc.onopen = () => {
-      clearTimeout(this.fallback);
-      this.setMode('p2p');
-    };
-    dc.onclose = () => {
-      if (!this.closed) this.setMode('relay');
+      if (this.mode === 'closed') return;
+      clearTimeout(this.fallbackTimer);
+      this.mode = 'direct';
+      this.onState(this.mode);
+      this.flush();
     };
     dc.onmessage = (e) => {
       try {
-        this.onMessage(JSON.parse(String(e.data)));
+        this.onMessage(JSON.parse(e.data as string));
       } catch {
-        /* ignore garbage */
+        /* ignore malformed */
       }
+    };
+    dc.onclose = () => {
+      if (this.mode === 'direct') this.useRelay();
     };
   }
 
-  private async offer(): Promise<void> {
-    const pc = this.pc!;
-    await pc.setLocalDescription(await pc.createOffer());
-    this.lobby.send({ t: 'signal', to: this.peer, data: { sdp: pc.localDescription!.toJSON() } });
+  private useRelay() {
+    if (this.mode === 'relay' || this.mode === 'closed') return;
+    clearTimeout(this.fallbackTimer);
+    this.mode = 'relay';
+    this.onState(this.mode);
+    this.flush();
   }
 
-  private chain: Promise<void> = Promise.resolve();
-
-  /** Signalling from the lobby (SDP offer/answer or an ICE candidate), applied strictly in order. */
-  signal(data: unknown): Promise<void> {
-    this.chain = this.chain.then(() => this.applySignal(data));
-    return this.chain;
+  private async makeOffer() {
+    const offer = await this.pc.createOffer();
+    await this.pc.setLocalDescription(offer);
+    this.signal({ kind: 'offer', sdp: offer });
   }
 
-  private async applySignal(data: unknown): Promise<void> {
-    const pc = this.pc;
-    if (!pc || this.closed) return;
-    const d = data as { sdp?: RTCSessionDescriptionInit; candidate?: RTCIceCandidateInit };
+  private async handleSignal(d: SignalData) {
     try {
-      if (d.sdp) {
-        await pc.setRemoteDescription(d.sdp);
-        if (d.sdp.type === 'offer') {
-          await pc.setLocalDescription(await pc.createAnswer());
-          this.lobby.send({ t: 'signal', to: this.peer, data: { sdp: pc.localDescription!.toJSON() } });
-        }
-      } else if (d.candidate) {
-        await pc.addIceCandidate(d.candidate);
+      if (d.kind === 'offer') {
+        await this.pc.setRemoteDescription(d.sdp);
+        const answer = await this.pc.createAnswer();
+        await this.pc.setLocalDescription(answer);
+        this.signal({ kind: 'answer', sdp: answer });
+        this.drainIce();
+      } else if (d.kind === 'answer') {
+        await this.pc.setRemoteDescription(d.sdp);
+        this.drainIce();
+      } else if (d.kind === 'ice') {
+        if (this.pc.remoteDescription) await this.pc.addIceCandidate(d.candidate);
+        else this.pendingIce.push(d.candidate);
       }
     } catch {
-      // A broken negotiation just means relay.
-      this.setMode('relay');
+      this.useRelay();
     }
   }
 
-  /** A relayed message for this link. */
-  relayed(m: GameMsg): void {
-    this.onMessage(m);
+  private drainIce() {
+    for (const c of this.pendingIce) void this.pc.addIceCandidate(c).catch(() => {});
+    this.pendingIce = [];
   }
 
-  send(m: GameMsg): void {
-    if (this.closed) return;
-    if (this.dc?.readyState === 'open') this.dc.send(JSON.stringify(m));
-    else this.lobby.send({ t: 'relay', to: this.peer, data: m });
+  private signal(data: SignalData) {
+    this.lobby.send({ t: 'signal', to: this.remoteId, data });
   }
 
-  close(): void {
-    this.closed = true;
-    clearTimeout(this.fallback);
-    this.dc?.close();
-    this.pc?.close();
+  send(m: PeerMsg) {
+    if (this.mode === 'direct' && this.dc?.readyState === 'open') this.dc.send(JSON.stringify(m));
+    else if (this.mode === 'relay') this.lobby.send({ t: 'relay', to: this.remoteId, data: m });
+    else if (this.mode === 'connecting') this.queue.push(m);
+  }
+
+  private flush() {
+    const q = this.queue;
+    this.queue = [];
+    for (const m of q) this.send(m);
+  }
+
+  close() {
+    this.mode = 'closed';
+    clearTimeout(this.fallbackTimer);
+    this.offLobby();
+    try {
+      this.dc?.close();
+      this.pc.close();
+    } catch {
+      /* already closed */
+    }
   }
 }

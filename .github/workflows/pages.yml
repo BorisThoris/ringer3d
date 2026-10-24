@@ -1,0 +1,40 @@
+name: Deploy web to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    # Turn on Pages (Settings → Pages → Source: GitHub Actions), then set the repository
+    # variable PAGES_ENABLED=true to publish the web build on every push to main.
+    if: ${{ vars.PAGES_ENABLED == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      # Set the repository variable LOBBY_URL (e.g. wss://lobby.example.com) to enable Online
+      # play from the hosted page; everything else works without it.
+      - run: npm run build
+        env:
+          VITE_LOBBY_URL: ${{ vars.LOBBY_URL }}
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: dist }
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,33 +1,35 @@
-/**
- * A close-up of one marble on its own small canvas: the taw picker and the
- * versus screen. Always full-quality glass (it is one marble), slowly turning
- * under a key light with a soft reflection beneath it.
- */
 import * as THREE from 'three';
-import { buildEnvironment, STUDIO } from './environment';
-import { createMarble, type MarbleLook, type MarbleMesh } from './marble';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import type { MarbleLook } from '../game/marbles';
+import { buildMarble, disposeObject, type BuiltMarble } from './marbleMesh';
 
+/**
+ * A close-up of one marble on its own small canvas (marble picker, fighter detail, versus).
+ * Full-quality glass, slowly turning under a key light over a soft glow pool; drag to spin it
+ * in your fingers. Ported from the parallel implementation's MarblePreview.
+ */
 export class MarblePreview {
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
   private camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
-  private marble: MarbleMesh | null = null;
+  private marble: BuiltMarble | null = null;
   private raf = 0;
   private t = Math.random() * 10;
   private last = performance.now();
   private spin = 0.5;
   private dragging = false;
   private lastX = 0;
+  private canvas: HTMLCanvasElement;
 
-  constructor(private canvas: HTMLCanvasElement, look: MarbleLook, accent = '#5ad1ff') {
-    // Opaque, with a real backdrop: transmission refracts what is behind the
-    // marble, and a transparent canvas would refract as flat milky grey.
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    this.scene.background = new THREE.Color('#0c1120');
+  constructor(canvas: HTMLCanvasElement, look: MarbleLook, accent = '#5ad1ff', quality: 'low' | 'high' = 'high') {
+    this.canvas = canvas;
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.scene.environment = buildEnvironment(this.renderer, { ...STUDIO, keyColor: '#ffffff', horizon: accent === '#ff5a7a' ? '#4a2234' : STUDIO.horizon });
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    pmrem.dispose();
 
     const key = new THREE.DirectionalLight('#ffffff', 2.4);
     key.position.set(2, 4, 3);
@@ -47,38 +49,49 @@ export class MarblePreview {
     g.fillRect(0, 0, 128, 128);
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
-    const pool = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 3.4), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+    const pool = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 2.4), new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.8, depthWrite: false }));
     pool.rotation.x = -Math.PI / 2;
     pool.position.y = -1.02;
     this.scene.add(pool);
 
-    this.camera.position.set(0, 0.9, 4.6);
+    this.camera.position.set(0, 1.1, 5.4);
     this.camera.lookAt(0, -0.1, 0);
+    this.quality = quality;
     this.setLook(look);
 
-    // Drag to spin it in your fingers.
     canvas.style.touchAction = 'none';
-    canvas.addEventListener('pointerdown', (e) => {
-      this.dragging = true;
-      this.lastX = e.clientX;
-      canvas.setPointerCapture(e.pointerId);
-    });
-    canvas.addEventListener('pointermove', (e) => {
-      if (!this.dragging) return;
-      this.spin = (e.clientX - this.lastX) * 0.4;
-      this.lastX = e.clientX;
-    });
-    canvas.addEventListener('pointerup', () => (this.dragging = false));
+    canvas.addEventListener('pointerdown', this.down);
+    canvas.addEventListener('pointermove', this.move);
+    canvas.addEventListener('pointerup', this.up);
     this.loop();
   }
+
+  private quality: 'low' | 'high';
+
+  private down = (e: PointerEvent) => {
+    this.dragging = true;
+    this.lastX = e.clientX;
+    this.canvas.setPointerCapture(e.pointerId);
+  };
+  private move = (e: PointerEvent) => {
+    if (!this.dragging) return;
+    this.spin = (e.clientX - this.lastX) * 0.4;
+    this.lastX = e.clientX;
+  };
+  private up = () => {
+    this.dragging = false;
+  };
 
   setLook(look: MarbleLook): void {
     if (this.marble) {
       this.scene.remove(this.marble.group);
-      if (this.marble.caustic) this.scene.remove(this.marble.caustic);
-      this.marble.dispose();
+      disposeObject(this.marble.group);
+      if (this.marble.caustic) {
+        this.scene.remove(this.marble.caustic);
+        (this.marble.caustic.material as THREE.Material).dispose();
+      }
     }
-    this.marble = createMarble(look, 1, 'high', 'preview');
+    this.marble = buildMarble(look, 1, this.quality, 3.7);
     this.scene.add(this.marble.group);
     if (this.marble.caustic) {
       this.marble.caustic.position.set(0.35, -1.0, 0.35);
@@ -111,7 +124,10 @@ export class MarblePreview {
 
   dispose(): void {
     cancelAnimationFrame(this.raf);
-    this.marble?.dispose();
+    this.canvas.removeEventListener('pointerdown', this.down);
+    this.canvas.removeEventListener('pointermove', this.move);
+    this.canvas.removeEventListener('pointerup', this.up);
+    if (this.marble) disposeObject(this.marble.group);
     this.renderer.dispose();
     this.renderer.forceContextLoss();
   }

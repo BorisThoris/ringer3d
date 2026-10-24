@@ -1,10 +1,6 @@
-node_modules/
-dist/
+node_modules
+dist
+.DS_Store
 *.log
-.vite/
-coverage/
-test-results/
-playwright-report/
-release/
-android/local.properties
-
+.vite
+e2e-out

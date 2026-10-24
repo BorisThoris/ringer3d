@@ -1,176 +1,111 @@
-/**
- * Lobby client: one WebSocket to the lobby server for the server browser,
- * rooms, signalling and the relay fallback.
- */
-import { PROTOCOL_VERSION, type LobbyEvent, type LobbyRequest, type RoomInfo, type RoomSettings } from './protocol';
+import type { LobbyClientMsg, LobbyServerMsg, RoomInfo } from './protocol';
 
-type Handler<E extends LobbyEvent['t']> = (e: Extract<LobbyEvent, { t: E }>) => void;
-export type Joined = Extract<LobbyEvent, { t: 'joined' }>;
+type Handler = (m: LobbyServerMsg) => void;
 
-const SERVER_KEY = 'ringer3d.server.v1';
+export const DEFAULT_ICE: RTCIceServer[] = [
+  { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+  { urls: 'stun:stun.cloudflare.com:3478' },
+];
 
-/** A server the player typed in (LAN play, self-hosting). Empty = default. */
-export function customServer(): string {
-  try {
-    return localStorage.getItem(SERVER_KEY) ?? '';
-  } catch {
-    return '';
-  }
-}
-
-export function setCustomServer(s: string): void {
-  try {
-    if (s.trim()) localStorage.setItem(SERVER_KEY, s.trim());
-    else localStorage.removeItem(SERVER_KEY);
-  } catch {
-    /* session only */
-  }
-}
-
-/** `192.168.1.5:8787`, `https://ringer.example.com` or a ws URL -> a lobby ws URL. */
-export function normaliseServer(s: string): string {
-  let v = s.trim();
-  if (!/^[a-z]+:\/\//i.test(v)) v = `ws://${v}`;
-  v = v.replace(/^http/i, 'ws');
-  const u = new URL(v);
-  if (u.pathname === '/' || u.pathname === '') u.pathname = '/lobby';
-  return u.toString();
-}
-
-/** Where the lobby lives: the player's own choice, a build-time URL, else the page's own host. */
-export function lobbyUrl(): string {
-  const custom = customServer();
-  if (custom) {
-    try {
-      return normaliseServer(custom);
-    } catch {
-      /* fall through to the default */
-    }
-  }
-  const env = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_LOBBY_URL;
-  if (env) return env;
-  if (typeof location === 'undefined' || location.protocol === 'file:') return 'ws://localhost:8787/lobby';
-  return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/lobby`;
-}
-
+/** WebSocket connection to the lobby/signaling server (server browser + WebRTC handshakes). */
 export class LobbyClient {
   private ws: WebSocket | null = null;
-  private handlers = new Map<string, Set<(e: LobbyEvent) => void>>();
-  you = '';
-  /** Round-trip time to the lobby, ms. */
-  rtt = 0;
-  private pinger = 0;
+  private handlers = new Set<Handler>();
+  peerId = '';
+  iceServers: RTCIceServer[] = DEFAULT_ICE;
+  private opened: Promise<void> | null = null;
+  readonly url: string;
 
-  constructor(readonly url = lobbyUrl()) {}
-
-  get connected(): boolean {
-    return this.ws?.readyState === WebSocket.OPEN;
+  constructor(url: string) {
+    this.url = url;
   }
 
-  /** Connect, retrying once: a busy phone can miss the first handshake window. */
-  async connect(name: string, timeoutMs = 15000): Promise<void> {
-    if (this.connected) {
-      this.send({ t: 'hello', name, version: PROTOCOL_VERSION });
-      return;
-    }
-    try {
-      await this.connectOnce(name, timeoutMs);
-    } catch {
-      this.ws?.close();
-      await this.connectOnce(name, timeoutMs);
-    }
-  }
-
-  private connectOnce(name: string, timeoutMs: number): Promise<void> {
-    return new Promise((resolve, reject) => {
-      let ws: WebSocket;
-      try {
-        ws = new WebSocket(this.url);
-      } catch (e) {
-        reject(e);
-        return;
-      }
+  connect(timeoutMs = 6000): Promise<void> {
+    if (this.opened) return this.opened;
+    this.opened = new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const ws = new WebSocket(this.url);
       this.ws = ws;
       const timer = setTimeout(() => {
-        ws.close();
-        reject(new Error('Could not reach the lobby server.'));
+        if (!settled) {
+          settled = true;
+          ws.close();
+          reject(new Error(`Couldn't reach the lobby server at ${this.url}.`));
+        }
       }, timeoutMs);
-      ws.onmessage = (m) => {
-        let e: LobbyEvent;
+      ws.onmessage = (ev) => {
+        let msg: LobbyServerMsg;
         try {
-          e = JSON.parse(String(m.data));
+          msg = JSON.parse(ev.data as string);
         } catch {
           return;
         }
-        if (e.t === 'welcome') {
-          clearTimeout(timer);
-          this.you = e.you;
-          this.send({ t: 'hello', name, version: PROTOCOL_VERSION });
-          this.pinger = setInterval(() => this.send({ t: 'ping', at: performance.now() }), 5000) as unknown as number;
-          resolve();
+        if (msg.t === 'welcome') {
+          this.peerId = msg.peerId;
+          if (msg.iceServers?.length) this.iceServers = msg.iceServers;
+          if (!settled) {
+            settled = true;
+            clearTimeout(timer);
+            resolve();
+          }
         }
-        if (e.t === 'pong') this.rtt = Math.round(performance.now() - e.at);
-        this.handlers.get(e.t)?.forEach((h) => h(e));
-        this.handlers.get('*')?.forEach((h) => h(e));
+        this.handlers.forEach((h) => h(msg));
       };
       ws.onerror = () => {
-        clearTimeout(timer);
-        reject(new Error('Could not reach the lobby server.'));
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          reject(new Error(`Couldn't reach the lobby server at ${this.url}.`));
+        }
       };
       ws.onclose = () => {
-        clearInterval(this.pinger);
-        this.handlers.get('closed')?.forEach((h) => h({ t: 'error', message: 'Disconnected from the lobby.' }));
+        this.handlers.forEach((h) => h({ t: 'error', message: 'Lost connection to the lobby server.' }));
+        this.opened = null;
       };
     });
+    return this.opened;
   }
 
-  on<E extends LobbyEvent['t']>(t: E | '*' | 'closed', h: Handler<E>): () => void {
-    let set = this.handlers.get(t);
-    if (!set) this.handlers.set(t, (set = new Set()));
-    set.add(h as (e: LobbyEvent) => void);
-    return () => set!.delete(h as (e: LobbyEvent) => void);
+  send(m: LobbyClientMsg) {
+    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(m));
   }
 
-  /** Resolve with the next event of kind `t`, or reject on an error event / timeout. */
-  private next<E extends LobbyEvent['t']>(t: E, ms = 5000): Promise<Extract<LobbyEvent, { t: E }>> {
+  on(h: Handler): () => void {
+    this.handlers.add(h);
+    return () => this.handlers.delete(h);
+  }
+
+  /** Ask once, resolve with the next message of the given type. */
+  request<T extends LobbyServerMsg['t']>(m: LobbyClientMsg, expect: T, timeoutMs = 6000): Promise<Extract<LobbyServerMsg, { t: T }>> {
     return new Promise((resolve, reject) => {
-      const offs: (() => void)[] = [];
-      const done = () => offs.forEach((o) => o());
-      const timer = setTimeout(() => (done(), reject(new Error('The lobby did not answer.'))), ms);
-      offs.push(this.on(t, (e) => (clearTimeout(timer), done(), resolve(e))));
-      offs.push(this.on('error', (e) => (clearTimeout(timer), done(), reject(new Error(e.message)))));
+      const timer = setTimeout(() => {
+        off();
+        reject(new Error('The lobby server did not answer in time.'));
+      }, timeoutMs);
+      const off = this.on((msg) => {
+        if (msg.t === expect) {
+          clearTimeout(timer);
+          off();
+          resolve(msg as Extract<LobbyServerMsg, { t: T }>);
+        } else if (msg.t === 'error') {
+          clearTimeout(timer);
+          off();
+          reject(new Error(msg.message));
+        }
+      });
+      this.send(m);
     });
   }
 
-  send(m: LobbyRequest): void {
-    if (this.connected) this.ws!.send(JSON.stringify(m));
+  async listRooms(): Promise<RoomInfo[]> {
+    const r = await this.request({ t: 'list' }, 'rooms');
+    return r.rooms;
   }
 
-  async list(): Promise<RoomInfo[]> {
-    const p = this.next('rooms');
-    this.send({ t: 'list' });
-    return (await p).rooms;
-  }
-
-  async create(settings: RoomSettings): Promise<Joined> {
-    const p = this.next('joined');
-    this.send({ t: 'create', settings });
-    return p;
-  }
-
-  async join(code: string): Promise<Joined> {
-    const p = this.next('joined');
-    this.send({ t: 'join', code });
-    return p;
-  }
-
-  leave(): void {
-    this.send({ t: 'leave' });
-  }
-
-  close(): void {
-    clearInterval(this.pinger);
+  close() {
+    this.handlers.clear();
     this.ws?.close();
     this.ws = null;
+    this.opened = null;
   }
 }

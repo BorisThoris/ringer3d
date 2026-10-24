@@ -1,0 +1,176 @@
+import type { ArenaId } from './arenas';
+
+export interface Fighter {
+  id: string;
+  /** Marble look id (game/marbles.ts). */
+  marble: string;
+  name: string;
+  title: string;
+  bio: string;
+  /** Shown on the versus screen when you face them. */
+  intro: string;
+  /** Said when they beat you. */
+  taunt: string;
+  /** Said when you beat them. */
+  defeat: string;
+  homeArena: ArenaId;
+  /** Ending text when this fighter conquers the tower. */
+  ending: string;
+  /** Playable from the start? Others unlock by beating them in the tower. */
+  starter: boolean;
+}
+
+export const FIGHTERS: Fighter[] = [
+  {
+    id: 'ember',
+    marble: 'ember',
+    name: 'Ember',
+    title: 'The Playground Prodigy',
+    bio: 'Won her first ring at six. Has not lost a recess since. Fire in the glass, fire in the thumb.',
+    intro: 'You knuckle down like you mean it. Good. So do I.',
+    taunt: 'Keep the marble. Call it a souvenir.',
+    defeat: 'Huh. Nobody\'s ever cooled me off before.',
+    homeArena: 'schoolyard',
+    ending:
+      'Ember carried the Black Taw home in her pocket and set it on the schoolyard wall. Every morning the kids touch it for luck before the bell. She never takes it down.',
+    starter: true,
+  },
+  {
+    id: 'tide',
+    marble: 'tide',
+    name: 'Tide',
+    title: 'The Undertow',
+    bio: 'A boardwalk hustler who reads a ring like a swell: wait, wait, then everything at once.',
+    intro: 'Every wave looks small until it takes your feet.',
+    taunt: 'Washed out. Happens to everyone.',
+    defeat: 'The tide always comes back. Remember that.',
+    homeArena: 'schoolyard',
+    ending:
+      'Tide threw the Black Taw into the sea at dawn. Fishermen still swear something dark rolls along the sand at low tide, looking for a ring.',
+    starter: true,
+  },
+  {
+    id: 'pip',
+    marble: 'pip',
+    name: 'Pip',
+    title: 'The Clay Kid',
+    bio: 'Shoots a hand-rolled clay taw his grandpa made. Not the best. Absolutely the most stubborn.',
+    intro: 'Grandpa says clay doesn\'t crack. Let\'s test it!',
+    taunt: 'Clay beats glass! I KNEW it!',
+    defeat: 'Okay... okay. One more? Best of fifty?',
+    homeArena: 'schoolyard',
+    ending:
+      'Pip pressed a dent of the Black Taw into fresh clay and fired it into a new shooter. It never wins pretty. It never stops winning.',
+    starter: true,
+  },
+  {
+    id: 'jade',
+    marble: 'jade',
+    name: 'Jade',
+    title: 'The Still Hand',
+    bio: 'Keeper of a garden where the sand is raked each dawn. Believes a perfect shot is one you never rush.',
+    intro: 'Breathe out. The marble already knows where it goes.',
+    taunt: 'You flicked before you saw. Again tomorrow.',
+    defeat: 'Your hand was quieter than your heart. Rare.',
+    homeArena: 'zen',
+    ending:
+      'Jade buried the Black Taw beneath the oldest stone in the garden and raked a ring around it. The sand has never needed raking since.',
+    starter: true,
+  },
+  {
+    id: 'volt',
+    marble: 'volt',
+    name: 'Volt',
+    title: 'The Night Shift',
+    bio: 'Runs the rooftop money games. Streams every shot. Has never been off camera, or off tilt.',
+    intro: 'Chat says you\'re cooked. Let\'s prove chat right.',
+    taunt: 'Clip it. CLIP IT.',
+    defeat: 'Stream\'s over. Don\'t... don\'t clip that.',
+    homeArena: 'rooftop',
+    ending:
+      'Volt broadcast the final shot to eleven million viewers. The Black Taw now spins on a pedestal in a neon case, and the rooftop has a waiting list a year long.',
+    starter: false,
+  },
+  {
+    id: 'rime',
+    marble: 'rime',
+    name: 'Rime',
+    title: 'Queen of Glacier Hall',
+    bio: 'Plays only on ice, where a breath too hard sends a marble across the hall. She never breathes too hard.',
+    intro: 'On my ice, the timid slide forever.',
+    taunt: 'Frozen out. As foretold.',
+    defeat: 'Spring arrives early this year, it seems.',
+    homeArena: 'glacier',
+    ending:
+      'Rime sealed the Black Taw inside a pillar of blue ice at the heart of Glacier Hall. On still nights you can see it glowing faintly, still trying to roll.',
+    starter: false,
+  },
+  {
+    id: 'ironside',
+    marble: 'ironside',
+    name: 'Ironside',
+    title: 'The Steelie',
+    bio: 'Ball-bearing taw, foundry-worker hands. Hits like a freight train and apologises after.',
+    intro: 'Sorry in advance. It\'s a heavy marble.',
+    taunt: 'Told you. Heavy.',
+    defeat: 'Good shooting. Honest work.',
+    homeArena: 'rooftop',
+    ending:
+      'Ironside melted the Black Taw into the foundry\'s next pour. Somewhere out there is a bridge that can never quite be crossed by the unworthy.',
+    starter: false,
+  },
+  {
+    id: 'nova',
+    marble: 'nova',
+    name: 'Nova',
+    title: 'The Far Shooter',
+    bio: 'Nobody knows where she came from. Her marble has stars in it. Real ones, she insists.',
+    intro: 'I have played on rings around other suns.',
+    taunt: 'Small ring. Small player.',
+    defeat: 'Interesting. This planet has teeth.',
+    homeArena: 'glacier',
+    ending:
+      'Nova pocketed the Black Taw and pointed at the sky. "That one next," she said. Nobody has seen her since, but there is one more star over the caldera now.',
+    starter: false,
+  },
+  {
+    id: 'obsidian',
+    marble: 'obsidian',
+    name: 'Obsidian',
+    title: 'The Black Taw',
+    bio: 'The first marble ever shot, they say, cooled from the caldera itself. It has taken every ring it has ever entered. It keeps them.',
+    intro: 'Every marble you ever lost... rolled to me.',
+    taunt: 'For keeps.',
+    defeat: 'Then keep me. If you can.',
+    homeArena: 'caldera',
+    ending: 'Obsidian takes your marble, as it has taken all the others. The caldera grows a little warmer.',
+    starter: false,
+  },
+];
+
+export interface TowerStage {
+  opponent: string;
+  arena: ArenaId;
+  bot: string;
+}
+
+/**
+ * The tower: seven challengers then the Black Taw. Opponents matching your own fighter are
+ * skipped and replaced by the next free fighter, MK-style.
+ */
+export function buildTower(playerFighter: string): TowerStage[] {
+  const order = ['pip', 'tide', 'jade', 'volt', 'ironside', 'rime', 'nova', 'ember'].filter((f) => f !== playerFighter);
+  const ladder = order.slice(0, 7);
+  const bots = ['rookie', 'casual', 'casual', 'skilled', 'skilled', 'expert', 'master'];
+  const stages: TowerStage[] = ladder.map((id, i) => ({
+    opponent: id,
+    arena: FIGHTERS.find((f) => f.id === id)!.homeArena,
+    bot: bots[i],
+  }));
+  stages.push({ opponent: 'obsidian', arena: 'caldera', bot: 'legend' });
+  return stages;
+}
+
+export function fighter(id: string): Fighter {
+  return FIGHTERS.find((f) => f.id === id) ?? FIGHTERS[0];
+}

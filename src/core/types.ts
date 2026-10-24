@@ -1,69 +1,74 @@
-/**
- * Shared types. Units are centimetres on the ground plane (x, z); y is up.
- * Nothing in `core/` imports three.js or Rapier, so the rules can be unit
- * tested, run on a lobby server, or replayed without a renderer.
- */
-
 export interface Vec2 {
   x: number;
   z: number;
 }
 
-export type MarbleId = string;
-
-/** One playable move. Humans and bots both produce exactly this, nothing more. */
-export interface ShotInput {
-  /** Shooter start position on the ground plane. */
-  from: Vec2;
-  /** Aim direction in radians: 0 = +x, PI/2 = +z. */
-  yaw: number;
-  /** 0..1, mapped to launch speed by the sim. */
-  power: number;
-  /** -1..1: negative = backspin (stop/draw), positive = topspin (follow). */
-  spin: number;
-  /** -1..1: side english, curves the shooter slightly after contact. */
-  english: number;
+export interface Vec3 {
+  x: number;
+  y: number;
+  z: number;
 }
 
 /**
- * What the physics reports once every body has come to rest. Raw positions
- * only: deciding what is "out" is the rules' job, not the sim's.
+ * Everything needed to reproduce a shot. This is the only thing peers exchange during play:
+ * every client runs the same deterministic simulation from it.
  */
-export interface ShotOutcome {
-  /** Where the shooter came to rest, or null if it left the playfield. */
-  shooterPos: Vec2 | null;
-  /** Rest position of every target that was in the ring before the shot; null = left the playfield. */
-  targets: Record<MarbleId, Vec2 | null>;
+export interface Shot {
+  /** Only used on the first shot of a turn: where on the ring line the player knuckles down (radians). */
+  placeAngle: number;
+  /** Direction of travel on the ground plane (radians, 0 = +X, counter-clockwise seen from above). */
+  aimAngle: number;
+  /** 0..1 */
+  power: number;
+  /** -1 (backspin / "stick") .. 0 (stun / slide) .. 1 (topspin / "follow"). */
+  spin: number;
 }
 
-export interface RingerConfig {
-  /** Ring radius in cm. The traditional ring is 10 ft across; casual rings 3-6 ft. */
-  ringRadius: number;
-  targetRadius: number;
-  shooterRadius: number;
-  /** Gap between neighbouring marbles in the starting cross, centre to centre. */
-  crossSpacing: number;
-  /** Number of target marbles (13 is the traditional cross). */
-  targetCount: number;
-  /**
-   * End as soon as one player has more than half the marbles (official
-   * tournament Ringer: first to 7 of 13). Off = play until the ring is empty.
-   */
-  endOnMajority: boolean;
-}
-
-export const DEFAULT_CONFIG: RingerConfig = {
-  ringRadius: 60,
-  targetRadius: 1.2,
-  shooterRadius: 1.5,
-  crossSpacing: 7.6,
-  targetCount: 13,
-  endOnMajority: false,
-};
+export type Phase = 'aim' | 'rolling' | 'gameOver';
 
 export interface PlayerInfo {
   id: string;
   name: string;
-  /** Present for bots: the bot profile id used to drive them. */
+  /** Marble cosmetic id from game/marbles.ts */
+  marble: string;
+  kind: 'human' | 'bot' | 'remote';
   botProfile?: string;
 }
+
+export interface MarbleState {
+  id: number;
+  pos: Vec3;
+  /** Quaternion x,y,z,w */
+  rot: [number, number, number, number];
+  inPlay: boolean;
+}
+
+export interface SurfaceParams {
+  /** Linear damping — rolling resistance of the surface. */
+  linearDamping: number;
+  /** Angular damping. */
+  angularDamping: number;
+  /** Coulomb friction between marble and ground. */
+  friction: number;
+  /** Marble-to-marble restitution. */
+  marbleRestitution: number;
+  /** Constant rolling-resistance deceleration (units/s²) applied to grounded marbles. */
+  rollDecel: number;
+}
+
+export const DEFAULT_SURFACE: SurfaceParams = {
+  linearDamping: 0.08,
+  angularDamping: 0.3,
+  friction: 0.6,
+  marbleRestitution: 0.93,
+  rollDecel: 11,
+};
+
+export type MatchEvent =
+  | { type: 'shot'; player: number; shot: Shot }
+  | { type: 'impact'; strength: number; pos: Vec3; kind: 'marble' | 'kerb' }
+  | { type: 'capture'; player: number; marbleId: number; pos: Vec3 }
+  | { type: 'shooterOut'; player: number }
+  | { type: 'shootAgain'; player: number }
+  | { type: 'turnStart'; player: number }
+  | { type: 'gameOver'; winners: number[] };

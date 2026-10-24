@@ -1,161 +1,133 @@
 # Ringer 3D
 
-Ringer, the classic playground marble game, rebuilt as a modern 3D game for
-the web, phones and PC. Knuckle down on the ring line, flick your taw, and
-knock the thirteen marbles of the cross out of the ring.
+The classic playground marble game — **Ringer** — rebuilt as a modern 3D game for web, iOS, Android and desktop.
 
-- **Story:** an eight-rung tower, Mortal Kombat style, from Pip Tumble in the
-  schoolyard to the Taw King in the moonlit courtyard. Versus screens, taunts,
-  and every fighter you beat gives you their marble.
-- **Quick Match:** fair bots (Rookie to Master) or 2–4 player pass-and-play.
-- **Online:** server browser, private rooms with codes, peer-to-peer play
-  (WebRTC) with a relay fallback, fair bots to fill seats or replace a player
-  who drops.
-- **Four fields** with their own physics: Schoolyard dirt, Rooftop pavement at
-  dusk, Grandma's carpet, Moonlit Courtyard flagstones.
-- **Glass marbles:** real refraction, dispersion and tint around 3D interiors
-  (cat's-eye vanes, swirls, onionskins, aventurine, clearies, steelies),
-  coloured caustics, per-field reflections, bloom. Twelve taws to collect.
-- Runs in any modern browser, as an installable PWA, as an Android/iOS app
-  (Capacitor) and as a desktop app (Electron).
+Knuckle down on the ring line, flick your shooter into the cross of 13 marbles, and keep every marble you knock out. Stay in the ring after a capture and you shoot again. Most marbles wins.
 
-## Play
+- **Five arenas** with their own feel: Schoolyard (asphalt), Zen Garden (grippy sand), Neon Rooftop (fast tile), Glacier Hall (ice), and the Caldera.
+- **Tower (story mode)**: pick a marble, climb eight opponents with their own personalities, beat the Black Taw, unlock fighters and endings.
+- **Fair bots**: six skill levels from Rookie to Legend.
+- **Online, no server required**: server browser, private rooms with 4-letter codes, 2–4 players. Games are found through public Nostr relays and matches run directly between devices over WebRTC; bots take dropped seats. An optional self-hosted lobby server is also supported.
+- **Pass and play** for 2–4 players on one device.
+- **Real glass marbles**: twisted cat's-eye blades, swirl ribbons, onionskins, aventurine galaxies, clearies with bubbles, dispersion and coloured caustics, plus a 3D close-up you can spin in the marble picker and versus screen.
+- Zero downloaded assets: textures, marbles and audio are all generated procedurally, so the app stays small and loads offline as a PWA.
+
+## Quick start
 
 ```bash
 npm install
-npm run dev                  # http://localhost:5181 (single player)
-npm run dev:server           # in a second terminal: the lobby for online play
+npm run dev          # game at http://localhost:5173 (online works out of the box, peer to peer)
+npm run server       # optional lobby server at ws://localhost:8787 (Settings → Online connection)
 ```
 
-Production, one process serving the game and the lobby:
+Production, single process (serves the game and runs the lobby):
 
 ```bash
-npm run build
-npm run serve                # http://localhost:8787, PORT to change
+npm start            # builds, then serves everything on http://localhost:8787
 ```
 
-### Controls
-
-- **Flick:** drag anywhere and pull back like a slingshot. Longer pull, harder
-  flick; release to shoot, drag back to the start to cancel.
-- **Knuckle down:** at the start of a turn, drag your shooter (or use ⟲ ⟳) to
-  pick your spot on the ring line.
-- **Spin:** tap the white ball. Low = backspin (stop after contact), high = follow.
-- **Camera:** two fingers orbit and pinch-zoom; right-drag and wheel on
-  desktop. ◎ cycles aim / overhead / follow.
-- **Keyboard:** ←/→ fine aim (Shift = finer), ↑/↓ power, Space shoots,
-  Alt+←/→ slides along the line.
-
-### Rules (traditional Ringer)
-
-1. Thirteen marbles sit in a cross in the middle of the ring.
-2. **Lag** for order: everyone rolls toward a line; closest goes first.
-3. Each turn starts on the ring line, anywhere around it.
-4. Every marble you knock out of the ring is yours.
-5. Knock at least one out **and** keep your shooter inside the ring: shoot
-   again from where it stopped.
-6. A miss, or your shooter leaving the ring, ends your turn (you keep what you won).
-7. When the ring is empty, most marbles wins. Tournament option: first to 7.
-
-## Fair bots
-
-Bots see what you see and shoot the way you shoot (`src/bots/bot.ts`):
-
-- They read marble positions, the ring and the surface. They never run the
-  physics ahead to test a shot.
-- They answer with the same `ShotInput` (aim, power, spin) a flick produces,
-  under the same limits.
-- Their plan is geometry (ghost-ball aiming, blockers) plus a feel for how far
-  a marble rolls on this surface, measured once per surface the way a player
-  learns it by practising (`src/sim/calibration.ts`).
-- Every shot gets hand noise on aim and power. Difficulty is that noise plus
-  judgement, never a hidden advantage. Story fighters are tuned the same way.
-
-## Online
-
-```
- guest ──WebRTC data channel──► host ◄──WebRTC── guest
-   │                              │                │
-   └────── lobby (WebSocket): server browser, codes, signalling, relay ──┘
-```
-
-- The **host** runs the match: seating, bots, and the authoritative result of
-  every shot. Shots travel as inputs (aim, power, spin); every device replays
-  them for the visuals, then snaps to the host's settled positions. Physics
-  drift between devices can never split the game (`src/game/online.test.ts`
-  plays a whole match with a deliberately wrong client and checks both agree).
-- Links are peer-to-peer over WebRTC (public STUN). If a network blocks that,
-  messages fall back to the lobby's relay automatically.
-- The host checks every move comes from the device that owns that seat. A
-  player who leaves is replaced by a fair bot; if the host leaves, the room closes.
-- **LAN party:** one player runs `npm run serve`; everyone opens Online →
-  Server and enters that PC's address (e.g. `192.168.1.20:8787`).
-- **Builds for stores/desktop** point at a server with
-  `VITE_LOBBY_URL=wss://your-host/lobby npm run build`.
-
-## Apps
-
-**Android** (Capacitor 6, JDK 17, Android SDK 34+):
+Tests (physics determinism, full matches, bot strength, lobby protocol):
 
 ```bash
-npm run build
-npx cap sync android
-cd android && gradlew assembleDebug        # app/build/outputs/apk/debug/app-debug.apk
+npm test
 ```
 
-Set `RINGER_BUILD_DIR` to put Gradle's build output on another drive.
+## Controls
 
-**iOS:** `npx cap add ios` on a Mac, then open `ios/App` in Xcode.
+| | Touch | Mouse / keyboard |
+|---|---|---|
+| Aim | Drag anywhere (slow drags are finer) | Drag, or ← / → (Shift = fine) |
+| Slide along the ring (first shot of a turn) | Drag your shooter | Drag your shooter, or A / D |
+| Power + flick | Pull the slider down, let go | Same, or hold Space and release |
+| Spin | Spin pad (top = topspin/follow, bottom = backspin/stick) | Q / E |
+| Camera | Camera button, pinch to zoom | T, mouse wheel |
 
-**Desktop** (Electron):
+## How it's built
+
+TypeScript + Three.js + Rapier physics + React for UI, bundled with Vite.
+
+```
+src/
+  core/      Deterministic simulation and rules. No DOM, no Math.random, no wall-clock time.
+    physics.ts   Rapier world per shot, rolling resistance, quantized layouts, hashing
+    match.ts     Ringer rules: captures, shoot-again, turn order, game end
+  ai/        Fair bots (candidate generation, imagined outcomes, human-like hand tremor)
+  game/      Arenas, marbles, story/tower data, settings, session orchestration
+  render/    Three.js view, procedural arenas/marbles/textures, camera rig, input, synth audio
+  net/       Lobby client, WebRTC peer links with relay fallback, online rooms
+  ui/        React screens and HUD
+server/      Node lobby + signaling + relay server (also serves the built app)
+android/ ios/   Capacitor native projects
+src-tauri/      Tauri desktop shell
+```
+
+### Determinism is the backbone
+
+Between shots every marble is at rest, so the whole table is just a list of positions. Each shot **rebuilds the physics world from the quantized layout** and runs a fixed 120 Hz step with Rapier's cross-platform deterministic build. That makes every shot's outcome a pure function of *(layout, shot, surface)*:
+
+- **Online** peers exchange only the shot (place angle, aim, power, spin). Everyone simulates the identical result locally, so there's no physics streaming and no lag during rolls. After each shot peers send a layout hash to the host; on mismatch the host sends a snapshot and the peer resyncs.
+- **Bots** "imagine" candidate shots with exactly the physics the game uses.
+- **Replays/reconnects** are trivial: a seed plus a list of shots.
+
+### Fair bots
+
+Bots only see what you see (marble positions) and output the same shot a human does. Difficulty changes how many shots they consider, whether they think about spin and leave position, and how steady their hand is: every intended shot is perturbed by Gaussian aim and power error (Rookie ≈ 6.5°, Legend ≈ 1.25°). Bot randomness comes from the match seed so games are reproducible. They also "line up" visibly before shooting.
+
+### Online architecture
+
+Two connection modes, chosen in Settings → Online connection. Both run the match itself peer to peer.
+
+- **Peer to peer (default, nothing to deploy).** The server browser reads small room listings (Nostr kind 30078 events with an expiry tag) that hosts post to several public relays every 20 seconds; private rooms are never posted. Players with the same room code meet through [Trystero](https://github.com/dmotz/trystero) over the same relays, which performs the WebRTC handshake. After that, game messages go directly between devices (`src/net/p2pMatchmaker.ts`).
+- **Lobby server (optional).** `server/index.mjs` provides the room list, codes, WebRTC signaling and a relay fallback for players behind very strict NATs where a direct connection can't be made (`src/net/serverMatchmaker.ts`). Configure STUN/TURN for clients with the server's `ICE_SERVERS` env var, e.g. `ICE_SERVERS='[{"urls":"turn:turn.example.com","username":"u","credential":"p"}]'`.
+- Star topology over the data channels: the host orders turns and validates that shots come from the player whose turn it is. After every shot peers compare layout hashes; on mismatch the host sends a snapshot and the peer resyncs. `match.shotLog` records each shot with before/after hashes for replays and debugging.
+- If a guest drops mid-match, a bot takes over their seat on the host. If the host leaves, the match ends for everyone.
+- `npm run e2e:online` (with the app served on :8787) plays a match between two browser profiles; CI runs it in both modes.
+
+## Deploying
+
+Online play works without deploying anything. To host the web build, push to `main` and the Pages workflow publishes it. To run your own lobby server as well:
+
+**Docker** (game + lobby on one port):
 
 ```bash
-npm run build
-npm run desktop              # run it
-npm run desktop:pack         # unpacked app in release/
-npm run desktop:dist         # installers (NSIS + portable on Windows, dmg, AppImage)
+docker build -t ringer3d .
+docker run -p 8787:8787 ringer3d
 ```
 
-## Architecture
+Put it behind HTTPS (any reverse proxy); the client automatically uses `wss://` on the same host. For a separately hosted lobby, build with `VITE_LOBBY_URL=wss://lobby.example.com npm run build`.
 
-| Layer | What it is |
-|---|---|
-| `src/core` | Ringer rules as a pure state machine. No three.js, no physics. |
-| `src/sim` | Rapier physics in metres at 240 Hz with CCD, plus the rolling resistance Rapier lacks; per-surface roll calibration. |
-| `src/bots` | Fair bots. Headless bot-vs-bot matches run in the tests. |
-| `src/game` | A match: rules + physics + bots + online roles (solo / host / client). |
-| `src/net` | Wire protocol, lobby client, WebRTC peer links with relay fallback, room sessions. |
-| `server/` | Node lobby + static server (`node server/index.ts`, no build step). |
-| `src/render` | three.js: glass marbles, per-arena reflection environments, procedural fields, camera rig, marble previews. |
-| `src/input` | Touch-first slingshot controls, placement, orbit/zoom, keyboard. |
-| `src/ui` | Menus, story tower, versus, taw picker, online rooms, HUD, results. |
-| `src/audio` | Synthesised sound effects; music tracks in `public/music`. |
-| `src/platform` | Haptics (native in the apps, vibration on the web). |
-
-## Tests
+## Mobile (Capacitor)
 
 ```bash
-npm test                     # rules, physics, bots, lobby protocol, online sync
-npm run typecheck
-npm run build
+npm run mobile:sync
+npm run android      # opens Android Studio
+npm run ios          # opens Xcode (macOS)
 ```
 
-Headless browser checks (Playwright with software WebGL). On the dev PC run
-them in the isolated window station, never on the desktop:
+Online uses peer-to-peer mode by default, so mobile builds need no extra configuration. Only if you use the optional lobby server: set `VITE_LOBBY_URL` to its `wss://` address (Android blocks plain `ws://` from the app's secure origin), or enter it in Settings. Haptics and fullscreen status bar handling use Capacitor plugins on device.
 
-```powershell
-powershell -File scripts/run-isolated.ps1 smoke      D:\agent-work\ringer3d\<date>-smoke
-powershell -File scripts/run-isolated.ps1 visual     D:\agent-work\ringer3d\<date>-visual
-powershell -File scripts/run-isolated.ps1 online-e2e D:\agent-work\ringer3d\<date>-online
+## Desktop (Tauri)
+
+Requires [Rust and the Tauri prerequisites](https://tauri.app/start/prerequisites/).
+
+```bash
+npm run desktop:dev      # native window with hot reload
+npm run desktop:build    # installers for the current OS (Windows .msi/.exe, macOS .dmg, Linux .deb/.AppImage)
 ```
 
-- `smoke` plays real flicks through the UI on a phone and a desktop viewport.
-- `visual` shoots every taw close up, the versus screen and each field.
-- `online-e2e` starts the server; one browser hosts, the other finds the ring
-  in the server browser, they connect and play first-to-7, and both must agree.
+## Continuous integration
 
-## Credits
+Every push builds and checks all targets on GitHub Actions (`.github/workflows/`):
 
-Music was generated locally with ACE-Step 1.5 (MIT; trained on licensed and
-royalty-free data). Everything else (textures, marbles, sound effects) is
-procedural code in this repository.
+- **Build all platforms**: typecheck, tests and web build; Android debug APK; iOS simulator app; desktop installers for Linux, Windows and macOS. Builds are downloadable as run artifacts.
+- **Device smoke tests**: boots an Android emulator and an iPhone simulator, installs and launches the app, fails if it crashes or logs an uncaught JS error, and publishes screenshots and logs to the `ci-screens` branch.
+- **Online e2e**: two browser profiles find each other in the server browser, connect and play; runs in peer-to-peer and lobby-server modes.
+- **Deploy web to GitHub Pages** (on `main`): enable Pages with source "GitHub Actions" in the repository settings and set the repository variable `PAGES_ENABLED=true` (or run the workflow manually). Online works there in peer-to-peer mode; set the repository variable `LOBBY_URL` only if you run the optional lobby server.
+
+## Tuning
+
+- Physics constants: `src/core/constants.ts` (ring size, shot speed, step rate) and each arena's `surface` in `src/game/arenas.ts` (rolling resistance, friction, bounce).
+- Bot skill: `src/ai/profiles.ts`.
+- Story ladder, fighters, quotes and endings: `src/game/story.ts`.
+
+Changing physics constants changes simulation results, so bump `PROTOCOL_VERSION` in `src/net/protocol.ts` when you do — the lobby refuses to mix versions.
