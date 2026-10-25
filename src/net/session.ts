@@ -10,6 +10,17 @@ import type { GameMsg, RoomInfo, SeatInfo } from './protocol';
 
 export const SEAT_COLORS = ['#5ad1ff', '#ff5a7a', '#5cff9d', '#ffd23f'];
 
+/**
+ * The seed for this device's own random choices (its bots' hands): the
+ * room's seed mixed with the peer id (FNV-1a). A shared seed made bots on two
+ * devices throw identical lags and tie forever.
+ */
+export function deviceSeed(roomSeed: number, peerId: string): number {
+  let h = (2166136261 ^ roomSeed) >>> 0;
+  for (let i = 0; i < peerId.length; i++) h = Math.imul(h ^ peerId.charCodeAt(i), 16777619);
+  return h >>> 0;
+}
+
 export interface SessionEvents {
   onRoom?: (room: RoomInfo) => void;
   onRoster?: (seats: SeatInfo[]) => void;

@@ -11,7 +11,7 @@ import { DEFAULT_CONFIG } from '../core/types';
 import { Match, type MatchEvents, type MatchPlayer, type Role } from '../game/match';
 import { LobbyClient, customServer, lobbyUrl, normaliseServer, setCustomServer } from '../net/lobby';
 import type { GameMsg, RoomInfo, SeatInfo } from '../net/protocol';
-import { NetSession } from '../net/session';
+import { NetSession, deviceSeed } from '../net/session';
 import { tap } from '../platform/haptics';
 import { Controls } from '../input/controls';
 import { ARENAS, arenaById } from '../render/arenas';
@@ -663,7 +663,9 @@ export class App {
       majority: msg.majority,
       lag: msg.lag,
       role: s.isHost ? 'host' : 'client',
-      seed: msg.seed,
+      // Each device's own bots need their own dice: a shared seed made two
+      // devices' bots throw identical lags and tie forever.
+      seed: deviceSeed(msg.seed, s.you),
       net: {
         onShot: (player, seq, shot) => s.send({ k: 'shot', player, seq, shot }),
         onOutcome: (o) => s.send(o),

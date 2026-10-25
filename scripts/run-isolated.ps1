@@ -1,6 +1,8 @@
 # Run one of the headless scripts in the isolated window station (never on
 # the interactive desktop). Launch hidden for long runs:
-#   Start-Process powershell -WindowStyle Hidden -ArgumentList '-NoProfile','-File','scripts\run-isolated.ps1','online-e2e','D:\agent-work\ringer3d\<date>-online'
+#   Start-Process powershell -WindowStyle Hidden -ArgumentList '-NoProfile -File "<repo>\scripts\run-isolated.ps1" -Script online-e2e -OutDir D:\agent-work\ringer3d\<date>-online -Extra --autoplay'
+# Quote the script path (the profile path has a space) and pass script flags
+# through -Extra: a bare `--flag` is parsed as a parameter of this script.
 param(
   [Parameter(Mandatory = $true)][string]$Script,
   [Parameter(Mandatory = $true)][string]$OutDir,
