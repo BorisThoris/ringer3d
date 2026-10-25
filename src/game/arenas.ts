@@ -1,6 +1,15 @@
 import { DEFAULT_SURFACE, type SurfaceParams } from '../core/types';
 
-export type ArenaId = 'schoolyard' | 'zen' | 'rooftop' | 'glacier' | 'caldera';
+/**
+ * The five fields. Each is a real place built from CC0 photographic assets (see
+ * public/assets/CREDITS.md): the ground is a scanned PBR material, the backdrop and
+ * reflections come from an HDRI shot at a matching location, props are scanned models.
+ * The surface changes the physics, the sound and the visual effects of every roll.
+ */
+export type ArenaId = 'desk' | 'culdesac' | 'grass' | 'sand' | 'ice';
+
+/** How the ground behaves and sounds; drives audio and visual surface effects. */
+export type SurfaceKind = 'wood' | 'concrete' | 'grass' | 'sand' | 'ice';
 
 export interface Arena {
   id: ArenaId;
@@ -8,93 +17,127 @@ export interface Arena {
   tagline: string;
   /** Gameplay feel of the ground. Same for every player in the match. */
   surface: SurfaceParams;
+  surfaceKind: SurfaceKind;
   surfaceLabel: string;
+  /** Asset folder under public/assets/. */
+  assets: string;
+  /** Fallback sky when the HDRI has not loaded (or failed). */
   sky: { top: string; bottom: string };
   fog: { color: string; near: number; far: number };
+  /** Matches the sun (or window) in the HDRI, so shadows agree with the backdrop. */
   sun: { color: string; intensity: number; dir: [number, number, number] };
   ambient: { sky: string; ground: string; intensity: number };
-  ground: { base: string; detail: string; pattern: 'asphalt' | 'sand' | 'tiles' | 'ice' | 'basalt' };
-  ring: { color: string; glow: number; style: 'chalk' | 'rope' | 'neon' | 'etched' | 'lava' };
-  props: 'playground' | 'garden' | 'city' | 'ice' | 'volcano';
+  /** Fallback ground colour, shown until the PBR textures arrive. */
+  groundColor: string;
+  ring: { color: string; style: 'chalk' | 'string' | 'drawn' | 'etched' };
   exposure: number;
+  /** HDRI brightness as reflections / as backdrop. */
+  envIntensity: number;
+  backgroundIntensity: number;
 }
 
 export const ARENAS: Record<ArenaId, Arena> = {
-  schoolyard: {
-    id: 'schoolyard',
-    name: 'Schoolyard',
-    tagline: 'Where every legend learned to knuckle down.',
+  desk: {
+    id: 'desk',
+    name: 'The Desk',
+    tagline: 'Homework can wait. Varnished oak, lamp on, ring of string.',
+    surface: { ...DEFAULT_SURFACE, rollDecel: 8, friction: 0.5, linearDamping: 0.06, marbleRestitution: 0.94 },
+    surfaceKind: 'wood',
+    surfaceLabel: 'Varnished wood · quick',
+    assets: 'desk',
+    sky: { top: '#d9c3a3', bottom: '#8a6a4a' },
+    fog: { color: '#cdb796', near: 60, far: 160 },
+    // Window light, measured from the HDRI (raised to 30° so shadows stay readable).
+    sun: { color: '#ffe6c4', intensity: 2.2, dir: [7.0, 6.0, 7.7] },
+    ambient: { sky: '#fff0d8', ground: '#5a3c22', intensity: 0.25 },
+    groundColor: '#5a3420',
+    ring: { color: '#f2ece0', style: 'string' },
+    exposure: 1.0,
+    envIntensity: 1,
+    backgroundIntensity: 1,
+  },
+  culdesac: {
+    id: 'culdesac',
+    name: 'The Cul-de-sac',
+    tagline: 'Chalk on concrete, the gutter one bad flick away.',
     surface: { ...DEFAULT_SURFACE },
-    surfaceLabel: 'Asphalt · balanced',
+    surfaceKind: 'concrete',
+    surfaceLabel: 'Concrete · balanced',
+    assets: 'culdesac',
     sky: { top: '#5aa9ff', bottom: '#dff1ff' },
-    fog: { color: '#cfe7ff', near: 30, far: 90 },
-    sun: { color: '#fff4e0', intensity: 3.2, dir: [6, 12, 4] },
-    ambient: { sky: '#bfe0ff', ground: '#6b6256', intensity: 1.1 },
-    ground: { base: '#4a4d52', detail: '#5d6066', pattern: 'asphalt' },
-    ring: { color: '#f5f5f0', glow: 0, style: 'chalk' },
-    props: 'playground',
+    fog: { color: '#cfe7ff', near: 80, far: 220 },
+    sun: { color: '#fff3e2', intensity: 2.0, dir: [8.4, 6.0, 6.2] },
+    ambient: { sky: '#bfe0ff', ground: '#6b6256', intensity: 0.25 },
+    groundColor: '#8d8a84',
+    ring: { color: '#f7f5ef', style: 'chalk' },
     exposure: 1.0,
+    envIntensity: 1,
+    backgroundIntensity: 1,
   },
-  zen: {
-    id: 'zen',
-    name: 'Zen Garden',
-    tagline: 'Raked sand. Patient hands. Slow rolls.',
-    surface: { ...DEFAULT_SURFACE, rollDecel: 14, friction: 0.75 },
-    surfaceLabel: 'Packed sand · grippy, slow',
-    sky: { top: '#ff9a6b', bottom: '#ffe1c2' },
-    fog: { color: '#ffd8b8', near: 25, far: 80 },
-    sun: { color: '#ffc58a', intensity: 2.6, dir: [-8, 6, 3] },
-    ambient: { sky: '#ffd0a8', ground: '#7a6a55', intensity: 1.0 },
-    ground: { base: '#d9c7a3', detail: '#c6b08a', pattern: 'sand' },
-    ring: { color: '#5b3d22', glow: 0, style: 'rope' },
-    props: 'garden',
+  grass: {
+    id: 'grass',
+    name: 'The Back Lawn',
+    tagline: 'Fresh-cut grass grabs every marble. Flick hard.',
+    surface: { ...DEFAULT_SURFACE, rollDecel: 21, friction: 0.85, linearDamping: 0.25, angularDamping: 0.6, marbleRestitution: 0.9 },
+    surfaceKind: 'grass',
+    surfaceLabel: 'Lawn · grippy, slow',
+    assets: 'grass',
+    sky: { top: '#5aa9ff', bottom: '#e6f4ff' },
+    fog: { color: '#d6ebff', near: 80, far: 220 },
+    sun: { color: '#fff4e0', intensity: 3.2, dir: [4.2, 10.8, 3.1] },
+    ambient: { sky: '#cfe6ff', ground: '#3f5a26', intensity: 0.25 },
+    groundColor: '#4d6b2a',
+    ring: { color: '#f4f1e8', style: 'string' },
     exposure: 1.0,
+    envIntensity: 1,
+    backgroundIntensity: 1,
   },
-  rooftop: {
-    id: 'rooftop',
-    name: 'Neon Rooftop',
-    tagline: 'Midnight money matches above the city.',
-    surface: { ...DEFAULT_SURFACE, rollDecel: 9, friction: 0.5 },
-    surfaceLabel: 'Polished tile · quick',
-    sky: { top: '#06030f', bottom: '#2a0f46' },
-    fog: { color: '#1a0b2e', near: 20, far: 70 },
-    sun: { color: '#b48cff', intensity: 1.2, dir: [3, 10, -6] },
-    ambient: { sky: '#5a3c9a', ground: '#120a20', intensity: 0.7 },
-    ground: { base: '#1c1a24', detail: '#2a2735', pattern: 'tiles' },
-    ring: { color: '#00f0ff', glow: 2.5, style: 'neon' },
-    props: 'city',
-    exposure: 1.15,
+  sand: {
+    id: 'sand',
+    name: 'The Beach',
+    tagline: 'Ring drawn with a finger. Sand eats speed and keeps tracks.',
+    surface: { ...DEFAULT_SURFACE, rollDecel: 27, friction: 0.95, linearDamping: 0.32, angularDamping: 0.7, marbleRestitution: 0.88 },
+    surfaceKind: 'sand',
+    surfaceLabel: 'Sand · heavy, short rolls',
+    assets: 'sand',
+    sky: { top: '#4f9be8', bottom: '#e9f4ff' },
+    fog: { color: '#e3eef7', near: 80, far: 240 },
+    sun: { color: '#fff1d6', intensity: 3.4, dir: [6.4, 6.3, 7.9] },
+    ambient: { sky: '#cfe6ff', ground: '#a8916a', intensity: 0.25 },
+    groundColor: '#cdbb98',
+    ring: { color: '#3d2f1f', style: 'drawn' },
+    exposure: 1.0,
+    envIntensity: 1,
+    backgroundIntensity: 1,
   },
-  glacier: {
-    id: 'glacier',
-    name: 'Glacier Hall',
-    tagline: 'Nothing stops on ice. Not even regret.',
-    surface: { ...DEFAULT_SURFACE, rollDecel: 6.5, friction: 0.3, linearDamping: 0.05 },
+  ice: {
+    id: 'ice',
+    name: 'The Frozen Lake',
+    tagline: 'Black ice, a ring scratched with a skate. Nothing stops.',
+    surface: { ...DEFAULT_SURFACE, rollDecel: 4.5, friction: 0.22, linearDamping: 0.035, angularDamping: 0.15, marbleRestitution: 0.95 },
+    surfaceKind: 'ice',
     surfaceLabel: 'Ice · very slick',
-    sky: { top: '#3f7fc8', bottom: '#cfe6f7' },
-    fog: { color: '#b9d8ee', near: 30, far: 95 },
-    sun: { color: '#eaf6ff', intensity: 2.0, dir: [4, 14, 8] },
-    ambient: { sky: '#bfe0ff', ground: '#3d6b91', intensity: 0.85 },
-    ground: { base: '#6fa6cc', detail: '#a8d2ec', pattern: 'ice' },
-    ring: { color: '#e9f8ff', glow: 0.9, style: 'etched' },
-    props: 'ice',
-    exposure: 0.85,
-  },
-  caldera: {
-    id: 'caldera',
-    name: 'Caldera',
-    tagline: 'The Black Taw waits where the earth bleeds.',
-    surface: { ...DEFAULT_SURFACE, rollDecel: 11.5, marbleRestitution: 0.95 },
-    surfaceLabel: 'Basalt · lively bounces',
-    sky: { top: '#120404', bottom: '#5a1406' },
-    fog: { color: '#2b0905', near: 18, far: 60 },
-    sun: { color: '#ff6a2b', intensity: 1.8, dir: [-4, 9, -5] },
-    ambient: { sky: '#7a2410', ground: '#1a0603', intensity: 0.8 },
-    ground: { base: '#22201f', detail: '#3a3230', pattern: 'basalt' },
-    ring: { color: '#ff5a1a', glow: 3, style: 'lava' },
-    props: 'volcano',
-    exposure: 1.1,
+    assets: 'ice',
+    sky: { top: '#7f9fc4', bottom: '#dfe8f2' },
+    fog: { color: '#dde6ef', near: 80, far: 220 },
+    // Overcast: the HDRI does the lighting, the sun only softens in a gentle shadow.
+    sun: { color: '#eef4ff', intensity: 0.9, dir: [6.1, 9.2, 4.7] },
+    ambient: { sky: '#d6e4f5', ground: '#5d7088', intensity: 0.25 },
+    groundColor: '#55697a',
+    ring: { color: '#eaf6ff', style: 'etched' },
+    exposure: 1.0,
+    envIntensity: 1,
+    backgroundIntensity: 1,
   },
 };
 
 export const ARENA_LIST: Arena[] = Object.values(ARENAS);
+
+/** Field ids from older builds (rooms, saved progress) mapped onto today's fields. */
+const LEGACY: Record<string, ArenaId> = { schoolyard: 'culdesac', zen: 'sand', rooftop: 'desk', glacier: 'ice', caldera: 'grass' };
+
+/** Any id, current or legacy, to a field that exists. */
+export function arenaId(id: string | undefined | null): ArenaId {
+  if (id && id in ARENAS) return id as ArenaId;
+  return (id && LEGACY[id]) || 'culdesac';
+}

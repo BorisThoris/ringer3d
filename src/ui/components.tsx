@@ -91,10 +91,11 @@ export function ArenaPicker({ value, onChange, allowed }: { value: ArenaId; onCh
             className="sky"
             style={
               {
-                background: `linear-gradient(180deg, ${a.sky.top}, ${a.sky.bottom})`,
+                // A crop of the field's real panorama, over its colours while it loads.
+                background: `center / cover url(./assets/${a.assets}/thumb.jpg), linear-gradient(180deg, ${a.sky.top}, ${a.sky.bottom})`,
                 '--ringc': a.ring.color,
-                '--glow': a.ring.glow,
-                '--groundc': a.ground.base,
+                '--glow': 0,
+                '--groundc': a.groundColor,
               } as CSSProperties
             }
           />

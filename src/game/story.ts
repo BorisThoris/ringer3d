@@ -30,9 +30,9 @@ export const FIGHTERS: Fighter[] = [
     intro: 'You knuckle down like you mean it. Good. So do I.',
     taunt: 'Keep the marble. Call it a souvenir.',
     defeat: 'Huh. Nobody\'s ever cooled me off before.',
-    homeArena: 'schoolyard',
+    homeArena: 'culdesac',
     ending:
-      'Ember carried the Black Taw home in her pocket and set it on the schoolyard wall. Every morning the kids touch it for luck before the bell. She never takes it down.',
+      'Ember carried the Black Taw home in her pocket and set it on the kerb at the end of her street. Every morning the kids touch it for luck on the way to school. She never takes it down.',
     starter: true,
   },
   {
@@ -44,7 +44,7 @@ export const FIGHTERS: Fighter[] = [
     intro: 'Every wave looks small until it takes your feet.',
     taunt: 'Washed out. Happens to everyone.',
     defeat: 'The tide always comes back. Remember that.',
-    homeArena: 'schoolyard',
+    homeArena: 'sand',
     ending:
       'Tide threw the Black Taw into the sea at dawn. Fishermen still swear something dark rolls along the sand at low tide, looking for a ring.',
     starter: true,
@@ -58,7 +58,7 @@ export const FIGHTERS: Fighter[] = [
     intro: 'Grandpa says clay doesn\'t crack. Let\'s test it!',
     taunt: 'Clay beats glass! I KNEW it!',
     defeat: 'Okay... okay. One more? Best of fifty?',
-    homeArena: 'schoolyard',
+    homeArena: 'grass',
     ending:
       'Pip pressed a dent of the Black Taw into fresh clay and fired it into a new shooter. It never wins pretty. It never stops winning.',
     starter: true,
@@ -72,7 +72,7 @@ export const FIGHTERS: Fighter[] = [
     intro: 'Breathe out. The marble already knows where it goes.',
     taunt: 'You flicked before you saw. Again tomorrow.',
     defeat: 'Your hand was quieter than your heart. Rare.',
-    homeArena: 'zen',
+    homeArena: 'grass',
     ending:
       'Jade buried the Black Taw beneath the oldest stone in the garden and raked a ring around it. The sand has never needed raking since.',
     starter: true,
@@ -82,13 +82,13 @@ export const FIGHTERS: Fighter[] = [
     marble: 'volt',
     name: 'Volt',
     title: 'The Night Shift',
-    bio: 'Runs the rooftop money games. Streams every shot. Has never been off camera, or off tilt.',
+    bio: 'Runs the money games on his bedroom desk. Streams every shot. Has never been off camera, or off tilt.',
     intro: 'Chat says you\'re cooked. Let\'s prove chat right.',
     taunt: 'Clip it. CLIP IT.',
     defeat: 'Stream\'s over. Don\'t... don\'t clip that.',
-    homeArena: 'rooftop',
+    homeArena: 'desk',
     ending:
-      'Volt broadcast the final shot to eleven million viewers. The Black Taw now spins on a pedestal in a neon case, and the rooftop has a waiting list a year long.',
+      'Volt broadcast the final shot to eleven million viewers. The Black Taw now spins on a pedestal in a neon case, and his desk has a waiting list a year long.',
     starter: false,
   },
   {
@@ -100,7 +100,7 @@ export const FIGHTERS: Fighter[] = [
     intro: 'On my ice, the timid slide forever.',
     taunt: 'Frozen out. As foretold.',
     defeat: 'Spring arrives early this year, it seems.',
-    homeArena: 'glacier',
+    homeArena: 'ice',
     ending:
       'Rime sealed the Black Taw inside a pillar of blue ice at the heart of Glacier Hall. On still nights you can see it glowing faintly, still trying to roll.',
     starter: false,
@@ -114,7 +114,7 @@ export const FIGHTERS: Fighter[] = [
     intro: 'Sorry in advance. It\'s a heavy marble.',
     taunt: 'Told you. Heavy.',
     defeat: 'Good shooting. Honest work.',
-    homeArena: 'rooftop',
+    homeArena: 'culdesac',
     ending:
       'Ironside melted the Black Taw into the foundry\'s next pour. Somewhere out there is a bridge that can never quite be crossed by the unworthy.',
     starter: false,
@@ -128,9 +128,9 @@ export const FIGHTERS: Fighter[] = [
     intro: 'I have played on rings around other suns.',
     taunt: 'Small ring. Small player.',
     defeat: 'Interesting. This planet has teeth.',
-    homeArena: 'glacier',
+    homeArena: 'sand',
     ending:
-      'Nova pocketed the Black Taw and pointed at the sky. "That one next," she said. Nobody has seen her since, but there is one more star over the caldera now.',
+      'Nova pocketed the Black Taw and pointed at the sky. "That one next," she said. Nobody has seen her since, but there is one more star over the beach now.',
     starter: false,
   },
   {
@@ -138,12 +138,12 @@ export const FIGHTERS: Fighter[] = [
     marble: 'obsidian',
     name: 'Obsidian',
     title: 'The Black Taw',
-    bio: 'The first marble ever shot, they say, cooled from the caldera itself. It has taken every ring it has ever entered. It keeps them.',
+    bio: 'The first marble ever shot, they say, cut from the black ice of a frozen lake. It has taken every ring it has ever entered. It keeps them.',
     intro: 'Every marble you ever lost... rolled to me.',
     taunt: 'For keeps.',
     defeat: 'Then keep me. If you can.',
-    homeArena: 'caldera',
-    ending: 'Obsidian takes your marble, as it has taken all the others. The caldera grows a little warmer.',
+    homeArena: 'ice',
+    ending: 'Obsidian takes your marble, as it has taken all the others. The lake freezes a little deeper.',
     starter: false,
   },
 ];
@@ -167,7 +167,7 @@ export function buildTower(playerFighter: string): TowerStage[] {
     arena: FIGHTERS.find((f) => f.id === id)!.homeArena,
     bot: bots[i],
   }));
-  stages.push({ opponent: 'obsidian', arena: 'caldera', bot: 'legend' });
+  stages.push({ opponent: 'obsidian', arena: 'ice', bot: 'legend' });
   return stages;
 }
 

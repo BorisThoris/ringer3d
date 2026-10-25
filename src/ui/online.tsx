@@ -29,7 +29,7 @@ export function OnlineHub({ onBack, onRoom }: { onBack: () => void; onRoom: (r: 
   const [busy, setBusy] = useState(false);
   const [code, setCode] = useState('');
   const [roomName, setRoomName] = useState(`${st.playerName}'s ring`);
-  const [arena, setArena] = useState<ArenaId>('schoolyard');
+  const [arena, setArena] = useState<ArenaId>('culdesac');
   const [maxPlayers, setMaxPlayers] = useState<'2' | '3' | '4'>('2');
   const [priv, setPriv] = useState(false);
 

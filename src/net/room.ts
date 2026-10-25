@@ -1,5 +1,5 @@
 import type { PlayerInfo } from '../core/types';
-import type { ArenaId } from '../game/arenas';
+import { arenaId, type ArenaId } from '../game/arenas';
 import { createStore } from '../game/store';
 import { PROTOCOL_VERSION, type OnlineMatchConfig, type PeerMsg, type RoomInfo, type RosterEntry } from './protocol';
 import type { Link, LinkMode, Matchmaker } from './transport';
@@ -35,7 +35,7 @@ const SHOOTER_POOL = ['ember', 'tide', 'jade', 'volt', 'rime', 'nova', 'ironside
 export class OnlineRoom implements NetGame {
   readonly mm: Matchmaker;
   readonly isHost: boolean;
-  readonly state = createStore<RoomState>({ room: null, roster: [], arena: 'schoolyard', started: false, error: null, links: {} });
+  readonly state = createStore<RoomState>({ room: null, roster: [], arena: 'culdesac', started: false, error: null, links: {} });
   private links = new Map<string, Link>();
   private hostId = '';
   private seats: Record<string, number> = {};
@@ -96,7 +96,7 @@ export class OnlineRoom implements NetGame {
     const room = new OnlineRoom(mm, false, { name: opts.name, marble: opts.marble });
     const res = await mm.join({ roomId: opts.roomId, code: opts.code, name: opts.name });
     room.hostId = res.hostId;
-    room.state.set({ room: res.room, arena: res.room.arena });
+    room.state.set({ room: res.room, arena: arenaId(res.room.arena) });
     const link = room.makeLink(res.hostId, false);
     link.send({ t: 'hello', name: opts.name, marble: opts.marble, version: PROTOCOL_VERSION });
     return room;
@@ -232,7 +232,7 @@ export class OnlineRoom implements NetGame {
     } else {
       switch (m.t) {
         case 'roster':
-          this.state.set({ roster: m.roster, arena: m.arena });
+          this.state.set({ roster: m.roster, arena: arenaId(m.arena) });
           return;
         case 'kick':
           this.state.set({ error: m.reason });
@@ -241,7 +241,7 @@ export class OnlineRoom implements NetGame {
         case 'start':
           this.seats = m.seats;
           this.mySeat = m.seats[this.mm.myId];
-          this.state.set({ started: true, arena: m.config.arena });
+          this.state.set({ started: true, arena: arenaId(m.config.arena) });
           this.startCbs.forEach((f) => f(m.config, m.seats));
           return;
         case 'seatLost':

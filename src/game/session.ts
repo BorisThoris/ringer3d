@@ -9,7 +9,7 @@ import type { NetGame } from '../net/room';
 import type { PeerMsg } from '../net/protocol';
 import { haptic, sound } from '../render/audio';
 import type { AimView, GameView } from '../render/GameView';
-import { ARENAS, type ArenaId } from './arenas';
+import { ARENAS, arenaId, type ArenaId } from './arenas';
 import { MARBLES } from './marbles';
 import { guideLength, settings } from './settings';
 import { hud, showBanner } from './store';
@@ -69,6 +69,8 @@ export class GameSession {
   constructor(view: GameView, opts: SessionOptions) {
     this.view = view;
     this.opts = opts;
+    // Older peers may send a retired field id; every device maps it the same way.
+    opts.arena = arenaId(opts.arena);
     const surface = ARENAS[opts.arena].surface;
     this.match = new Match({ players: opts.players, seed: opts.seed, surface });
     this.aim = {
@@ -111,12 +113,10 @@ export class GameSession {
       this.offs.push(net.onHostLost(() => this.abort('The host left the match.')));
     }
 
+    sound.setSurface(ARENAS[this.opts.arena].surfaceKind);
     if (!this.isDemo) {
-      const mood = ({ schoolyard: 'bright', zen: 'calm', rooftop: 'night', glacier: 'cold', caldera: 'ominous' } as const)[this.opts.arena];
-      // Caldera is the Black Taw's ground: boss music there. The pad stays as a fallback.
-      void sound.playTrack(this.opts.arena === 'caldera' ? 'boss' : 'match').then((ok) => {
-        if (!ok && !this.disposed) sound.startPad(mood);
-      });
+      const mood = ({ desk: 'calm', culdesac: 'bright', grass: 'bright', sand: 'calm', ice: 'cold' } as const)[this.opts.arena];
+      sound.startPad(mood);
     }
     hud.set({
       active: !this.isDemo,
@@ -201,13 +201,15 @@ export class GameSession {
       case 'shot':
         this.view.camMode = this.isDemo ? 'attract' : 'follow';
         if (!demo) {
-          sound.clack(40);
+          sound.launch(e.shot.power);
           if (settings.get().haptics) haptic(12);
         }
         this.refreshHud();
         break;
       case 'impact':
         if (!demo || e.strength > 200) sound.clack(demo ? e.strength * 0.15 : e.strength, e.kind);
+        // The ground answers every collision: sand spray, frost, dust.
+        if (e.strength > 30) this.view.surfaceImpact(e.pos, e.strength);
         if (!demo && e.strength > 400 && settings.get().haptics) haptic(8);
         break;
       case 'capture': {
@@ -598,10 +600,7 @@ export class GameSession {
     this.view.unbindMatch();
     this.match.dispose();
     sound.setRolling(0);
-    if (!this.isDemo) {
-      sound.stopPad();
-      void sound.playTrack('menu');
-    }
+    if (!this.isDemo) sound.stopPad();
     hud.set({ active: false, banner: null, thinking: false });
   }
 }

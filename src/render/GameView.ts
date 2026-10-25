@@ -10,6 +10,7 @@ import { ARENAS, type ArenaId } from '../game/arenas';
 import { MIB_LOOKS, type MarbleLook } from '../game/marbles';
 import { buildArena, type BuiltArena } from './arenaBuilder';
 import { buildMarble, disposeObject, type Quality } from './marbleMesh';
+import { SurfaceFx, type Mover } from './surfaceFx';
 import { radialGlowTexture } from './textures';
 
 export type CamMode = 'attract' | 'aim' | 'top' | 'follow' | 'overview';
@@ -67,6 +68,9 @@ export class GameView {
   private lastSim: unknown = null;
   private leaving: Leaving[] = [];
   private bursts: Burst[] = [];
+  /** Sand spray and grooves, grass clippings, ice scratches, concrete dust. */
+  private surfaceFx: SurfaceFx;
+  private movers: Mover[] = [];
 
   private match: Match | null = null;
   private looks: MarbleLook[] = [];
@@ -110,6 +114,7 @@ export class GameView {
     this.camera = new THREE.PerspectiveCamera(50, 1, 0.05, 400);
     this.scene.add(this.marbleRoot);
     this.pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.surfaceFx = new SurfaceFx(this.scene);
 
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
@@ -174,24 +179,34 @@ export class GameView {
       this.scene.remove(this.arena.root);
       this.arena.dispose();
     }
-    this.arena = buildArena(def, this.quality);
-    this.scene.add(this.arena.root);
+    const built = buildArena(def, this.quality);
+    this.arena = built;
+    this.scene.add(built.root);
     this.scene.fog = new THREE.Fog(def.fog.color, def.fog.near, def.fog.far);
     this.renderer.toneMappingExposure = def.exposure;
+    this.surfaceFx.setSurface(def.surfaceKind);
+    // Gradient reflections until the field's HDRI arrives, then the real place.
     this.envTex?.dispose();
-    this.envTex = this.pmrem.fromScene(this.arena.envScene, 0.02).texture;
+    this.envTex = this.pmrem.fromScene(built.envScene, 0.02).texture;
     this.scene.environment = this.envTex;
-    this.scene.environmentIntensity = def.props === 'city' || def.props === 'volcano' ? 0.8 : 1;
+    this.scene.environmentIntensity = def.envIntensity;
+    void built.sky.then(({ hdr }) => {
+      if (this.arena !== built || !hdr) return;
+      this.envTex?.dispose();
+      this.envTex = this.pmrem.fromEquirectangular(hdr).texture;
+      this.scene.environment = this.envTex;
+    });
     this.sunDir.set(...def.sun.dir).normalize();
-    // Lamp-lit night arenas throw weaker sunlight caustics.
+    // Overcast fields throw weaker sunlight caustics.
     this.causticStrength = Math.min(1, def.sun.intensity / 3);
-    this.bloom.strength = def.ring.glow > 1 ? 0.75 : 0.35;
+    this.bloom.strength = 0.3;
     this.bloom.enabled = this.quality !== 'low';
   }
 
   /** Attach a match: builds marble meshes for the 13 mibs and each player's shooter. */
   bindMatch(match: Match, looks: MarbleLook[]) {
     this.clearMarbles();
+    this.surfaceFx.clear();
     this.match = match;
     this.looks = looks;
     for (const t of match.layout.targets) {
@@ -357,6 +372,7 @@ export class GameView {
     }
 
     const sim = m.sim;
+    this.movers.length = 0;
     if (sim) {
       if (sim !== this.lastSim) {
         this.lastSim = sim;
@@ -366,6 +382,8 @@ export class GameView {
         const mesh = b.id === SHOOTER_ID ? shooter : this.targetMeshes.get(b.id);
         if (!mesh) continue;
         const t = b.body.translation();
+        const v = b.body.linvel();
+        this.movers.push({ id: b.id, x: t.x, y: t.y, z: t.z, vx: v.x, vz: v.z, radius: b.radius });
         mesh.position.set(t.x, t.y, t.z);
         mesh.visible = true;
         const r = b.body.rotation();
@@ -511,7 +529,13 @@ export class GameView {
     mesh.scale.set(len, 1, width);
   }
 
+  /** The ground answers a collision: sand spray, frost, dust. */
+  surfaceImpact(pos: { x: number; y: number; z: number }, strength: number) {
+    this.surfaceFx.impact(pos, strength);
+  }
+
   private updateEffects(dt: number) {
+    this.surfaceFx.update(dt, this.match?.sim ? this.movers : []);
     for (const b of this.bursts) {
       b.life -= dt * 1.2;
       const pos = b.points.geometry.attributes.position as THREE.BufferAttribute;
@@ -650,6 +674,7 @@ export class GameView {
     this.resizeObs.disconnect();
     this.clearMarbles();
     this.arena?.dispose();
+    this.surfaceFx.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }

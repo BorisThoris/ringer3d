@@ -1,14 +1,41 @@
+import type { SurfaceKind } from '../game/arenas';
 import { vibrate } from '../platform';
+import { sample } from './assets';
 
-export type Track = 'menu' | 'match' | 'boss';
+/** Real recordings (Kenney Impact Sounds, CC0) for each surface's contacts. */
+const SURFACE_SOUNDS: Record<SurfaceKind, { kerb: string; tap: string; kerbVol: number; tapVol: number }> = {
+  wood: { kerb: 'impactWood_medium', tap: 'impactWood_light', kerbVol: 0.9, tapVol: 0.5 },
+  concrete: { kerb: 'impactPlate_medium', tap: 'footstep_concrete', kerbVol: 0.8, tapVol: 0.35 },
+  grass: { kerb: 'impactSoft_heavy', tap: 'footstep_grass', kerbVol: 0.9, tapVol: 0.4 },
+  sand: { kerb: 'impactSoft_heavy', tap: 'impactSoft_medium', kerbVol: 0.8, tapVol: 0.35 },
+  ice: { kerb: 'impactPlate_light', tap: 'footstep_snow', kerbVol: 0.8, tapVol: 0.3 },
+};
 
-/** Synthesised sound (glass clacks, rolling, chimes, an ambient pad) plus looped music tracks. */
+/** How each surface colours the rolling rumble: filter shape and loudness. */
+const ROLL_TONE: Record<SurfaceKind, { type: BiquadFilterType; freq: number; q: number; gain: number }> = {
+  wood: { type: 'lowpass', freq: 380, q: 4, gain: 1.1 }, // hollow, resonant desk
+  concrete: { type: 'bandpass', freq: 950, q: 0.7, gain: 0.9 }, // gritty
+  grass: { type: 'highpass', freq: 2600, q: 0.6, gain: 0.45 }, // soft swish
+  sand: { type: 'bandpass', freq: 3600, q: 0.5, gain: 0.55 }, // hiss
+  ice: { type: 'bandpass', freq: 1900, q: 3.5, gain: 0.75 }, // thin, ringing
+};
+
+const TAKES = 5;
+
+/**
+ * Sound: recorded glass impacts and surface contacts (CC0, public/assets/sfx), a synthesised
+ * rolling rumble shaped by the surface, chimes and an ambient pad. If a recording has not
+ * loaded the synthesised version plays, so there is never silence.
+ */
 export class Sound {
   private ctx: AudioContext | null = null;
   private master!: GainNode;
   private sfx!: GainNode;
   private music!: GainNode;
   private rollGain: GainNode | null = null;
+  private rollFilter: BiquadFilterNode | null = null;
+  private surface: SurfaceKind = 'concrete';
+  private buffers = new Map<string, AudioBuffer>();
   private noise: AudioBuffer | null = null;
   private padNodes: AudioNode[] = [];
   private lastClack = 0;
@@ -37,7 +64,60 @@ export class Sound {
     const d = this.noise.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     this.startRoll();
-    if (this.wanted) void this.playTrack(this.wanted);
+    this.preload(['impactGlass_light', 'impactGlass_medium', 'impactGlass_heavy']);
+    this.setSurface(this.surface);
+  }
+
+  private preload(names: string[]) {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    for (const n of names) {
+      for (let i = 0; i < TAKES; i++) {
+        const key = `${n}_${String(i).padStart(3, '0')}`;
+        if (this.buffers.has(key)) continue;
+        void sample(ctx, key).then((b) => b && this.buffers.set(key, b));
+      }
+    }
+  }
+
+  /** Play a random take of a recording; false if none is loaded yet. */
+  private play(name: string, vol: number, rate = 1): boolean {
+    const ctx = this.ctx;
+    if (!ctx) return false;
+    const takes: AudioBuffer[] = [];
+    for (let i = 0; i < TAKES; i++) {
+      const b = this.buffers.get(`${name}_${String(i).padStart(3, '0')}`);
+      if (b) takes.push(b);
+    }
+    if (!takes.length) return false;
+    const src = ctx.createBufferSource();
+    src.buffer = takes[Math.floor(Math.random() * takes.length)];
+    src.playbackRate.value = rate * (0.94 + Math.random() * 0.12);
+    const g = ctx.createGain();
+    g.gain.value = vol;
+    src.connect(g).connect(this.sfx);
+    src.start();
+    return true;
+  }
+
+  /** The ground changes: its contact recordings and the colour of the rolling sound. */
+  setSurface(kind: SurfaceKind) {
+    this.surface = kind;
+    const s = SURFACE_SOUNDS[kind];
+    this.preload([s.kerb, s.tap]);
+    const ctx = this.ctx;
+    if (ctx && this.rollFilter) {
+      const t = ROLL_TONE[kind];
+      this.rollFilter.type = t.type;
+      this.rollFilter.frequency.setTargetAtTime(t.freq, ctx.currentTime, 0.05);
+      this.rollFilter.Q.setTargetAtTime(t.q, ctx.currentTime, 0.05);
+    }
+  }
+
+  /** The thumb flick: the shooter scuffs the surface as it leaves. */
+  launch(power: number) {
+    const s = SURFACE_SOUNDS[this.surface];
+    this.play(s.tap, s.tapVol * (0.4 + power * 0.6));
   }
 
   setVolumes(sfx: number, music: number) {
@@ -58,6 +138,14 @@ export class Sound {
     this.lastClack = now;
     const vol = Math.min(1, Math.log10(1 + strength) / 3.2);
     if (vol < 0.04) return;
+    // Real recordings first: glass on glass, or the field's own boundary material.
+    if (kind === 'kerb') {
+      const s = SURFACE_SOUNDS[this.surface];
+      if (this.play(s.kerb, vol * s.kerbVol)) return;
+    } else {
+      const take = vol > 0.75 ? 'impactGlass_heavy' : vol > 0.4 ? 'impactGlass_medium' : 'impactGlass_light';
+      if (this.play(take, 0.25 + vol * 0.75, 1.15)) return;
+    }
     const out = ctx.createGain();
     out.gain.value = vol;
     out.connect(this.sfx);
@@ -113,6 +201,7 @@ export class Sound {
     const lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
     lp.frequency.value = 420;
+    this.rollFilter = lp;
     this.rollGain = ctx.createGain();
     this.rollGain.gain.value = 0;
     n.connect(lp).connect(this.rollGain).connect(this.sfx);
@@ -122,7 +211,7 @@ export class Sound {
   /** Continuous rolling rumble, driven every frame by total marble speed. */
   setRolling(speed: number) {
     if (!this.ctx || !this.rollGain) return;
-    const v = Math.min(0.35, speed * 0.02);
+    const v = Math.min(0.35, speed * 0.02) * ROLL_TONE[this.surface].gain;
     this.rollGain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.08);
   }
 
@@ -189,67 +278,6 @@ export class Sound {
         this.padNodes.push(o, lfo);
       }
     }
-  }
-
-  // ---- Music tracks (public/music, rendered locally with ACE-Step) ----------
-
-  private tracks = new Map<Track, Promise<AudioBuffer | null>>();
-  private current: { name: Track; src: AudioBufferSourceNode; gain: GainNode } | null = null;
-  private wanted: Track | null = 'menu';
-
-  private load(name: Track): Promise<AudioBuffer | null> {
-    let p = this.tracks.get(name);
-    if (!p) {
-      const ctx = this.ctx!;
-      p = fetch(`./music/${name}.mp3`)
-        .then((r) => (r.ok ? r.arrayBuffer() : null))
-        .then((b) => (b ? ctx.decodeAudioData(b) : null))
-        .catch(() => null);
-      this.tracks.set(name, p);
-    }
-    return p;
-  }
-
-  /**
-   * Loop a track on the music bus (so the music volume setting applies),
-   * crossfading from whatever was playing. Resolves false if it could not
-   * load, so callers can fall back to the synth pad.
-   */
-  async playTrack(name: Track): Promise<boolean> {
-    this.wanted = name;
-    const ctx = this.ctx;
-    if (!ctx) return true; // starts on unlock
-    if (this.current?.name === name) return true;
-    const buf = await this.load(name);
-    if (!buf || this.wanted !== name) return !!buf;
-    this.stopPad();
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    src.loop = true;
-    const gain = ctx.createGain();
-    gain.gain.value = 0;
-    gain.gain.linearRampToValueAtTime(1, ctx.currentTime + 1.2);
-    src.connect(gain).connect(this.music);
-    src.start();
-    this.fadeOutCurrent();
-    this.current = { name, src, gain };
-    return true;
-  }
-
-  stopTrack() {
-    this.wanted = null;
-    this.fadeOutCurrent();
-  }
-
-  private fadeOutCurrent() {
-    const c = this.current;
-    const ctx = this.ctx;
-    if (!c || !ctx) return;
-    this.current = null;
-    c.gain.gain.cancelScheduledValues(ctx.currentTime);
-    c.gain.gain.setValueAtTime(c.gain.gain.value, ctx.currentTime);
-    c.gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.2);
-    c.src.stop(ctx.currentTime + 1.3);
   }
 
   stopPad() {

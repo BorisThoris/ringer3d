@@ -54,7 +54,7 @@ afterAll(() => {
 describe('lobby server', () => {
   it('hosts, lists, joins by code, relays signals only within a room, and cleans up', async () => {
     const host = await new Client().ready();
-    host.send({ t: 'create', name: 'Test ring', hostName: 'Hosty', arena: 'zen', maxPlayers: 2, private: false, version: 1 });
+    host.send({ t: 'create', name: 'Test ring', hostName: 'Hosty', arena: 'sand', maxPlayers: 2, private: false, version: 1 });
     const created = await host.next('created');
     const room = created.room as { id: string; code: string };
     expect(room.code).toMatch(/^[A-Z]{4}$/);

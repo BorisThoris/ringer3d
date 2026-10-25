@@ -11,6 +11,8 @@ import { GameView } from '../render/GameView';
 /** Owns the single 3D canvas for the app's lifetime and swaps game sessions in and out. */
 class Engine {
   view: GameView | null = null;
+  /** For diagnostics and end-to-end checks (decoded samples, context state). */
+  readonly sound = sound;
   controls: Controls | null = null;
   session: GameSession | null = null;
   private demoArena = 0;

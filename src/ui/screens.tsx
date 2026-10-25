@@ -70,7 +70,7 @@ const DIFFICULTIES = ['rookie', 'casual', 'skilled', 'expert', 'master', 'legend
 
 export function QuickPlay({ onBack, onStart }: { onBack: () => void; onStart: (arena: ArenaId, players: PlayerInfo[]) => void }) {
   const st = settings.use((s) => s);
-  const [arena, setArena] = useState<ArenaId>('schoolyard');
+  const [arena, setArena] = useState<ArenaId>('culdesac');
   const [diff, setDiff] = useState<(typeof DIFFICULTIES)[number]>('casual');
   const [opp, setOpp] = useState('tide');
   const oppOptions = FIGHTERS.filter((f) => f.marble !== st.marble).map((f) => f.id);
@@ -127,7 +127,7 @@ export function QuickPlay({ onBack, onStart }: { onBack: () => void; onStart: (a
 
 export function LocalPlay({ onBack, onStart }: { onBack: () => void; onStart: (arena: ArenaId, players: PlayerInfo[]) => void }) {
   const st = settings.get();
-  const [arena, setArena] = useState<ArenaId>('schoolyard');
+  const [arena, setArena] = useState<ArenaId>('culdesac');
   const [players, setPlayers] = useState<{ name: string; marble: string }[]>([
     { name: st.playerName, marble: st.marble },
     { name: 'Player 2', marble: st.marble === 'tide' ? 'ember' : 'tide' },
