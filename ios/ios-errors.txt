@@ -1,6 +1,5 @@
-2026-10-25 14:05:42.302 E  App[13748:ac42] [com.apple.TextInputUI:CandidateGeneration] Attempted to update accumulator from source type: 0, after completion has already been called for token:[50787527]. This is an error and will be ignored.
-2026-10-25 14:05:42.979 E  App[13748:abfe] [com.apple.WebKit:ResourceLoadStatistics] Failed to request known fingerprinting scripts from WebPrivacy: Error Domain=WebPrivacyErrorDomain Code=1001 "List data not found" UserInfo={NSLocalizedDescription=List data not found}
-2026-10-25 14:05:45.001 Df App[13748:ac2a] [com.apple.xpc:connection] [0x10120cdd0] Re-initialization successful; calling out to event handler with XPC_ERROR_CONNECTION_INTERRUPTED
-2026-10-25 14:05:46.805 Df App[13748:ac26] [com.apple.AppSSO:SOClient] configurationWithCompletion: success = YES, error = (null)
-2026-10-25 14:06:06.210 E  App[13748:ad09] [com.apple.imageio:com.apple.WebKit.WebContent] WebContent[13778] makeImagePlus:3798: *** ERROR: 'JPEG'-_reader->initImage[0] failed err=3
-2026-10-25 14:07:40.412 E  App[13748:ad09] [com.apple.imageio:com.apple.WebKit.WebContent] WebContent[13778] makeImagePlus:3798: *** ERROR: 'JPEG'-_reader->initImage[0] failed err=3
+2026-10-25 15:04:20.440 Df App[6236:61f6] [com.apple.AppSSO:SOClient] configurationWithCompletion: success = YES, error = (null)
+2026-10-25 15:04:20.918 E  App[6236:61e4] [com.apple.WebKit:ResourceLoadStatistics] Failed to request known fingerprinting scripts from WebPrivacy: Error Domain=WebPrivacyErrorDomain Code=1001 "List data not found" UserInfo={NSLocalizedDescription=List data not found}
+2026-10-25 15:04:22.026 E  App[6236:61f6] [com.apple.TextInputUI:CandidateGeneration] Attempted to update accumulator from source type: 0, after completion has already been called for token:[6BEA6497]. This is an error and will be ignored.
+2026-10-25 15:04:33.218 E  App[6236:622d] [com.apple.imageio:com.apple.WebKit.WebContent] WebContent[6242] makeImagePlus:3798: *** ERROR: 'JPEG'-_reader->initImage[0] failed err=3
+2026-10-25 15:05:11.013 E  App[6236:622d] [com.apple.imageio:com.apple.WebKit.WebContent] WebContent[6242] makeImagePlus:3798: *** ERROR: 'JPEG'-_reader->initImage[0] failed err=3
