@@ -175,5 +175,13 @@ export function Marble3D({ id, size = 120, accent, style }: { id: string; size?:
   }, [look]);
 
   if (quality === 'low') return <MarbleChip id={id} size={size * 0.7} style={style} />;
-  return <canvas ref={ref} aria-label={`${look.name} marble`} style={{ width: size, height: size, flex: 'none', ...style }} />;
+  // The preview canvas is opaque (glass must refract something); feather it into the panel.
+  const feather = 'radial-gradient(circle at 50% 46%, #000 50%, transparent 70%)';
+  return (
+    <canvas
+      ref={ref}
+      aria-label={`${look.name} marble`}
+      style={{ width: size, height: size, flex: 'none', maskImage: feather, WebkitMaskImage: feather, ...style }}
+    />
+  );
 }

@@ -276,7 +276,10 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
           depthWrite: false,
         })
       : new THREE.MeshPhysicalMaterial({
-          color: '#ffffff',
+          // The part that is not transmitted shows the shell colour: white made every
+          // low-clarity marble (a dark galaxy, a neon core) read as milky haze. Tint it
+          // toward the marble's own base, more so the less clear the glass is.
+          color: new THREE.Color('#ffffff').lerp(tint, 1 - look.clarity),
           roughness: 0,
           transmission: look.clarity,
           // three's transmission is screen-space: thickness sets how far the refracted image

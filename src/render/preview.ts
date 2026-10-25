@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { buildEnvironment, STUDIO } from './studioEnv';
 import type { MarbleLook } from '../game/marbles';
 import { buildMarble, disposeObject, type BuiltMarble } from './marbleMesh';
 
@@ -20,16 +21,32 @@ export class MarblePreview {
   private dragging = false;
   private lastX = 0;
   private canvas: HTMLCanvasElement;
+  private studioEnv!: THREE.Texture;
+  private room: THREE.Texture | null = null;
+
+  private roomEnv(): THREE.Texture {
+    if (!this.room) {
+      const pmrem = new THREE.PMREMGenerator(this.renderer);
+      this.room = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+      pmrem.dispose();
+    }
+    return this.room;
+  }
 
   constructor(canvas: HTMLCanvasElement, look: MarbleLook, accent = '#5ad1ff', quality: 'low' | 'high' = 'high') {
     this.canvas = canvas;
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    // Opaque with a real backdrop: transmission refracts what is behind the marble, and a
+    // transparent canvas refracts as flat milky grey. The edge is feathered in CSS
+    // (Marble3D) so the dark square melts into whatever panel it sits on.
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    this.scene.background = new THREE.Color('#0c1120');
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    const pmrem = new THREE.PMREMGenerator(this.renderer);
-    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    pmrem.dispose();
+    // A dark studio with soft rounded lights, not the white RoomEnvironment that washes
+    // glass out: the marble stays clear and its highlights round.
+    this.studioEnv = buildEnvironment(this.renderer, STUDIO);
+    this.scene.environment = this.studioEnv;
 
     const key = new THREE.DirectionalLight('#ffffff', 2.4);
     key.position.set(2, 4, 3);
@@ -91,6 +108,9 @@ export class MarblePreview {
         (this.marble.caustic.material as THREE.Material).dispose();
       }
     }
+    // Chrome is pure reflection: it needs the bright room to have anything to mirror.
+    // Glass needs the dark studio to stay clear.
+    this.scene.environment = look.core === 'steelie' ? this.roomEnv() : this.studioEnv;
     this.marble = buildMarble(look, 1, this.quality, 3.7);
     this.scene.add(this.marble.group);
     if (this.marble.caustic) {
@@ -128,6 +148,8 @@ export class MarblePreview {
     this.canvas.removeEventListener('pointermove', this.move);
     this.canvas.removeEventListener('pointerup', this.up);
     if (this.marble) disposeObject(this.marble.group);
+    this.studioEnv.dispose();
+    this.room?.dispose();
     this.renderer.dispose();
     this.renderer.forceContextLoss();
   }
