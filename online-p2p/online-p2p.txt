@@ -1,5 +1,11 @@
-[p2p] room code LPUS
-[p2p] room listed in browser: true
-[p2p] host roster: Room code | Host | Connected peer to peer
-[p2p] shot logs identical: true (6 shots compared)
-PASS [p2p]
+file:///home/runner/work/ringer3d/ringer3d/node_modules/puppeteer-core/lib/puppeteer/node/BrowserLauncher.js:233
+                throw new TimeoutError(error.message);
+                      ^
+
+TimeoutError: Timed out after 30000 ms while waiting for the WS endpoint URL to appear in stdout!
+    at ChromeLauncher.launch (file:///home/runner/work/ringer3d/ringer3d/node_modules/puppeteer-core/lib/puppeteer/node/BrowserLauncher.js:233:23)
+    at async ChromeLauncher.launch (file:///home/runner/work/ringer3d/ringer3d/node_modules/puppeteer-core/lib/puppeteer/node/ChromeLauncher.js:39:16)
+    at async PuppeteerNode.launch (file:///home/runner/work/ringer3d/ringer3d/node_modules/puppeteer-core/lib/puppeteer/node/PuppeteerNode.js:124:16)
+    at async file:///home/runner/work/ringer3d/ringer3d/scripts/e2e-online.mjs:28:17
+
+Node.js v22.23.3
