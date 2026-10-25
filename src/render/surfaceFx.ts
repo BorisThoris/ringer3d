@@ -28,7 +28,7 @@ interface Style {
 
 const STYLES: Record<SurfaceKind, Style> = {
   sand: { grain: new THREE.Color('#d9c49c'), rollRate: 26, impactCount: 26, grainSize: 0.07, gravity: 9, track: 'dark', trackColor: new THREE.Color('#9c8a6e'), trackWidth: 0.26, trackLife: 40 },
-  grass: { grain: new THREE.Color('#6f9a3a'), rollRate: 8, impactCount: 12, grainSize: 0.06, gravity: 7, track: 'light', trackColor: new THREE.Color('#2a3318'), trackWidth: 0.3, trackLife: 18 },
+  grass: { grain: new THREE.Color('#6f9a3a'), rollRate: 8, impactCount: 12, grainSize: 0.06, gravity: 7, track: 'light', trackColor: new THREE.Color('#4f6030'), trackWidth: 0.34, trackLife: 18 },
   ice: { grain: new THREE.Color('#f2f8ff'), rollRate: 3, impactCount: 22, grainSize: 0.05, gravity: 6, track: 'light', trackColor: new THREE.Color('#5a6670'), trackWidth: 0.06, trackLife: 60 },
   concrete: { grain: new THREE.Color('#c9c5bd'), rollRate: 1.5, impactCount: 10, grainSize: 0.05, gravity: 2.5, track: null, trackColor: new THREE.Color('#000'), trackWidth: 0, trackLife: 0 },
   wood: { grain: new THREE.Color('#e9dcc4'), rollRate: 0, impactCount: 5, grainSize: 0.04, gravity: 1.5, track: null, trackColor: new THREE.Color('#000'), trackWidth: 0, trackLife: 0 },

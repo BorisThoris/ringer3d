@@ -25,7 +25,6 @@ the originals are linked below.
 
 - Sky, lighting and backdrop: [stuttgart_suburbs](https://polyhaven.com/a/stuttgart_suburbs) (Poly Haven HDRI)
 - Ground material: [brushed_concrete](https://polyhaven.com/a/brushed_concrete) (Poly Haven texture)
-- Ground material: [smooth_concrete_floor](https://polyhaven.com/a/smooth_concrete_floor) (Poly Haven texture)
 - Ground material: [concrete_pavement](https://polyhaven.com/a/concrete_pavement) (Poly Haven texture)
 - Ground material: [asphalt_02](https://polyhaven.com/a/asphalt_02) (Poly Haven texture)
 - Prop: [fire_hydrant](https://polyhaven.com/a/fire_hydrant) (Poly Haven model)

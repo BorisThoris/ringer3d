@@ -226,6 +226,8 @@ export function buildArena(arena: Arena, quality: Quality): BuiltArena {
       const kerbH = 0.15 * M;
       const kerbTop = 0.12 * M;
       // One big slab: its far edges sit out where the ground-projected street takes over.
+      // The gutter dips below the road; the projected photo ground must sit under it.
+      groundY = -0.6;
       const roadW = 320;
       const roadD = 200;
       const roadMat = standard(arena.groundColor, 0.9);
@@ -245,8 +247,9 @@ export function buildArena(arena: Arena, quality: Quality): BuiltArena {
         root.add(j);
       }
       // Gutter: a shallow channel falling toward the kerb.
-      const gutterMat = standard('#7d7a74', 0.8);
-      material(gutterMat, 'smooth_concrete_floor', [roadW, gutterW], 2);
+      // Same concrete as the road, darker with run-off grime.
+      const gutterMat = standard('#6f6d69', 0.75);
+      material(gutterMat, 'brushed_concrete', [roadW, gutterW], 1.5, 0.8);
       const gutter = new THREE.Mesh(own(new THREE.PlaneGeometry(roadW, Math.hypot(gutterW, 0.4))), gutterMat);
       gutter.rotation.x = -Math.PI / 2 + Math.atan2(0.4, gutterW);
       gutter.position.set(0, -0.2, gutterStart - gutterW / 2);
