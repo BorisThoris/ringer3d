@@ -1,3 +1,0 @@
-10-25 14:04:08.513  2500  2500 W Capacitor/Console: File: https://localhost/assets/index-CYK92pb1.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
-10-25 14:04:25.387  2500  2500 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-10-25 14:04:27.082  2500  2500 I Capacitor/Console: File:  - Line 333 - Msg: undefined
