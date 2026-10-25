@@ -1,3 +1,6 @@
-10-25 11:34:38.797  2964  2964 W Capacitor/Console: File: https://localhost/assets/index-CvjkIOFc.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
-10-25 11:34:59.429  2964  2964 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-10-25 11:35:02.234  2964  2964 I Capacitor/Console: File:  - Line 333 - Msg: undefined
+10-25 12:07:23.392  2975  2975 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
+10-25 12:07:23.393  2975  2975 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
+10-25 12:07:23.395  2975  2975 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
+10-25 12:07:25.524  2975  2975 W Capacitor/Console: File: https://localhost/assets/index-D8X5a2Qt.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+10-25 12:07:45.856  2975  2975 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+10-25 12:07:46.462  2975  2975 I Capacitor/Console: File:  - Line 333 - Msg: undefined
