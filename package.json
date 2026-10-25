@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Ringer 3D \u2014 a modern take on the classic playground marble game.",
+  "description": "Ringer 3D — a modern take on the classic playground marble game.",
   "scripts": {
     "dev": "vite --host",
     "build": "tsc --noEmit && vite build",
@@ -17,7 +17,8 @@
     "mobile:sync": "npm run build && cap sync",
     "android": "npm run mobile:sync && cap open android",
     "ios": "npm run mobile:sync && cap open ios",
-    "e2e:online": "node scripts/e2e-online.mjs"
+    "e2e:online": "node scripts/e2e-online.mjs",
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.3",
@@ -45,6 +46,7 @@
     "puppeteer-core": "^25.16.0",
     "typescript": "~5.9",
     "vite": "^8.3.5",
-    "vitest": "^5.0.5"
+    "vitest": "^5.0.5",
+    "wrangler": "^4.152.0"
   }
 }
