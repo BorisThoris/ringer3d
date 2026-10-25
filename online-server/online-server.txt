@@ -1,15 +1,5 @@
-file:///home/runner/work/ringer3d/ringer3d/node_modules/puppeteer-core/lib/puppeteer/util/Deferred.js:57
-            this.#timeoutError = new TimeoutError(opts.message);
-                                 ^
-
-TimeoutError: Navigation timeout of 60000 ms exceeded
-    at new Deferred (file:///home/runner/work/ringer3d/ringer3d/node_modules/puppeteer-core/lib/puppeteer/util/Deferred.js:57:34)
-    at Deferred.create (file:///home/runner/work/ringer3d/ringer3d/node_modules/puppeteer-core/lib/puppeteer/util/Deferred.js:18:16)
-    at new LifecycleWatcher (file:///home/runner/work/ringer3d/ringer3d/node_modules/puppeteer-core/lib/puppeteer/cdp/LifecycleWatcher.js:70:46)
-    at CdpFrame.goto (file:///home/runner/work/ringer3d/ringer3d/node_modules/puppeteer-core/lib/puppeteer/cdp/Frame.js:152:29)
-    at CdpFrame.<anonymous> (file:///home/runner/work/ringer3d/ringer3d/node_modules/puppeteer-core/lib/puppeteer/util/decorators.js:101:27)
-    at CdpPage.goto (file:///home/runner/work/ringer3d/ringer3d/node_modules/puppeteer-core/lib/puppeteer/api/Page.js:582:43)
-    at client (file:///home/runner/work/ringer3d/ringer3d/scripts/e2e-online.mjs:46:14)
-    at async file:///home/runner/work/ringer3d/ringer3d/scripts/e2e-online.mjs:64:5
-
-Node.js v22.23.3
+[server] room code SXSL
+[server] room listed in browser: true
+[server] host roster: Room code | Host | Connected peer to peer
+[server] shot logs identical: false (6 shots compared)
+PASS [server]
