@@ -1,6 +1,8 @@
 import { vibrate } from '../platform';
 
-/** Synthesised sound: glass clacks, rolling, chimes and an ambient pad. No audio files. */
+export type Track = 'menu' | 'match' | 'boss';
+
+/** Synthesised sound (glass clacks, rolling, chimes, an ambient pad) plus looped music tracks. */
 export class Sound {
   private ctx: AudioContext | null = null;
   private master!: GainNode;
@@ -35,6 +37,7 @@ export class Sound {
     const d = this.noise.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     this.startRoll();
+    if (this.wanted) void this.playTrack(this.wanted);
   }
 
   setVolumes(sfx: number, music: number) {
@@ -186,6 +189,67 @@ export class Sound {
         this.padNodes.push(o, lfo);
       }
     }
+  }
+
+  // ---- Music tracks (public/music, rendered locally with ACE-Step) ----------
+
+  private tracks = new Map<Track, Promise<AudioBuffer | null>>();
+  private current: { name: Track; src: AudioBufferSourceNode; gain: GainNode } | null = null;
+  private wanted: Track | null = 'menu';
+
+  private load(name: Track): Promise<AudioBuffer | null> {
+    let p = this.tracks.get(name);
+    if (!p) {
+      const ctx = this.ctx!;
+      p = fetch(`./music/${name}.mp3`)
+        .then((r) => (r.ok ? r.arrayBuffer() : null))
+        .then((b) => (b ? ctx.decodeAudioData(b) : null))
+        .catch(() => null);
+      this.tracks.set(name, p);
+    }
+    return p;
+  }
+
+  /**
+   * Loop a track on the music bus (so the music volume setting applies),
+   * crossfading from whatever was playing. Resolves false if it could not
+   * load, so callers can fall back to the synth pad.
+   */
+  async playTrack(name: Track): Promise<boolean> {
+    this.wanted = name;
+    const ctx = this.ctx;
+    if (!ctx) return true; // starts on unlock
+    if (this.current?.name === name) return true;
+    const buf = await this.load(name);
+    if (!buf || this.wanted !== name) return !!buf;
+    this.stopPad();
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    const gain = ctx.createGain();
+    gain.gain.value = 0;
+    gain.gain.linearRampToValueAtTime(1, ctx.currentTime + 1.2);
+    src.connect(gain).connect(this.music);
+    src.start();
+    this.fadeOutCurrent();
+    this.current = { name, src, gain };
+    return true;
+  }
+
+  stopTrack() {
+    this.wanted = null;
+    this.fadeOutCurrent();
+  }
+
+  private fadeOutCurrent() {
+    const c = this.current;
+    const ctx = this.ctx;
+    if (!c || !ctx) return;
+    this.current = null;
+    c.gain.gain.cancelScheduledValues(ctx.currentTime);
+    c.gain.gain.setValueAtTime(c.gain.gain.value, ctx.currentTime);
+    c.gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.2);
+    c.src.stop(ctx.currentTime + 1.3);
   }
 
   stopPad() {

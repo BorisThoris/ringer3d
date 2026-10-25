@@ -113,7 +113,10 @@ export class GameSession {
 
     if (!this.isDemo) {
       const mood = ({ schoolyard: 'bright', zen: 'calm', rooftop: 'night', glacier: 'cold', caldera: 'ominous' } as const)[this.opts.arena];
-      sound.startPad(mood);
+      // Caldera is the Black Taw's ground: boss music there. The pad stays as a fallback.
+      void sound.playTrack(this.opts.arena === 'caldera' ? 'boss' : 'match').then((ok) => {
+        if (!ok && !this.disposed) sound.startPad(mood);
+      });
     }
     hud.set({
       active: !this.isDemo,
@@ -595,7 +598,10 @@ export class GameSession {
     this.view.unbindMatch();
     this.match.dispose();
     sound.setRolling(0);
-    if (!this.isDemo) sound.stopPad();
+    if (!this.isDemo) {
+      sound.stopPad();
+      void sound.playTrack('menu');
+    }
     hud.set({ active: false, banner: null, thinking: false });
   }
 }

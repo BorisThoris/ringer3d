@@ -10,7 +10,7 @@ Knuckle down on the ring line, flick your shooter into the cross of 13 marbles, 
 - **Online, no server required**: server browser, private rooms with 4-letter codes, 2–4 players. Games are found through public Nostr relays and matches run directly between devices over WebRTC; bots take dropped seats. An optional self-hosted lobby server is also supported.
 - **Pass and play** for 2–4 players on one device.
 - **Real glass marbles**: twisted cat's-eye blades, swirl ribbons, onionskins, aventurine galaxies, clearies with bubbles, dispersion and coloured caustics, plus a 3D close-up you can spin in the marble picker and versus screen.
-- Zero downloaded assets: textures, marbles and audio are all generated procedurally, so the app stays small and loads offline as a PWA.
+- Almost no assets: textures, marbles and sound effects are generated procedurally, so the app stays small and loads offline as a PWA. The only files are three music tracks (menu, match, boss; ~3 MB in `public/music`), generated locally with ACE-Step 1.5 (MIT, trained on licensed and royalty-free data). If a track fails to load, the synth ambient pad plays instead.
 
 ## Quick start
 
