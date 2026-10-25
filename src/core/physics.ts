@@ -133,8 +133,9 @@ export class ShotSim {
         RAPIER.ColliderDesc.cuboid(0.25, 0.6, segLen)
           .setTranslation(Math.cos(a) * r, 0.6, Math.sin(a) * r)
           .setRotation(yawQuat(-a))
-          .setRestitution(0.5)
-          .setFriction(0.2)
+          .setRestitution(surface.edge.restitution)
+          .setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Min)
+          .setFriction(surface.edge.friction)
           .setActiveEvents(RAPIER.ActiveEvents.CONTACT_FORCE_EVENTS)
           .setContactForceEventThreshold(2),
         kerb,
@@ -197,16 +198,36 @@ export class ShotSim {
       impacts.push({ strength: e.totalForceMagnitude(), pos: { x: p.x, y: p.y, z: p.z }, kind });
     });
 
-    // Rolling resistance: constant deceleration while touching the ground.
-    const dv = this.surface.rollDecel * WORLD.dt;
+    // The ground underfoot: slopes steer, bumps throw fast marbles up, and rolling
+    // resistance brings everything to rest (it outweighs every slope, so nothing creeps).
+    const S = this.surface;
+    const dv = S.rollDecel * WORLD.dt;
+    const pull = ROLL_G * WORLD.dt;
     for (const b of this.bodies) {
       const t = b.body.translation();
       if (t.y > b.radius + 0.03) continue;
-      const v = b.body.linvel();
-      const sp = Math.hypot(v.x, v.z);
+      let { x: vx, y: vy, z: vz } = b.body.linvel();
+      let sx = S.camber.x;
+      let sz = S.camber.z;
+      if (S.bumps.amp > 0) {
+        bumpSlope(t.x, t.z, S.bumps, slope);
+        sx += slope.x;
+        sz += slope.z;
+      }
+      // A marble at rest sits in its dimple: slopes only act on moving marbles.
+      const sp0 = Math.hypot(vx, vz);
+      const hold = Math.min(1, sp0 / SETTLE_SPEED);
+      vx -= sx * pull * hold;
+      vz -= sz * pull * hold;
+      const sp = Math.hypot(vx, vz);
       if (sp <= 0) continue;
+      // Rolling uphill over a bump at speed launches the marble a little.
+      if (S.hop > 0 && sp > HOP_MIN_SPEED && vy < 0.05 && t.y < b.radius + 0.01) {
+        const rise = (sx * vx + sz * vz) / sp;
+        if (rise > 0) vy = Math.max(vy, Math.min(HOP_MAX, S.hop * sp * rise));
+      }
       const f = Math.max(0, sp - dv) / sp;
-      b.body.setLinvel({ x: v.x * f, y: v.y, z: v.z * f }, true);
+      b.body.setLinvel({ x: vx * f, y: vy, z: vz * f }, true);
       const w = b.body.angvel();
       b.body.setAngvel({ x: w.x * f, y: w.y * f, z: w.z * f }, true);
     }
@@ -250,6 +271,60 @@ export class ShotSim {
 }
 
 const MARBLE_FRICTION = 0.25;
+/** A rolling solid sphere accelerates down a slope at 5/7 g. */
+const ROLL_G = (5 / 7) * -WORLD.gravity;
+/** Below this speed bumps steer but never lift. */
+const HOP_MIN_SPEED = 4;
+/** Highest lift a bump can give (units/s): about a marble's height in the air. */
+const HOP_MAX = 2.6;
+/** Below this speed slopes fade out, so marbles come to rest instead of creeping. */
+const SETTLE_SPEED = 0.3;
+
+const slope = { x: 0, z: 0 };
+
+/** Integer lattice hash to [-1, 1). Integer maths only: identical on every peer. */
+function lattice(ix: number, iz: number): number {
+  let h = (Math.imul(ix, 374761393) + Math.imul(iz, 668265263)) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  h ^= h >>> 16;
+  return (h >>> 0) / 2147483648 - 1;
+}
+
+/**
+ * Gradient of one octave of value noise at (u, v), in noise units per lattice cell, added
+ * into `out`. Quintic fade; only + - * / so the result is bit-identical everywhere.
+ */
+function noiseGrad(u: number, v: number, w: number, out: { x: number; z: number }) {
+  const iu = Math.floor(u);
+  const iv = Math.floor(v);
+  const fu = u - iu;
+  const fv = v - iv;
+  const a = lattice(iu, iv);
+  const b = lattice(iu + 1, iv);
+  const c = lattice(iu, iv + 1);
+  const d = lattice(iu + 1, iv + 1);
+  const su = fu * fu * fu * (fu * (fu * 6 - 15) + 10);
+  const sv = fv * fv * fv * (fv * (fv * 6 - 15) + 10);
+  const du = 30 * fu * fu * (fu * (fu - 2) + 1);
+  const dvv = 30 * fv * fv * (fv * (fv - 2) + 1);
+  out.x += w * du * (b - a + (a - b - c + d) * sv);
+  out.z += w * dvv * (c - a + (a - b - c + d) * su);
+}
+
+/** Slope (rise over run) of the field's bump surface at (x, z): two octaves, ~`amp` typical. */
+export function bumpSlope(x: number, z: number, p: SurfaceParams['bumps'], out: { x: number; z: number }) {
+  out.x = 0;
+  out.z = 0;
+  // Ridges: long along x, short across z.
+  const u = x / (p.scale * p.stretch);
+  const v = z / p.scale;
+  noiseGrad(u, v, 1, out);
+  noiseGrad(u * 2.03 + 17.1, v * 2.03 + 5.3, 0.5, out);
+  // A cell spans scale·stretch along x but only scale along z.
+  const k = p.amp * 0.8;
+  out.x *= k / p.stretch;
+  out.z *= k;
+}
 
 function yawQuat(a: number) {
   return { x: 0, y: Math.sin(a / 2), z: 0, w: Math.cos(a / 2) };

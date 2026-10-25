@@ -54,6 +54,18 @@ export interface SurfaceParams {
   marbleRestitution: number;
   /** Constant rolling-resistance deceleration (units/s²) applied to grounded marbles. */
   rollDecel: number;
+  /**
+   * The ground is never perfectly flat. A deterministic bump field steers slow rolls:
+   * `amp` is the steepest slope (rise over run), `scale` the bump size in units, and
+   * `stretch` > 1 squashes bumps across z into long ridges (sand ripples).
+   */
+  bumps: { amp: number; scale: number; stretch: number };
+  /** Constant tilt of the whole field (rise over run along x and z): a road's camber. */
+  camber: { x: number; z: number };
+  /** Fast marbles hop over bumps: fraction of the bump slope turned into lift. 0 = never. */
+  hop: number;
+  /** What stops marbles past the ring: a hard kerb bounces them back, a snowbank or long grass swallows them. */
+  edge: { restitution: number; friction: number };
 }
 
 export const DEFAULT_SURFACE: SurfaceParams = {
@@ -62,6 +74,10 @@ export const DEFAULT_SURFACE: SurfaceParams = {
   friction: 0.6,
   marbleRestitution: 0.93,
   rollDecel: 11,
+  bumps: { amp: 0, scale: 1, stretch: 1 },
+  camber: { x: 0, z: 0 },
+  hop: 0,
+  edge: { restitution: 0.5, friction: 0.2 },
 };
 
 export type MatchEvent =

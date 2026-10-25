@@ -10,6 +10,7 @@ import { ARENAS, type ArenaId } from '../game/arenas';
 import { MIB_LOOKS, type MarbleLook } from '../game/marbles';
 import { buildArena, type BuiltArena } from './arenaBuilder';
 import { buildMarble, disposeObject, type Quality } from './marbleMesh';
+import { Juice } from './juice';
 import { SurfaceFx, type Mover } from './surfaceFx';
 import { radialGlowTexture } from './textures';
 
@@ -71,6 +72,12 @@ export class GameView {
   /** Sand spray and grooves, grass clippings, ice scratches, concrete dust. */
   private surfaceFx: SurfaceFx;
   private movers: Mover[] = [];
+  /** Streaks, shockwaves, camera trauma. */
+  private juice: Juice;
+  /** Game-time rate the session is playing at (slow motion < 1); effects follow it. */
+  timeScale = 1;
+  private baseFov = 48;
+  private camTarget = new THREE.Vector3();
 
   private match: Match | null = null;
   private looks: MarbleLook[] = [];
@@ -115,6 +122,7 @@ export class GameView {
     this.scene.add(this.marbleRoot);
     this.pmrem = new THREE.PMREMGenerator(this.renderer);
     this.surfaceFx = new SurfaceFx(this.scene);
+    this.juice = new Juice(this.scene);
 
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
@@ -207,6 +215,7 @@ export class GameView {
   bindMatch(match: Match, looks: MarbleLook[]) {
     this.clearMarbles();
     this.surfaceFx.clear();
+    this.juice.clear();
     this.match = match;
     this.looks = looks;
     for (const t of match.layout.targets) {
@@ -534,8 +543,28 @@ export class GameView {
     this.surfaceFx.impact(pos, strength);
   }
 
-  private updateEffects(dt: number) {
+  /** A hit with weight: camera jolt and, for hard ones, a shockwave on the ground. */
+  hitFeedback(pos: { x: number; z: number }, strength: number, kind: 'marble' | 'kerb') {
+    if (strength < 120) return;
+    this.juice.kick(Math.min(kind === 'kerb' ? 0.25 : 0.45, strength / 2400));
+    if (strength > 260) this.juice.shockwave(pos, strength, kind === 'kerb' ? '#ffd9a8' : '#ffffff');
+  }
+
+  /** The flick leaves the thumb. */
+  launchFeedback(power: number) {
+    this.juice.launch(power);
+  }
+
+  /** A mib knocked out of the ring. */
+  captureFeedback(pos: { x: number; z: number }, color: string) {
+    this.juice.kick(0.35);
+    this.juice.shockwave(pos, 1200, color);
+  }
+
+  private updateEffects(realDt: number) {
+    const dt = realDt * this.timeScale;
     this.surfaceFx.update(dt, this.match?.sim ? this.movers : []);
+    this.juice.update(dt, this.match?.sim ? this.movers : []);
     for (const b of this.bursts) {
       b.life -= dt * 1.2;
       const pos = b.points.geometry.attributes.position as THREE.BufferAttribute;
@@ -650,6 +679,7 @@ export class GameView {
     );
     this.camera.position.copy(tmpV);
     this.camera.lookAt(c.tx, c.ty, c.tz);
+    this.juice.applyToCamera(this.camera, this.camTarget.set(c.tx, c.ty, c.tz), this.baseFov, dt);
   }
 
   resize() {
@@ -661,7 +691,8 @@ export class GameView {
     this.composer.setSize(w, h);
     this.bloom.resolution.set(w / 2, h / 2);
     this.camera.aspect = w / h;
-    this.camera.fov = w / h < 1 ? 58 : 48;
+    this.baseFov = w / h < 1 ? 58 : 48;
+    this.camera.fov = this.baseFov;
     this.camera.updateProjectionMatrix();
   }
 
@@ -675,6 +706,7 @@ export class GameView {
     this.clearMarbles();
     this.arena?.dispose();
     this.surfaceFx.dispose();
+    this.juice.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }

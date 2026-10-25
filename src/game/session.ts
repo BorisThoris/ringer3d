@@ -1,6 +1,6 @@
 import { WORLD } from '../core/constants';
 import { Match } from '../core/match';
-import { placementPoint } from '../core/physics';
+import { isOutsideRing, placementPoint, SHOOTER_ID } from '../core/physics';
 import { hashString, Rng } from '../core/rng';
 import type { MatchEvent, PlayerInfo, Shot } from '../core/types';
 import { planBotShot } from '../ai/bot';
@@ -43,6 +43,9 @@ interface PreparedShot {
 
 const TAU = Math.PI * 2;
 const MAX_STEPS_PER_FRAME = 12;
+/** Capture slow motion: starts at SLOWMO_RATE of full speed and eases back over this long. */
+const SLOWMO_SECONDS = 0.9;
+const SLOWMO_RATE = 0.25;
 
 export class GameSession {
   readonly match: Match;
@@ -63,6 +66,10 @@ export class GameSession {
   private lastAimSent = 0;
   private charging = false;
   private chargeT = 0;
+  /** Real seconds of slow motion left after a capture (it eases back to full speed). */
+  private slowmo = 0;
+  /** Mibs that have rolled over the ring line during the shot in flight. */
+  private crossed = new Set<number>();
   private ended = false;
   private disposed = false;
 
@@ -200,7 +207,9 @@ export class GameSession {
       }
       case 'shot':
         this.view.camMode = this.isDemo ? 'attract' : 'follow';
+        this.crossed.clear();
         if (!demo) {
+          this.view.launchFeedback(e.shot.power);
           sound.launch(e.shot.power);
           if (settings.get().haptics) haptic(12);
         }
@@ -210,6 +219,7 @@ export class GameSession {
         if (!demo || e.strength > 200) sound.clack(demo ? e.strength * 0.15 : e.strength, e.kind);
         // The ground answers every collision: sand spray, frost, dust.
         if (e.strength > 30) this.view.surfaceImpact(e.pos, e.strength);
+        if (!demo) this.view.hitFeedback(e.pos, e.strength, e.kind);
         if (!demo && e.strength > 400 && settings.get().haptics) haptic(8);
         break;
       case 'capture': {
@@ -337,7 +347,15 @@ export class GameSession {
 
     if (m.phase === 'rolling') {
       const behind = this.incoming.has(m.shotsTaken);
-      const speed = behind ? 6 : this.speed * (hud.get().fast ? 3 : 1);
+      // Slow motion only changes how quickly fixed steps are consumed, never the steps.
+      let slow = 1;
+      if (this.slowmo > 0 && !behind) {
+        const k = 1 - this.slowmo / SLOWMO_SECONDS;
+        slow = SLOWMO_RATE + (1 - SLOWMO_RATE) * k * k;
+        this.slowmo -= dt;
+      }
+      const speed = behind ? 6 : this.speed * (hud.get().fast ? 3 : 1) * slow;
+      this.view.timeScale = behind ? 1 : slow;
       this.acc += dt * speed;
       let steps = 0;
       while (this.acc >= WORLD.dt && steps < MAX_STEPS_PER_FRAME * speed && m.phase === 'rolling') {
@@ -346,9 +364,12 @@ export class GameSession {
         steps++;
       }
       if (steps >= MAX_STEPS_PER_FRAME * speed) this.acc = 0;
+      if (!this.isDemo && !behind) this.watchRingLine();
       this.updateRollSound();
     } else {
       this.acc = 0;
+      this.slowmo = 0;
+      this.view.timeScale = 1;
       sound.setRolling(0);
       if (this.delay > 0) {
         this.delay -= dt;
@@ -382,6 +403,24 @@ export class GameSession {
       this.chargeT += dt;
       const ph = (this.chargeT / 1.6) % 2;
       this.setPower(ph < 1 ? ph : 2 - ph);
+    }
+  }
+
+  /**
+   * The moment a mib rolls over the ring line, not when the shot is scored: a jolt, a
+   * shockwave in the shooter's colour, and for the first one a beat of slow motion.
+   */
+  private watchRingLine() {
+    const sim = this.match.sim;
+    if (!sim) return;
+    for (const b of sim.bodies) {
+      if (b.id === SHOOTER_ID || this.crossed.has(b.id)) continue;
+      const t = b.body.translation();
+      if (!isOutsideRing(t.x, t.z)) continue;
+      this.crossed.add(b.id);
+      const look = MARBLES[this.opts.players[this.match.current].marble];
+      this.view.captureFeedback(t, look?.accent ?? '#ffffff');
+      if (this.crossed.size === 1) this.slowmo = SLOWMO_SECONDS;
     }
   }
 
