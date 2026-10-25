@@ -21,3 +21,27 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npx vite build
+
+  ios:
+    # Compiles the iOS app for the simulator (unsigned): proves the Capacitor
+    # project, pods and web bundle build on a Mac.
+    runs-on: macos-14
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - run: npx vite build
+      - run: npx cap sync ios
+      - name: Build for the iOS simulator
+        working-directory: ios/App
+        run: |
+          pod install
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build | tail -n 20

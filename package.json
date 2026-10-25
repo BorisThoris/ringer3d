@@ -25,16 +25,37 @@
   "build": {
     "appId": "com.boristhoris.ringer3d",
     "productName": "Ringer 3D",
-    "directories": { "output": "release" },
-    "files": ["dist/**", "electron/**", "package.json"],
-    "win": { "target": ["nsis", "portable"], "signAndEditExecutable": false },
-    "mac": { "target": "dmg", "category": "public.app-category.games" },
-    "linux": { "target": ["AppImage"], "category": "Game" }
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "electron/**",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "signAndEditExecutable": false
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.games"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Game"
+    }
   },
   "dependencies": {
     "@capacitor/android": "^6.2.1",
     "@capacitor/core": "^6.2.1",
     "@capacitor/haptics": "^6.0.2",
+    "@capacitor/ios": "^6.2.1",
     "@dimforge/rapier3d-compat": "0.19.3",
     "three": "0.180.0",
     "ws": "^8.18.3"
