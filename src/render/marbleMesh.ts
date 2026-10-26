@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { MarbleLook } from '../game/marbles';
 import { marbleTexture } from './textures';
+import { inkMaterial } from './toon';
 
 /**
  * Marbles. A glass marble is a transmissive shell (real refraction, a touch of dispersion,
@@ -141,11 +142,18 @@ function contactShadow(r: number): THREE.Mesh {
   return m;
 }
 
+/** The marble's ink outline: a back-face hull, its width a share of the radius. */
+function inkHull(r: number, seg: number): THREE.Mesh {
+  const hull = new THREE.Mesh(sphere(r, seg), inkMaterial(r * 0.14));
+  hull.userData.isInk = true;
+  return hull;
+}
+
 /**
  * Real glass goes dark at grazing angles. A thin shell that darkens toward the silhouette
- * reads as glass and outlines every marble against bright ground (sand, snow, paper).
+ * reads as glass and outlines a marble against bright ground (sand, snow, paper).
  */
-function edgeMaterial(): THREE.ShaderMaterial {
+export function edgeMaterial(): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,
@@ -214,7 +222,7 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
       new THREE.MeshPhysicalMaterial({ color: look.base, metalness: 1, roughness: 0.04, clearcoat: 0.6, clearcoatRoughness: 0.05, envMapIntensity: 3 }),
     );
     s.castShadow = true;
-    group.add(s);
+    group.add(s, inkHull(r, seg));
     return { group, caustic: null, contact: contactShadow(r) };
   }
   if (look.core === 'solid' || look.clarity < 0.05) {
@@ -223,7 +231,7 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
       new THREE.MeshPhysicalMaterial({ color: '#ffffff', map: marbleTexture('clay', look.base, look.accent2, 3), roughness: 0.75, clearcoat: 0.15 }),
     );
     s.castShadow = true;
-    group.add(s);
+    group.add(s, inkHull(r, seg));
     return { group, caustic: null, contact: contactShadow(r) };
   }
 
@@ -363,10 +371,8 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
   shell.castShadow = true;
   shell.renderOrder = 2;
   group.add(shell);
-  // The dark edge, drawn just outside the glass.
-  const edge = new THREE.Mesh(sphere(r * 1.003, seg), edgeMaterial());
-  edge.renderOrder = 3;
-  group.add(edge);
+  // The ink line round the glass, like every solid thing in the cel-shaded world.
+  group.add(inkHull(r, seg));
 
   // Coloured caustic: the light focused through the glass lands on the ground.
   const cc = new THREE.Color(look.core === 'clearie' ? look.base : look.accent).lerp(new THREE.Color('#ffffff'), 0.35);
@@ -383,6 +389,8 @@ export function disposeObject(o: THREE.Object3D) {
   o.traverse((c) => {
     const m = c as THREE.Mesh;
     if (m.isMesh) {
+      // Ink materials are shared by every outline; they stay.
+      if (m.userData.isInk) return;
       const mats = Array.isArray(m.material) ? m.material : [m.material];
       for (const mat of mats) mat.dispose();
       // Shared cached geometry stays; per-marble ribbons are freed.

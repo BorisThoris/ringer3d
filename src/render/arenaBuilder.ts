@@ -5,11 +5,13 @@ import { Rng } from '../core/rng';
 import type { Arena, ArenaId } from '../game/arenas';
 import { hdri } from './assets';
 import { groundArt } from './groundArt';
+import { ink, toon } from './toon';
 import type { Quality } from './marbleMesh';
 import { radialGlowTexture, ringTexture } from './textures';
 
 /**
- * Builds a field as a toy diorama: a disc of hand-painted ground (groundArt.ts), a chunky
+ * Builds a field as a cel-shaded toy diorama (banded light, inked outlines; toon.ts): a
+ * disc of hand-painted ground (groundArt.ts), a chunky
  * bank along the edge of play that looks like what the physics edge does (a stone kerb
  * bounces, a snowbank or a sand berm swallows), a few rounded props standing out in the
  * fog, and soft, bright light. Everything is made in code; the field's HDRI is never shown,
@@ -108,7 +110,8 @@ export function buildArena(arena: Arena, quality: Quality): BuiltArena {
     for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getX(i) / size + 0.5, pos.getY(i) / size + 0.5);
     return geo;
   };
-  const matte = (color: string, rough = 0.9) => own(new THREE.MeshStandardMaterial({ color, roughness: rough, envMapIntensity: 0.4 }));
+  // Cel-shaded: every surface in banded light, solid things inked.
+  const matte = (color: string) => own(toon(color));
   const place = (m: THREE.Object3D, r: number, a: number, y = 0) => {
     m.position.set(Math.cos(a) * r, y, Math.sin(a) * r);
     m.traverse((o) => {
@@ -118,6 +121,8 @@ export function buildArena(arena: Arena, quality: Quality): BuiltArena {
         mesh.receiveShadow = true;
       }
     });
+    // Scenery stands far off: a heavier line keeps it readable through the fog.
+    for (const g of ink(m, 0.07)) own(g);
     root.add(m);
     return m;
   };
@@ -149,19 +154,14 @@ export function buildArena(arena: Arena, quality: Quality): BuiltArena {
     t.needsUpdate = true;
     own(t);
   }
-  const groundMat = (transparent: boolean) =>
-    own(
-      new THREE.MeshStandardMaterial({
-        map,
-        normalMap,
-        normalScale: new THREE.Vector2(art.normalScale, art.normalScale),
-        roughness: art.roughness,
-        // Matte ground: it should not throw glints that compete with the glass.
-        envMapIntensity: arena.id === 'ice' ? 0.45 : 0.3,
-        transparent,
-        depthWrite: !transparent,
-      }),
-    );
+  const groundMat = (transparent: boolean) => {
+    // Banded light over the painted ground; a light touch of the normal map so bumps
+    // catch a band edge without turning noisy.
+    const m = own(toon('#ffffff', { map, normalMap, normalScale: art.normalScale * 0.5 }));
+    m.transparent = transparent;
+    m.depthWrite = !transparent;
+    return m;
+  };
   const inner = groundMat(false);
   const rim = groundMat(true);
   const fade = (() => {
@@ -190,10 +190,11 @@ export function buildArena(arena: Arena, quality: Quality): BuiltArena {
   const bank = BANK[arena.id];
   const pts = bank.profile.map(([dr, h]) => new THREE.Vector2(B + dr, h));
   // The lathe winds its faces inward: draw both sides so the bank is lit from outside.
-  const bankMat = own(new THREE.MeshStandardMaterial({ color: bank.color, roughness: bank.rough ?? 0.92, side: THREE.DoubleSide, envMapIntensity: 0.4 }));
+  const bankMat = own(toon(bank.color, { side: THREE.DoubleSide }));
   const bankMesh = new THREE.Mesh(own(new THREE.LatheGeometry(pts, 180)), bankMat);
   bankMesh.receiveShadow = true;
   bankMesh.castShadow = quality === 'high';
+  for (const g of ink(bankMesh, 0.05)) own(g);
   root.add(bankMesh);
 
   // ---- Scenery: a few rounded props out past the edge, fading into the fog --------------
@@ -227,7 +228,7 @@ export function buildArena(arena: Arena, quality: Quality): BuiltArena {
     // A loop of cotton string lying on the surface.
     const tube = own(new THREE.TorusGeometry(R, 0.045, 8, 320));
     // Off-white cotton: pure white blooms like a neon tube under the key light.
-    const mat = own(new THREE.MeshStandardMaterial({ color: new THREE.Color(arena.ring.color).multiplyScalar(0.42), roughness: 1 }));
+    const mat = own(toon(new THREE.Color(arena.ring.color).multiplyScalar(0.7)));
     const ring = new THREE.Mesh(tube, mat);
     ring.rotation.x = -Math.PI / 2;
     ring.position.y = 0.04;
@@ -321,7 +322,7 @@ export function buildArena(arena: Arena, quality: Quality): BuiltArena {
 
 interface Kit {
   rng: Rng;
-  matte: (color: string, rough?: number) => THREE.MeshStandardMaterial;
+  matte: (color: string, rough?: number) => THREE.Material;
   place: (m: THREE.Object3D, r: number, a: number, y?: number) => THREE.Object3D;
   blobGeo: (seed: number, detail?: number) => THREE.BufferGeometry;
   own: <T extends { dispose(): void }>(x: T) => T;
@@ -394,6 +395,8 @@ function tufts(k: Kit, n: number, rMin: number, rMax: number, color: string, hei
   inst.instanceMatrix.needsUpdate = true;
   inst.castShadow = k.quality === 'high';
   inst.receiveShadow = true;
+  // Blades are thinner than a pen line: ink would turn them into black wedges.
+  inst.userData.noInk = true;
   return inst;
 }
 

@@ -4,7 +4,7 @@ import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Rng } from '../core/rng';
 import type { Piece } from '../core/types';
 import type { ArenaId } from '../game/arenas';
-import { applyPBR, pbr } from './assets';
+import { ink, toon } from './toon';
 import type { Quality } from './marbleMesh';
 
 /**
@@ -22,14 +22,11 @@ export interface BuiltPieces {
 }
 
 const BUMPER_H = 0.45;
-type Tex = [folder: string, id: string];
 
 interface MatOpts {
   rough?: number;
   metal?: number;
   opacity?: number;
-  tex?: Tex;
-  tile?: number;
   emissive?: string;
   map?: THREE.Texture;
 }
@@ -40,37 +37,18 @@ export function buildPieces(pieces: readonly Piece[], arena: ArenaId, quality: Q
   const own = <T extends { dispose(): void }>(x: T) => (owned.push(x), x);
   const rng = new Rng(pieces.length * 7919 + arena.length);
   const shadows = quality !== 'low';
-  let disposed = false;
   const bumpers: { x: number; z: number; ring: THREE.Mesh; cap: THREE.MeshStandardMaterial; k: number }[] = [];
   const flags: THREE.Mesh[] = [];
 
   // ---- Materials (cached by look) -------------------------------------------------------
-  const mats = new Map<string, THREE.MeshStandardMaterial>();
+  const mats = new Map<string, THREE.MeshToonMaterial>();
+  // Cel-shaded: flat colours in banded light (roughness and metal do not apply).
   const mat = (color: string, o: MatOpts = {}) => {
-    const key = `${color}|${o.rough}|${o.metal}|${o.opacity}|${o.tex?.[1]}|${o.tile}|${o.emissive}|${o.map?.uuid}`;
+    const key = `${color}|${o.opacity}|${o.emissive}|${o.map?.uuid}`;
     let m = mats.get(key);
     if (m) return m;
-    m = own(
-      new THREE.MeshStandardMaterial({
-        color,
-        roughness: o.rough ?? 0.85,
-        metalness: o.metal ?? 0,
-        transparent: o.opacity !== undefined,
-        opacity: o.opacity ?? 1,
-        emissive: o.emissive ?? '#000000',
-        map: o.map ?? null,
-      }),
-    );
+    m = own(toon(color, { opacity: o.opacity, emissive: o.emissive, map: o.map ?? null }));
     mats.set(key, m);
-    const tex = o.tex;
-    if (tex) {
-      const mm = m;
-      void pbr(tex[0], tex[1]).then((set) => {
-        if (!set || disposed) return;
-        applyPBR(mm, set, [1, 1], (o.tile ?? 1) / 25, 1);
-        mm.color.set(color);
-      });
-    }
     return m;
   };
   const geo = <T extends THREE.BufferGeometry>(g: T) => own(g);
@@ -88,6 +66,7 @@ export function buildPieces(pieces: readonly Piece[], arena: ArenaId, quality: Q
     d.position.set(x, y, z);
     d.receiveShadow = true;
     d.renderOrder = 1;
+    d.userData.noInk = true;
     group.add(d);
     return d;
   };
@@ -419,7 +398,10 @@ export function buildPieces(pieces: readonly Piece[], arena: ArenaId, quality: Q
           new THREE.Vector3(-len / 2 + w * 0.4, 0, 0),
           new THREE.Vector3(len / 2 - w * 0.6, 0, w * 0.18),
         ]);
-        lay(mesh(geo(new THREE.TubeGeometry(path, 48, p.r * 0.55, 6, false)), mat('#c8ccd2', { rough: 0.25, metal: 0.95 })), p.r * 0.55);
+        const clip = mesh(geo(new THREE.TubeGeometry(path, 48, p.r * 0.55, 6, false)), mat('#c8ccd2', { rough: 0.25, metal: 0.95 }));
+        // Thinner than a pen line.
+        clip.userData.noInk = true;
+        lay(clip, p.r * 0.55);
         break;
       }
       case 'twig': {
@@ -512,9 +494,12 @@ export function buildPieces(pieces: readonly Piece[], arena: ArenaId, quality: Q
     flags.push(flag);
   }
 
+  // Ink everything solid so far; pebbles get a finer line of their own below.
+  for (const g of ink(group, 0.03)) own(g);
+
   // Pebbles and stones: one instanced draw, each squashed and turned its own way.
   if (pebbles.length) {
-    const inst = new THREE.InstancedMesh(rockGeo(17), own(new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.8 })), pebbles.length);
+    const inst = new THREE.InstancedMesh(rockGeo(17), own(toon('#ffffff')), pebbles.length);
     const qn = new THREE.Quaternion();
     const e = new THREE.Euler();
     pebbles.forEach((s, i) => {
@@ -526,6 +511,7 @@ export function buildPieces(pieces: readonly Piece[], arena: ArenaId, quality: Q
     inst.instanceMatrix.needsUpdate = true;
     inst.castShadow = shadows;
     inst.receiveShadow = true;
+    for (const g of ink(inst, 0.012)) own(g);
     group.add(inst);
   }
 
@@ -554,7 +540,6 @@ export function buildPieces(pieces: readonly Piece[], arena: ArenaId, quality: Q
       for (const b of bumpers) if ((b.x - x) ** 2 + (b.z - z) ** 2 < 0.8 * 0.8) b.k = Math.min(1, b.k + strength / 800);
     },
     dispose: () => {
-      disposed = true;
       for (const o of owned) o.dispose();
     },
   };
