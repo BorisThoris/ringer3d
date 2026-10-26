@@ -45,7 +45,8 @@ export const MARBLES: Record<string, MarbleLook> = {
 export const MIB_LOOKS: MarbleLook[] = [
   { id: 'mib-a', name: 'Mib', core: 'catseye', base: '#1f6fe0', accent: '#ffe14d', accent2: '#ffffff', clarity: 0.34, glow: 0.25 },
   { id: 'mib-b', name: 'Mib', core: 'catseye', base: '#e8401a', accent: '#ffffff', accent2: '#ffd23f', clarity: 0.32, glow: 0.25 },
-  { id: 'mib-c', name: 'Mib', core: 'catseye', base: '#0fa356', accent: '#ffffff', accent2: '#c2ff7a', clarity: 0.34, glow: 0.25 },
+  // Deep emerald, darker than any lawn or felt, so it still stands off green ground.
+  { id: 'mib-c', name: 'Mib', core: 'catseye', base: '#06582e', accent: '#ffffff', accent2: '#c2ff7a', clarity: 0.3, glow: 0.2 },
   { id: 'mib-d', name: 'Mib', core: 'swirl', base: '#7b3ff0', accent: '#ffd23f', accent2: '#ff7ad9', clarity: 0.34, glow: 0.25 },
   { id: 'mib-e', name: 'Mib', core: 'swirl', base: '#f0b400', accent: '#c41f2f', accent2: '#ffffff', clarity: 0.3, glow: 0.25 },
   { id: 'mib-f', name: 'Mib', core: 'catseye', base: '#009fb3', accent: '#ff3d7f', accent2: '#ffffff', clarity: 0.34, glow: 0.25 },
