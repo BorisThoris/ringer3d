@@ -9,12 +9,17 @@ import {
   type Layout,
 } from './physics';
 import { Rng } from './rng';
-import type { MatchEvent, Phase, PlayerInfo, Shot, SurfaceParams } from './types';
+import type { MatchEvent, Phase, Piece, PlayerInfo, Shot, SurfaceParams } from './types';
+
+/** After this many shots in a row without a capture, the ring is called and the leader wins. */
+export const DRY_SHOTS_LIMIT = 40;
 
 export interface MatchConfig {
   players: PlayerInfo[];
   seed: number;
   surface: SurfaceParams;
+  /** The map's pieces (obstacles, hazards, cups). Empty: an open field. */
+  pieces?: Piece[];
   /** If set, the first player to reach this score wins immediately. Defaults to a mathematical lock. */
   targetScore?: number;
 }
@@ -26,6 +31,7 @@ export interface MatchSnapshot {
   current: number;
   firstShotOfTurn: boolean;
   shotsTaken: number;
+  dryShots?: number;
   phase: Phase;
   winners: number[];
 }
@@ -47,6 +53,8 @@ export class Match {
   current: number;
   firstShotOfTurn = true;
   shotsTaken = 0;
+  /** Shots in a row that captured nothing (every player's). */
+  dryShots = 0;
   phase: Phase = 'aim';
   winners: number[] = [];
   /** The in-flight simulation while phase === 'rolling'. */
@@ -101,7 +109,7 @@ export class Match {
     if (shot.power <= 0) return false;
     this.lastShot = shot;
     this.shotLog.push({ n: this.shotsTaken, player: this.current, shot, before: layoutHash(this.layout), first: this.firstShotOfTurn });
-    this.sim = new ShotSim(this.layout, this.config.surface, shot, this.firstShotOfTurn);
+    this.sim = new ShotSim(this.layout, this.config.surface, shot, this.firstShotOfTurn, this.config.pieces);
     this.phase = 'rolling';
     this.shotsTaken++;
     this.emit({ type: 'shot', player: this.current, shot });
@@ -125,11 +133,14 @@ export class Match {
     const after = sim.resultLayout();
     const log = this.shotLog[this.shotLog.length - 1];
     if (log) log.after = layoutHash(after);
+    // Holed marbles are reported in a pocket; celebrate them at their cup instead.
+    const cups = new Map(sim.holed);
     sim.free();
     this.sim = null;
 
     const p = this.current;
     const capturedNow: { id: number; x: number; y: number; z: number }[] = [];
+    this.dryShots++;
     after.targets = after.targets.filter((t) => {
       if (isOutsideRing(t.x, t.z)) {
         capturedNow.push(t);
@@ -138,9 +149,11 @@ export class Match {
       return true;
     });
     for (const t of capturedNow) {
+      this.dryShots = 0;
       this.scores[p]++;
       this.captured[p].push(t.id);
-      this.emit({ type: 'capture', player: p, marbleId: t.id, pos: { x: t.x, y: t.y, z: t.z } });
+      const cup = cups.get(t.id);
+      this.emit({ type: 'capture', player: p, marbleId: t.id, pos: cup ? { x: cup.x, y: 0, z: cup.z } : { x: t.x, y: t.y, z: t.z } });
     }
 
     const shooter = after.shooter;
@@ -174,7 +187,10 @@ export class Match {
     const secondBest = others.length ? Math.max(...others) : -Infinity;
     const locked = leaders.length === 1 && best > secondBest + remaining;
     const reachedTarget = this.config.targetScore !== undefined && best >= this.config.targetScore;
-    if (remaining === 0 || locked || reachedTarget) {
+    // The ring is called: a marble nobody can shift (wedged against a wall, buried in a trap)
+    // must not keep a match going forever.
+    const called = this.dryShots >= DRY_SHOTS_LIMIT;
+    if (remaining === 0 || locked || reachedTarget || called) {
       this.phase = 'gameOver';
       this.winners = leaders;
       this.layout = { ...this.layout, shooter: null };
@@ -202,6 +218,7 @@ export class Match {
       current: this.current,
       firstShotOfTurn: this.firstShotOfTurn,
       shotsTaken: this.shotsTaken,
+      dryShots: this.dryShots,
       phase: this.phase === 'rolling' ? 'aim' : this.phase,
       winners: [...this.winners],
     };
@@ -217,6 +234,7 @@ export class Match {
     this.current = s.current;
     this.firstShotOfTurn = s.firstShotOfTurn;
     this.shotsTaken = s.shotsTaken;
+    this.dryShots = s.dryShots ?? 0;
     this.phase = s.phase;
     this.winners = [...s.winners];
   }

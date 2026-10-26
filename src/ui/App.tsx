@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PlayerInfo } from '../core/types';
 import type { ArenaId } from '../game/arenas';
+import type { Difficulty, MapDef } from '../game/maps';
 import type { SessionMode, SessionResult } from '../game/session';
 import { MARBLES, uiColor } from '../game/marbles';
 import { progress, settings } from '../game/settings';
@@ -11,6 +12,7 @@ import { sound } from '../render/audio';
 import { engine } from './engine';
 import { Hud } from './Hud';
 import { OnlineHub, RoomLobby } from './online';
+import type { MapChoice } from './components';
 import { HowTo, LocalPlay, MainMenu, QuickPlay, Results, SettingsScreen, type ResultsInfo } from './screens';
 import { Ending, StorySelect, Tower, Versus } from './story';
 
@@ -26,6 +28,8 @@ type ScreenState =
 interface PlayArgs {
   mode: SessionMode;
   arena: ArenaId;
+  level?: { difficulty: Difficulty; seed: number };
+  map?: MapDef;
   players: PlayerInfo[];
   localSeats: number[];
   room?: OnlineRoom;
@@ -75,6 +79,8 @@ export function App() {
     engine.run({
       mode: a.mode,
       arena: a.arena,
+      level: a.level,
+      map: a.map,
       players: a.players,
       seed: a.seed ?? ((Math.random() * 2 ** 31) | 0),
       localSeats: a.localSeats,
@@ -88,31 +94,33 @@ export function App() {
   };
 
   // ---- Modes ----------------------------------------------------------------------------
-  const quick = (arena: ArenaId, players: PlayerInfo[]) => {
+  const quick = (choice: MapChoice, players: PlayerInfo[]) => {
     play({
       mode: 'bot',
-      arena,
+      arena: choice.arena,
+      level: choice,
       players,
       localSeats: [0],
       results: (r) => ({
         title: r.winners.length > 1 ? 'Draw' : r.winners[0] === 0 ? 'You win' : `${players[1].name} wins`,
         scores: scoresOf(players, r),
-        primary: { label: 'Rematch', action: () => quick(arena, players) },
+        primary: { label: 'Rematch', action: () => quick(choice, players) },
         secondary: { label: 'Menu', action: toMenu },
       }),
     });
   };
 
-  const local = (arena: ArenaId, players: PlayerInfo[]) => {
+  const local = (choice: MapChoice, players: PlayerInfo[]) => {
     play({
       mode: 'local',
-      arena,
+      arena: choice.arena,
+      level: choice,
       players,
       localSeats: players.map((_, i) => i),
       results: (r) => ({
         title: r.winners.length > 1 ? 'Draw' : `${players[r.winners[0]].name} wins`,
         scores: scoresOf(players, r),
-        primary: { label: 'Play again', action: () => local(arena, players) },
+        primary: { label: 'Play again', action: () => local(choice, players) },
         secondary: { label: 'Menu', action: toMenu },
       }),
     });
@@ -129,6 +137,7 @@ export function App() {
     play({
       mode: 'story',
       arena: st.arena,
+      level: { difficulty: st.difficulty, seed: st.mapSeed },
       players,
       localSeats: [0],
       results: (r) => {
@@ -174,6 +183,7 @@ export function App() {
     play({
       mode: 'online',
       arena: config.arena,
+      map: config.map,
       players,
       localSeats: [mySeat],
       room,

@@ -9,6 +9,8 @@ const SURFACE_SOUNDS: Record<SurfaceKind, { kerb: string; tap: string; kerbVol: 
   grass: { kerb: 'impactSoft_heavy', tap: 'footstep_grass', kerbVol: 0.9, tapVol: 0.4 },
   sand: { kerb: 'impactSoft_heavy', tap: 'impactSoft_medium', kerbVol: 0.8, tapVol: 0.35 },
   ice: { kerb: 'impactPlate_light', tap: 'footstep_snow', kerbVol: 0.8, tapVol: 0.3 },
+  gravel: { kerb: 'impactMining', tap: 'footstep_concrete', kerbVol: 0.8, tapVol: 0.45 },
+  turf: { kerb: 'impactWood_medium', tap: 'footstep_carpet', kerbVol: 0.9, tapVol: 0.45 },
 };
 
 /** How each surface colours the rolling rumble: filter shape and loudness. */
@@ -18,6 +20,8 @@ const ROLL_TONE: Record<SurfaceKind, { type: BiquadFilterType; freq: number; q: 
   grass: { type: 'highpass', freq: 2600, q: 0.6, gain: 0.45 }, // soft swish
   sand: { type: 'bandpass', freq: 3600, q: 0.5, gain: 0.55 }, // hiss
   ice: { type: 'bandpass', freq: 1900, q: 3.5, gain: 0.75 }, // thin, ringing
+  gravel: { type: 'bandpass', freq: 1400, q: 0.6, gain: 1.1 }, // crunchy grit
+  turf: { type: 'lowpass', freq: 900, q: 0.8, gain: 0.7 }, // soft, felted
 };
 
 const TAKES = 5;
@@ -64,7 +68,7 @@ export class Sound {
     const d = this.noise.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     this.startRoll();
-    this.preload(['impactGlass_light', 'impactGlass_medium', 'impactGlass_heavy']);
+    this.preload(['impactGlass_light', 'impactGlass_medium', 'impactGlass_heavy', 'impactPunch_medium']);
     this.setSurface(this.surface);
   }
 
@@ -130,7 +134,7 @@ export class Sound {
   }
 
   /** Glass-on-glass clack. strength ~ contact force. */
-  clack(strength: number, kind: 'marble' | 'kerb' = 'marble') {
+  clack(strength: number, kind: 'marble' | 'kerb' | 'bumper' = 'marble') {
     const ctx = this.ctx;
     if (!ctx) return;
     const now = ctx.currentTime;
@@ -139,7 +143,9 @@ export class Sound {
     const vol = Math.min(1, Math.log10(1 + strength) / 3.2);
     if (vol < 0.04) return;
     // Real recordings first: glass on glass, or the field's own boundary material.
-    if (kind === 'kerb') {
+    // A mini-golf bumper: a rubbery punch.
+    if (kind === 'bumper' && this.play('impactPunch_medium', 0.35 + vol * 0.65, 1.1)) return;
+    if (kind !== 'marble') {
       const s = SURFACE_SOUNDS[this.surface];
       if (this.play(s.kerb, vol * s.kerbVol)) return;
     } else {
@@ -150,7 +156,7 @@ export class Sound {
     out.gain.value = vol;
     out.connect(this.sfx);
 
-    if (kind === 'kerb') {
+    if (kind !== 'marble') {
       const o = ctx.createOscillator();
       o.type = 'triangle';
       o.frequency.setValueAtTime(180, now);

@@ -4,7 +4,8 @@ The classic playground marble game — **Ringer** — rebuilt as a modern 3D gam
 
 Knuckle down on the ring line, flick your shooter into the cross of 13 marbles, and keep every marble you knock out. Stay in the ring after a capture and you shoot again. Most marbles wins.
 
-- **Five arenas** with their own feel: Schoolyard (asphalt), Zen Garden (grippy sand), Neon Rooftop (fast tile), Glacier Hall (ice), and the Caldera.
+- **Seven fields**, each with its own ground physics (bumps, camber, grip, what the edge does): a desk, a cul-de-sac, a back lawn, a beach, a frozen lake, a gravel pit, and a mini-golf course.
+- **Generated maps** (easy / medium / hard, shuffle for a new one): what you would really find on each field — books, pencils, paper and coins on the desk; cracks, puddles, bricks and cones on the street; molehills, mud, twigs and rocks on the lawn; driftwood, shells and wet sand on the beach; cracks, black ice and drifts on the lake; pebble beds in the pit. Bumpers, speed pads and cups live on the mini-golf course. Maps are laid out with rotational symmetry so every seat is equally fair, and the host sends the map whole in online play.
 - **Tower (story mode)**: pick a marble, climb eight opponents with their own personalities, beat the Black Taw, unlock fighters and endings.
 - **Fair bots**: six skill levels from Rookie to Legend.
 - **Online, no server required**: server browser, private rooms with 4-letter codes, 2–4 players. Games are found through public Nostr relays and matches run directly between devices over WebRTC; bots take dropped seats. An optional self-hosted lobby server is also supported.
@@ -127,6 +128,7 @@ Every push builds and checks all targets on GitHub Actions (`.github/workflows/`
 ## Tuning
 
 - Physics constants: `src/core/constants.ts` (ring size, shot speed, step rate) and each arena's `surface` in `src/game/arenas.ts` (rolling resistance, friction, bounce).
+- Maps: `src/game/maps.ts` (what each field's generator places), `src/core/physics.ts` (how pieces collide, patches and cups), `src/render/mapPieces.ts` (how each piece looks).
 - Bot skill: `src/ai/profiles.ts`.
 - Story ladder, fighters, quotes and endings: `src/game/story.ts`.
 

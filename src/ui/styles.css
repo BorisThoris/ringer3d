@@ -613,6 +613,72 @@ button {
   color: rgba(18, 13, 36, 0.62);
 }
 
+/* ---------- Map picker: field polaroids, then the generated map's plan ----------------- */
+.map-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.map-card {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 12px;
+  border-radius: var(--r-card);
+  background: rgba(0, 0, 0, 0.22);
+  border: 1.5px solid var(--glass-line);
+}
+.map-preview {
+  flex: none;
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18), 0 10px 26px rgba(0, 0, 0, 0.45);
+  animation: pop 420ms var(--spring);
+}
+.map-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  align-items: flex-start;
+}
+.map-name {
+  font-family: var(--marker);
+  font-weight: 400;
+  font-size: var(--t-xl);
+  line-height: 1.05;
+  color: var(--sun);
+  transform: rotate(-1.5deg);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+}
+.map-sum {
+  font-size: var(--t-sm);
+  font-weight: 700;
+  color: var(--chalk-dim);
+  line-height: 1.4;
+}
+.chip.diff-easy[aria-pressed='true'] {
+  background: var(--mint);
+  box-shadow: 0 4px 0 #0f7a4a, 0 8px 20px rgba(0, 0, 0, 0.25);
+}
+.chip.diff-medium[aria-pressed='true'] {
+  background: var(--sun);
+  box-shadow: 0 4px 0 #b97a00, 0 8px 20px rgba(0, 0, 0, 0.25);
+}
+.chip.diff-hard[aria-pressed='true'] {
+  background: var(--cherry);
+  color: #fff;
+  box-shadow: 0 4px 0 #8e1240, 0 8px 20px rgba(0, 0, 0, 0.25);
+}
+@media (max-width: 480px) {
+  .map-card {
+    flex-direction: column;
+  }
+  .map-meta {
+    align-items: center;
+    text-align: center;
+  }
+}
+
 .marble-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));

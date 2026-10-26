@@ -1,13 +1,17 @@
 import type { MatchSnapshot } from '../core/match';
 import type { PlayerInfo, Shot } from '../core/types';
 import type { ArenaId } from '../game/arenas';
+import type { Difficulty, MapDef } from '../game/maps';
 
-export const PROTOCOL_VERSION = 1;
+/** 2: matches carry a generated map (obstacles, hazards), sent whole by the host. */
+export const PROTOCOL_VERSION = 2;
 
 export interface OnlineMatchConfig {
   seed: number;
   arena: ArenaId;
   players: PlayerInfo[];
+  /** The map, generated once by the host and played as sent by everyone. */
+  map?: MapDef;
 }
 
 export interface RosterEntry {
@@ -30,7 +34,7 @@ export interface AimPreview {
 /** Messages exchanged between peers (over WebRTC data channels, or relayed by the lobby server). */
 export type PeerMsg =
   | { t: 'hello'; name: string; marble: string; version: number }
-  | { t: 'roster'; roster: RosterEntry[]; arena: ArenaId }
+  | { t: 'roster'; roster: RosterEntry[]; arena: ArenaId; difficulty?: Difficulty; mapSeed?: number }
   | { t: 'ready'; ready: boolean }
   | { t: 'start'; config: OnlineMatchConfig; seats: Record<string, number> }
   | { t: 'aim'; seat: number; aim: AimPreview }

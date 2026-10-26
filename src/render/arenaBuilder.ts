@@ -1,39 +1,69 @@
 import * as THREE from 'three';
-import { GroundedSkybox } from 'three/examples/jsm/objects/GroundedSkybox.js';
 import { WORLD } from '../core/constants';
 import { Rng } from '../core/rng';
-import type { Arena } from '../game/arenas';
-import { applyPBR, backdrop, hdri, model, pbr, UNITS_PER_METRE } from './assets';
+import type { Arena, ArenaId } from '../game/arenas';
+import { applyPBR, hdri, model, pbr } from './assets';
 import type { Quality } from './marbleMesh';
 import { radialGlowTexture, ringTexture } from './textures';
 
 /**
- * Builds a field: real-scale geometry around the ring, scanned CC0 materials and props,
- * and the field's HDRI as both the visible backdrop (ground-projected, so the photographed
- * street or room sits at the right perspective) and the reflections in every marble.
+ * Builds a field as a stage: a disc of the field's scanned ground (CC0), a low bank along
+ * the edge of play that matches what the physics edge does (a stone kerb bounces, a
+ * snowbank or a sand berm swallows), and fog beyond it. The field's HDRI never shows: it
+ * only lights the scene and fills the glass marbles with a real place to reflect.
  *
- * Everything that needs a download is applied when it arrives: until then (or if offline)
- * the field shows flat colours and a gradient sky, and stays fully playable.
- *
- * Scale: 1 unit ≈ 4 cm (25 units per metre). The physics boundary is a circle of radius
- * WORLD.boundaryRadius; solid-looking props all sit outside it.
+ * Map pieces (obstacles, hazards) are built separately (mapPieces.ts), per match.
+ * Everything that needs a download is applied when it arrives; until then the field shows
+ * flat colours and stays fully playable.
  */
 export interface BuiltArena {
   root: THREE.Group;
   /** Fallback reflection scene, used until the HDRI arrives. */
   envScene: THREE.Scene;
   sun: THREE.DirectionalLight;
-  /** HDRI lighting and backdrop for this field (either may be null if it failed to load). */
-  sky: Promise<{ hdr: THREE.DataTexture | null; backdrop: THREE.Texture | null }>;
+  /** The colour the world fades into beyond the edge. */
+  fog: THREE.Color;
+  /** HDRI lighting for this field (null if it failed to load). */
+  sky: Promise<{ hdr: THREE.DataTexture | null }>;
   update(t: number, dt: number): void;
   dispose(): void;
 }
 
 const R = WORLD.ringRadius;
 const B = WORLD.boundaryRadius;
-const M = UNITS_PER_METRE;
-/** Height of the HDRI cameras above their ground, in units (they shot at ~1.6 m). */
-const PHOTO_HEIGHT = 1.6 * M;
+/** Ground: solid out past the edge bank, then fading into the fog. */
+const GROUND_SOLID = B + 4;
+const GROUND_OUTER = B + 16;
+
+/** The scanned ground of each field: texture set, metres per tile, normal strength. */
+const GROUND: Record<ArenaId, { id: string; tile: number; normal: number; roughness?: number; tint?: string }> = {
+  desk: { id: 'wood_table_001', tile: 1.5, normal: 1 },
+  culdesac: { id: 'brushed_concrete', tile: 2.5, normal: 0.8 },
+  grass: { id: 'Grass006', tile: 2, normal: 1.1 },
+  sand: { id: 'aerial_beach_01', tile: 3, normal: 1.6 },
+  ice: { id: 'Ice003', tile: 2, normal: 0.6, roughness: 0.35 },
+  gravel: { id: 'gravel_floor_02', tile: 1.2, normal: 1.4, tint: '#b9b1a6' },
+  // Artificial turf: the lawn scan, fine-tiled, flattened and dyed.
+  minigolf: { id: 'Grass006', tile: 0.35, normal: 0.25, tint: '#55d65f' },
+};
+
+/** The bank along the edge of play, as a lathe profile (radius offset from B, height). */
+const BANK: Record<ArenaId, { profile: [number, number][]; color: string; texture?: string; tile?: number }> = {
+  // A wooden lip, like a tray rim on the desk.
+  desk: { profile: [[-0.1, 0], [-0.1, 0.45], [0.05, 0.55], [0.6, 0.55], [0.7, 0]], color: '#6b4127', texture: 'wood_table_001', tile: 1.5 },
+  // A stone kerb: square, hard.
+  culdesac: { profile: [[0, 0], [0, 0.62], [0.12, 0.7], [1.4, 0.7], [1.5, 0]], color: '#a29f97', texture: 'concrete_pavement', tile: 1.8 },
+  // Long grass handled by tufts; a gentle green berm under them.
+  grass: { profile: [[-0.2, 0], [0.6, 0.35], [1.6, 0.55], [3, 0.2], [3.8, 0]], color: '#4e6d2a', texture: 'Grass006', tile: 2 },
+  sand: { profile: [[-0.3, 0], [0.8, 0.55], [2, 0.75], [3.4, 0.3], [4.2, 0]], color: '#d1bf9b', texture: 'aerial_beach_01', tile: 3 },
+  ice: { profile: [[-0.3, 0], [0.4, 0.6], [1.6, 1.05], [3, 0.6], [4, 0]], color: '#eef3f8', texture: 'snow_02', tile: 2 },
+  gravel: { profile: [[-0.2, 0], [0.6, 0.5], [1.8, 0.7], [3.2, 0.25], [4, 0]], color: '#8a8379', texture: 'gravel_floor_02', tile: 1.2 },
+  // A painted wooden rail, like every course's border.
+  minigolf: { profile: [[0, 0], [0, 0.55], [0.06, 0.62], [0.42, 0.62], [0.48, 0.55], [0.48, 0]], color: '#f4efe4' },
+};
+
+/** Where the texture for a bank lives when it is not the field's own folder. */
+const TEXTURE_FOLDER: Record<string, string> = { concrete_pavement: 'culdesac', snow_02: 'ice', Grass006: 'grass', wood_table_001: 'desk' };
 
 export function buildArena(arena: Arena, quality: Quality): BuiltArena {
   const root = new THREE.Group();
@@ -44,8 +74,9 @@ export function buildArena(arena: Arena, quality: Quality): BuiltArena {
   let disposed = false;
   const own = <T extends { dispose(): void }>(x: T) => (owned.push(x), x);
   const folder = arena.assets;
+  const fog = new THREE.Color(arena.fog.color);
 
-  // ---- Fallback sky (replaced by the HDRI backdrop when it loads) ----------------------
+  // ---- Fallback reflections (until the HDRI arrives) ------------------------------------
   const skyMat = own(
     new THREE.ShaderMaterial({
       side: THREE.BackSide,
@@ -59,16 +90,12 @@ export function buildArena(arena: Arena, quality: Quality): BuiltArena {
         }`,
     }),
   );
-  const skyDome = new THREE.Mesh(own(new THREE.SphereGeometry(300, 32, 16)), skyMat);
-  root.add(skyDome);
-  envScene.add(skyDome.clone());
+  envScene.add(new THREE.Mesh(own(new THREE.SphereGeometry(300, 32, 16)), skyMat));
   const envGround = new THREE.Mesh(own(new THREE.CircleGeometry(200, 32)), own(new THREE.MeshBasicMaterial({ color: arena.groundColor })));
   envGround.rotation.x = -Math.PI / 2;
   envScene.add(envGround);
 
   // ---- Lights ---------------------------------------------------------------------------
-  // The HDRI supplies ambient light and reflections; the sun adds crisp shadows aligned
-  // with the sun (or window) in the photo.
   const hemi = new THREE.HemisphereLight(arena.ambient.sky, arena.ambient.ground, arena.ambient.intensity);
   root.add(hemi);
   const sun = new THREE.DirectionalLight(arena.sun.color, arena.sun.intensity);
@@ -76,11 +103,12 @@ export function buildArena(arena: Arena, quality: Quality): BuiltArena {
   sun.castShadow = quality !== 'low';
   const sm = quality === 'high' ? 4096 : 2048;
   sun.shadow.mapSize.set(sm, sm);
+  // The stage is small now: a tight shadow frustum keeps shadows crisp.
   const sc = sun.shadow.camera;
-  sc.left = sc.bottom = -26;
-  sc.right = sc.top = 26;
+  sc.left = sc.bottom = -(B + 5);
+  sc.right = sc.top = B + 5;
   sc.near = 1;
-  sc.far = 120;
+  sc.far = 90;
   sun.position.multiplyScalar(4);
   sun.shadow.bias = -0.0003;
   sun.shadow.normalBias = 0.03;
@@ -88,6 +116,7 @@ export function buildArena(arena: Arena, quality: Quality): BuiltArena {
   root.add(sun, sun.target);
 
   // ---- Helpers --------------------------------------------------------------------------
+  const texFolder = (id: string) => TEXTURE_FOLDER[id] ?? folder;
   /** Planar UVs in world units so neighbouring ground pieces tile seamlessly. */
   const planarUV = (geo: THREE.BufferGeometry, size: number) => {
     const pos = geo.attributes.position as THREE.BufferAttribute;
@@ -95,253 +124,116 @@ export function buildArena(arena: Arena, quality: Quality): BuiltArena {
     for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getX(i) / size + 0.5, pos.getY(i) / size + 0.5);
     return geo;
   };
-  /**
-   * Ground: a solid disc where the game is played (opaque, so glass marbles refract it),
-   * and an outer rim that fades into the ground-projected photo. Both share one tiling.
-   */
-  const groundDisc = (rSolid: number, rOuter: number, color: string, id: string, tileMetres: number, normalScale = 1) => {
-    const size = rOuter * 2;
-    const inner = own(new THREE.MeshStandardMaterial({ color, roughness: 0.9 }));
-    const rim = own(new THREE.MeshStandardMaterial({ color, roughness: 0.9, transparent: true, depthWrite: false }));
-    const fade = (() => {
-      const c = document.createElement('canvas');
-      c.width = c.height = 256;
-      const g = c.getContext('2d')!;
-      const grad = g.createRadialGradient(128, 128, 0, 128, 128, 128);
-      grad.addColorStop(0, '#fff');
-      grad.addColorStop(rSolid / rOuter, '#fff');
-      grad.addColorStop(1, '#000');
-      g.fillStyle = grad;
-      g.fillRect(0, 0, 256, 256);
-      return own(new THREE.CanvasTexture(c));
-    })();
+
+  // ---- Ground: opaque where the game is played, fading into the fog beyond ---------------
+  const g = GROUND[arena.id];
+  const size = GROUND_OUTER * 2;
+  const inner = own(new THREE.MeshStandardMaterial({ color: arena.groundColor, roughness: 0.9 }));
+  const rim = own(new THREE.MeshStandardMaterial({ color: arena.groundColor, roughness: 0.9, transparent: true, depthWrite: false }));
+  const fade = (() => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 256;
+    const g2 = c.getContext('2d')!;
+    const grad = g2.createRadialGradient(128, 128, 0, 128, 128, 128);
+    grad.addColorStop(0, '#fff');
+    grad.addColorStop(GROUND_SOLID / GROUND_OUTER, '#fff');
+    grad.addColorStop(1, '#000');
+    g2.fillStyle = grad;
+    g2.fillRect(0, 0, 256, 256);
+    return own(new THREE.CanvasTexture(c));
+  })();
+  rim.alphaMap = fade;
+  const disc = new THREE.Mesh(own(planarUV(new THREE.CircleGeometry(GROUND_SOLID, 128), size)), inner);
+  const outer = new THREE.Mesh(own(planarUV(new THREE.RingGeometry(GROUND_SOLID, GROUND_OUTER, 128, 4), size)), rim);
+  for (const m of [disc, outer]) {
+    m.rotation.x = -Math.PI / 2;
+    m.receiveShadow = true;
+    root.add(m);
+  }
+  outer.renderOrder = -1;
+  if (arena.id === 'desk') inner.envMapIntensity = rim.envMapIntensity = 0.55;
+  void pbr(texFolder(g.id), g.id).then((set) => {
+    if (!set || disposed) return;
+    applyPBR(inner, set, [size, size], g.tile, g.normal);
+    applyPBR(rim, set, [size, size], g.tile, g.normal);
     rim.alphaMap = fade;
-    const disc = new THREE.Mesh(own(planarUV(new THREE.CircleGeometry(rSolid, 96), size)), inner);
-    const ring = new THREE.Mesh(own(planarUV(new THREE.RingGeometry(rSolid, rOuter, 96, 4), size)), rim);
-    for (const m of [disc, ring]) {
-      m.rotation.x = -Math.PI / 2;
-      m.receiveShadow = true;
-      root.add(m);
+    if (g.roughness !== undefined) inner.roughness = rim.roughness = g.roughness;
+    if (g.tint) {
+      inner.color.set(g.tint);
+      rim.color.set(g.tint);
     }
-    ring.renderOrder = -1;
-    void pbr(folder, id).then((set) => {
-      if (!set || disposed) return;
-      applyPBR(inner, set, [size, size], tileMetres, normalScale);
-      applyPBR(rim, set, [size, size], tileMetres, normalScale);
-      // The alpha map must not tile with the ground texture.
-      rim.alphaMap = fade;
+  });
+
+  // ---- The edge of play: a bank that looks like what the physics edge does --------------
+  const bank = BANK[arena.id];
+  const pts = bank.profile.map(([dr, h]) => new THREE.Vector2(B + dr, h));
+  const bankGeo = own(new THREE.LatheGeometry(pts, 160));
+  // The lathe winds its faces inward: draw both sides so the bank is lit from outside.
+  const bankMat = own(new THREE.MeshStandardMaterial({ color: bank.color, roughness: 0.95, side: THREE.DoubleSide }));
+  const bankMesh = new THREE.Mesh(bankGeo, bankMat);
+  bankMesh.receiveShadow = true;
+  bankMesh.castShadow = quality === 'high';
+  root.add(bankMesh);
+  if (bank.texture) {
+    const id = bank.texture;
+    void pbr(texFolder(id), id).then((set) => {
+      if (set && !disposed) applyPBR(bankMat, set, [2 * Math.PI * B, 4], bank.tile ?? 2, 1);
     });
-    return { disc, inner, rim };
-  };
-  /** Load a scanned prop at real-world scale and place it. */
-  const prop = (id: string, x: number, z: number, rotY = 0, scale = 1, y = 0) => {
-    void model(folder, id).then((g) => {
-      if (!g || disposed) return;
-      g.scale.setScalar(M * scale);
-      g.position.set(x, y, z);
-      g.rotation.y = rotY;
-      if (quality !== 'high') g.traverse((o) => (o.castShadow = false));
-      root.add(g);
-    });
-  };
-  /** Many copies of a prop as instanced meshes (grass, shells): one draw call per sub-mesh. */
-  const scatter = (id: string, n: number, rMin: number, rMax: number, size: [number, number], targetHeight?: number) => {
-    void model(folder, id).then((g) => {
-      if (!g || disposed) return;
-      g.updateMatrixWorld(true);
-      const box = new THREE.Box3().setFromObject(g);
-      const h = Math.max(1e-6, box.max.y - box.min.y);
-      const base = targetHeight ? targetHeight / h : M;
-      const place = new THREE.Matrix4();
+  }
+  // The lawn's long grass: tufts along the berm, never inside the ring.
+  if (arena.id === 'grass') {
+    void model(folder, 'grass_medium_01').then((m) => {
+      if (!m || disposed) return;
+      m.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(m);
+      const base = 1.2 / Math.max(1e-6, box.max.y - box.min.y);
+      const n = quality === 'low' ? 70 : 180;
+      const xf: THREE.Matrix4[] = [];
       const q = new THREE.Quaternion();
-      const transforms: THREE.Matrix4[] = [];
       for (let i = 0; i < n; i++) {
         const a = rng.next() * Math.PI * 2;
-        const r = Math.sqrt(rng.range(rMin * rMin, rMax * rMax));
-        const s = base * rng.range(size[0], size[1]);
+        const r = B + rng.range(-0.2, 3.4);
+        const s = base * rng.range(0.7, 1.3);
         q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rng.next() * Math.PI * 2);
-        transforms.push(place.clone().compose(new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r), q, new THREE.Vector3(s, s, s)));
+        xf.push(new THREE.Matrix4().compose(new THREE.Vector3(Math.cos(a) * r, 0.25, Math.sin(a) * r), q, new THREE.Vector3(s, s, s)));
       }
-      g.traverse((o) => {
+      m.traverse((o) => {
         const mesh = o as THREE.Mesh;
         if (!mesh.isMesh) return;
         const inst = new THREE.InstancedMesh(mesh.geometry, mesh.material, n);
         inst.userData.shared = true;
-        const local = mesh.matrixWorld;
-        transforms.forEach((t, i) => inst.setMatrixAt(i, t.clone().multiply(local)));
+        xf.forEach((t, i) => inst.setMatrixAt(i, t.clone().multiply(mesh.matrixWorld)));
         inst.instanceMatrix.needsUpdate = true;
         inst.computeBoundingSphere();
-        inst.castShadow = quality === 'high';
         inst.receiveShadow = true;
         root.add(inst);
       });
     });
-  };
-  const standard = (color: string, roughness = 0.9) => own(new THREE.MeshStandardMaterial({ color, roughness }));
-  const material = (mat: THREE.MeshStandardMaterial, id: string, size: [number, number], tile: number, normalScale = 1) => {
-    void pbr(folder, id).then((set) => {
-      if (set && !disposed) applyPBR(mat, set, size, tile, normalScale);
-    });
-  };
-
-  // ---- The field ------------------------------------------------------------------------
-  let groundY = 0;
-  switch (arena.id) {
-    case 'desk': {
-      // A 2 m x 1.2 m oak desk in a living room. The room floor is 75 cm below the desktop.
-      const W = 2 * M;
-      const D = 1.2 * M;
-      const T = 0.035 * M;
-      const top = standard(arena.groundColor, 0.5);
-      // Satin varnish: a soft sheen of the window, not a mirror of it.
-      top.envMapIntensity = 0.55;
-      const desk = new THREE.Mesh(own(new THREE.BoxGeometry(W, T, D)), top);
-      desk.position.y = -T / 2;
-      desk.receiveShadow = true;
-      desk.castShadow = true;
-      root.add(desk);
-      material(top, 'wood_table_001', [W, D], 1.5);
-      // Legs, so the desk stands on the room's floor.
-      const legMat = standard('#3a2414', 0.6);
-      material(legMat, 'wood_table_001', [0.06 * M, 0.72 * M], 1.5);
-      for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-        const leg = new THREE.Mesh(own(new THREE.BoxGeometry(0.06 * M, 0.72 * M, 0.06 * M)), legMat);
-        leg.position.set(lx * (W / 2 - 0.08 * M), -T - 0.36 * M, lz * (D / 2 - 0.08 * M));
-        leg.castShadow = true;
-        root.add(leg);
-      }
-      groundY = -0.75 * M;
-      prop('desk_lamp_arm_01', -19, -9, 0.6);
-      prop('book_encyclopedia_set_01', 18.5, -10, -0.35);
-      prop('stationery_supplies', -17, 9.5, 0.4);
-      prop('round_spectacles', 15.5, 10, 2.2);
-      prop('alarm_clock_01', 21, 3, -1.2);
-      prop('magnifying_glass_01', -12, -13, 1.0);
-      break;
-    }
-    case 'culdesac': {
-      // Turning circle of brushed concrete; past the boundary, a concrete gutter, a 15 cm
-      // kerb and a slab sidewalk, like the edge of any cul-de-sac.
-      const gutterStart = -(B + 1);
-      const gutterW = 0.28 * M;
-      const kerbZ = gutterStart - gutterW;
-      const kerbH = 0.15 * M;
-      const kerbTop = 0.12 * M;
-      // One big slab: its far edges sit out where the ground-projected street takes over.
-      // The gutter dips below the road; the projected photo ground must sit under it.
-      groundY = -0.6;
-      const roadW = 320;
-      const roadD = 200;
-      const roadMat = standard(arena.groundColor, 0.9);
-      const road = new THREE.Mesh(own(new THREE.PlaneGeometry(roadW, roadD)), roadMat);
-      road.rotation.x = -Math.PI / 2;
-      road.position.set(0, 0, gutterStart + roadD / 2);
-      road.receiveShadow = true;
-      root.add(road);
-      material(roadMat, 'brushed_concrete', [roadW, roadD], 2.5, 0.8);
-      // Expansion joints, clear of the ring.
-      const joint = standard('#2b2a28', 1);
-      for (const x of [-31, 31]) {
-        const j = new THREE.Mesh(own(new THREE.PlaneGeometry(0.18, 60)), joint);
-        j.rotation.x = -Math.PI / 2;
-        j.position.set(x, 0.004, gutterStart + 30);
-        j.receiveShadow = true;
-        root.add(j);
-      }
-      // Gutter: a shallow channel falling toward the kerb.
-      // Same concrete as the road, darker with run-off grime.
-      const gutterMat = standard('#6f6d69', 0.75);
-      material(gutterMat, 'brushed_concrete', [roadW, gutterW], 1.5, 0.8);
-      const gutter = new THREE.Mesh(own(new THREE.PlaneGeometry(roadW, Math.hypot(gutterW, 0.4))), gutterMat);
-      gutter.rotation.x = -Math.PI / 2 + Math.atan2(0.4, gutterW);
-      gutter.position.set(0, -0.2, gutterStart - gutterW / 2);
-      gutter.receiveShadow = true;
-      root.add(gutter);
-      // Kerb face and rounded top, then the sidewalk.
-      const kerbMat = standard('#9a978f', 0.85);
-      material(kerbMat, 'concrete_pavement', [roadW, kerbH], 1.8);
-      const face = new THREE.Mesh(own(new THREE.PlaneGeometry(roadW, kerbH + 0.4)), kerbMat);
-      face.position.set(0, (kerbH - 0.4) / 2, kerbZ);
-      face.receiveShadow = true;
-      root.add(face);
-      const kerbCap = new THREE.Mesh(own(new THREE.BoxGeometry(roadW, 0.6, kerbTop)), kerbMat);
-      kerbCap.position.set(0, kerbH - 0.3, kerbZ - kerbTop / 2);
-      kerbCap.castShadow = kerbCap.receiveShadow = true;
-      root.add(kerbCap);
-      const walkMat = standard('#a19d95', 0.85);
-      const walkD = 1.6 * M;
-      material(walkMat, 'concrete_pavement', [roadW, walkD], 1.8);
-      const walk = new THREE.Mesh(own(new THREE.PlaneGeometry(roadW, walkD)), walkMat);
-      walk.rotation.x = -Math.PI / 2;
-      walk.position.set(0, kerbH, kerbZ - kerbTop - walkD / 2);
-      walk.receiveShadow = true;
-      root.add(walk);
-      const sideY = kerbH;
-      const sideZ = kerbZ - kerbTop;
-      prop('fire_hydrant', -9, sideZ - 6, 0.3, 1, sideY);
-      prop('metal_trash_can', 8, sideZ - 5, -0.4, 1, sideY);
-      prop('utility_box_01', -26, sideZ - 9, 0, 1, sideY);
-      prop('street_lamp_01', 24, sideZ - 12, Math.PI, 1, sideY);
-      prop('water_manhole_cover', 19, 8, 0.2, 1, 0.01);
-      break;
-    }
-    case 'grass': {
-      // ambientCG Grass006: a freshly cut lawn scan, ~2 m per tile.
-      groundDisc(50, 110, arena.groundColor, 'Grass006', 2, 1.1);
-      // A mown lawn: short tufts around the ring (never inside it, so marbles stay
-      // visible), longer grass toward the edges, a few dandelions, the gnome.
-      scatter('grass_medium_02', quality === 'low' ? 50 : 120, R + 1.2, B + 3, [0.7, 1.2], 0.45);
-      scatter('grass_medium_01', quality === 'low' ? 60 : 200, B + 5, 48, [0.8, 1.4], 2.2);
-      scatter('dandelion_01', 9, B + 2, 30, [0.8, 1.1], 1.6);
-      prop('garden_gnome', 17, -15, -2.3);
-      prop('watering_can_metal_01', -19, 13, 0.7);
-      break;
-    }
-    case 'sand': {
-      // The aerial scan covers 30 m; tiled at 3 m its wind ripples come out marble-sized.
-      groundDisc(50, 110, arena.groundColor, 'aerial_beach_01', 3, 1.6);
-      // Shells washed up around the ring and a child's bucket; the real beach is the backdrop.
-      scatter('lambis_shell', 7, R + 2.5, 22, [0.8, 1.2]);
-      prop('wooden_bucket_01', -16.5, 12, 0.5);
-      break;
-    }
-    case 'ice': {
-      const iceR = 28;
-      const iceMat = standard(arena.groundColor, 0.2);
-      const ice = new THREE.Mesh(own(planarUV(new THREE.CircleGeometry(iceR, 96), iceR * 2)), iceMat);
-      ice.rotation.x = -Math.PI / 2;
-      ice.receiveShadow = true;
-      root.add(ice);
-      void pbr(folder, 'Ice003').then((set) => {
-        if (!set || disposed) return;
-        applyPBR(iceMat, set, [iceR * 2, iceR * 2], 2, 0.6);
-        // Polished black ice: the scan's roughness, biased glossy.
-        iceMat.roughness = 0.35;
-      });
-      const snow = groundDisc(60, 115, '#e8eef4', 'snow_02', 2, 1.4);
-      // The snow disc sits just under the ice so the lake shows through in the middle.
-      snow.disc.position.y = -0.02;
-      // A soft snowbank along the shore.
-      const bankMat = standard('#eef3f8', 1);
-      material(bankMat, 'snow_02', [40, 6], 2, 1.4);
-      const bank = new THREE.Mesh(own(new THREE.TorusGeometry(iceR + 1.5, 2.2, 10, 96)), bankMat);
-      bank.rotation.x = -Math.PI / 2;
-      bank.scale.set(1, 1, 0.45);
-      bank.position.y = -0.2;
-      bank.receiveShadow = bank.castShadow = true;
-      root.add(bank);
-      prop('boulder_01', -33, -12, 0.5, 1.4);
-      prop('boulder_01', 30, 20, 2.4, 1.1);
-      for (let i = 0; i < 7; i++) {
-        const a = (i / 7) * Math.PI * 2 + 0.6;
-        const r = 40 + rng.range(-3, 6);
-        prop('fir_sapling', Math.cos(a) * r, Math.sin(a) * r, rng.next() * 6, rng.range(0.7, 1.1));
-      }
-      // Left on the shore, clear of the camera's orbit.
-      prop('rubber_boots', 25, -14, 2.6);
-      break;
-    }
   }
+
+  // ---- Fog banks drifting just past the edge --------------------------------------------
+  const mistMat = own(
+    new THREE.SpriteMaterial({ map: radialGlowTexture(), color: fog, transparent: true, opacity: 0.35, depthWrite: false, fog: false }),
+  );
+  const mists: { s: THREE.Sprite; a: number; r: number; speed: number }[] = [];
+  const mistCount = quality === 'low' ? 10 : 18;
+  for (let i = 0; i < mistCount; i++) {
+    const s = new THREE.Sprite(mistMat);
+    const scale = rng.range(10, 18);
+    s.scale.set(scale, scale * 0.45, 1);
+    s.renderOrder = 3;
+    const m = { s, a: (i / mistCount) * Math.PI * 2 + rng.range(-0.2, 0.2), r: B + rng.range(9, 15), speed: rng.range(0.01, 0.03) * (rng.next() < 0.5 ? -1 : 1) };
+    s.position.y = rng.range(0.6, 2.6);
+    mists.push(m);
+    root.add(s);
+  }
+  updaters.push((_t, dt) => {
+    for (const m of mists) {
+      m.a += m.speed * dt;
+      m.s.position.x = Math.cos(m.a) * m.r;
+      m.s.position.z = Math.sin(m.a) * m.r;
+    }
+  });
 
   // ---- Ring line ------------------------------------------------------------------------
   const ringY = 0.008;
@@ -387,7 +279,7 @@ export function buildArena(arena: Arena, quality: Quality): BuiltArena {
     root.add(ring);
   }
 
-  // ---- Air: dust motes in the window light, snow over the lake --------------------------
+  // ---- Air: dust motes in the lamplight, snow over the lake, grit over the pit -----------
   if (arena.id === 'desk' || arena.id === 'ice') {
     const snow = arena.id === 'ice';
     const count = quality === 'low' ? 80 : 240;
@@ -395,9 +287,9 @@ export function buildArena(arena: Arena, quality: Quality): BuiltArena {
     const p = new Float32Array(count * 3);
     const speed = new Float32Array(count);
     for (let i = 0; i < count; i++) {
-      p[i * 3] = rng.range(-22, 22);
-      p[i * 3 + 1] = rng.range(0, 18);
-      p[i * 3 + 2] = rng.range(-22, 22);
+      p[i * 3] = rng.range(-18, 18);
+      p[i * 3 + 1] = rng.range(0, 14);
+      p[i * 3 + 2] = rng.range(-18, 18);
       speed[i] = rng.range(0.3, 1);
     }
     geo.setAttribute('position', new THREE.BufferAttribute(p, 3));
@@ -416,42 +308,28 @@ export function buildArena(arena: Arena, quality: Quality): BuiltArena {
       for (let i = 0; i < count; i++) {
         let y = p[i * 3 + 1] + (snow ? -dt * speed[i] * 0.9 : Math.sin(t * 0.3 + i) * dt * 0.08);
         p[i * 3] += Math.sin(t * 0.4 + i) * dt * (snow ? 0.35 : 0.06);
-        if (y < 0) y = 18;
-        if (y > 18) y = 0;
+        if (y < 0) y = 14;
+        if (y > 14) y = 0;
         p[i * 3 + 1] = y;
       }
       geo.attributes.position.needsUpdate = true;
     });
   }
 
-  // ---- Sky: HDRI lighting + ground-projected backdrop -----------------------------------
-  const sky = Promise.all([hdri(folder), backdrop(folder)]).then(([hdr, bg]) => {
-    if (disposed) return { hdr, backdrop: bg };
-    if (bg) {
-      const box = new GroundedSkybox(bg, PHOTO_HEIGHT, 280, quality === 'low' ? 48 : 96);
-      // Its ground sits at position.y - height: put it just under this field's floor.
-      box.position.y = groundY - 0.05 + PHOTO_HEIGHT;
-      (box.material as THREE.MeshBasicMaterial).color.setScalar(arena.backgroundIntensity);
-      own(box.geometry);
-      own(box.material as THREE.Material);
-      root.add(box);
-      skyDome.visible = false;
-    }
-    return { hdr, backdrop: bg };
-  });
-
   return {
     root,
     envScene,
     sun,
-    sky,
+    fog,
+    sky: hdri(folder).then((hdr) => ({ hdr })),
     update: (t, dt) => {
       for (const u of updaters) u(t, dt);
     },
     dispose: () => {
       disposed = true;
       for (const o of owned) o.dispose();
-      // Instanced/scanned props share geometry and materials with the asset cache.
+      // Instanced grass shares geometry and materials with the asset cache.
     },
   };
 }
+

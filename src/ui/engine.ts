@@ -45,6 +45,8 @@ class Engine {
     this.run({
       mode: 'demo',
       arena: id,
+      // Show off a busy map behind the menus.
+      level: { difficulty: this.demoArena % 2 ? 'hard' : 'medium', seed: (Math.random() * 1e9) | 0 },
       players,
       seed: (Math.random() * 1e9) | 0,
       localSeats: [],

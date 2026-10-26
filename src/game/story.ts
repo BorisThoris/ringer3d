@@ -1,4 +1,6 @@
+import { hashString } from '../core/rng';
 import type { ArenaId } from './arenas';
+import type { Difficulty } from './maps';
 
 export interface Fighter {
   id: string;
@@ -114,7 +116,8 @@ export const FIGHTERS: Fighter[] = [
     intro: 'Sorry in advance. It\'s a heavy marble.',
     taunt: 'Told you. Heavy.',
     defeat: 'Good shooting. Honest work.',
-    homeArena: 'culdesac',
+    // The gravel yard behind the foundry.
+    homeArena: 'gravel',
     ending:
       'Ironside melted the Black Taw into the foundry\'s next pour. Somewhere out there is a bridge that can never quite be crossed by the unworthy.',
     starter: false,
@@ -152,7 +155,12 @@ export interface TowerStage {
   opponent: string;
   arena: ArenaId;
   bot: string;
+  /** The stage's map: harder the higher you climb, the same course every time you retry. */
+  difficulty: Difficulty;
+  mapSeed: number;
 }
+
+const STAGE_DIFFICULTY: Difficulty[] = ['easy', 'easy', 'medium', 'medium', 'medium', 'hard', 'hard', 'hard'];
 
 /**
  * The tower: seven challengers then the Black Taw. Opponents matching your own fighter are
@@ -166,8 +174,10 @@ export function buildTower(playerFighter: string): TowerStage[] {
     opponent: id,
     arena: FIGHTERS.find((f) => f.id === id)!.homeArena,
     bot: bots[i],
+    difficulty: STAGE_DIFFICULTY[i],
+    mapSeed: hashString(`tower:${id}:${i}`) % 100000,
   }));
-  stages.push({ opponent: 'obsidian', arena: 'ice', bot: 'legend' });
+  stages.push({ opponent: 'obsidian', arena: 'ice', bot: 'legend', difficulty: 'hard', mapSeed: hashString('tower:obsidian') % 100000 });
   return stages;
 }
 

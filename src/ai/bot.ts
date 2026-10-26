@@ -1,7 +1,7 @@
 import { WORLD } from '../core/constants';
 import { isOutsideRing, placementPoint, ShotSim, type Layout } from '../core/physics';
 import { Rng } from '../core/rng';
-import type { Shot, SurfaceParams } from '../core/types';
+import type { Piece, Shot, SurfaceParams } from '../core/types';
 import type { BotProfile } from './profiles';
 
 export interface BotContext {
@@ -9,6 +9,7 @@ export interface BotContext {
   firstShotOfTurn: boolean;
   seatAngle: number;
   surface: SurfaceParams;
+  pieces?: Piece[];
 }
 
 interface Candidate {
@@ -100,7 +101,8 @@ function generateCandidates(ctx: BotContext, p: BotProfile, rng: Rng): Candidate
           const ox = gx - ex * s;
           const oz = gz - ez * s;
           const pa = Math.atan2(oz, ox);
-          for (const d of [0, -0.18, 0.18]) {
+          // Wider spots too, for when posts and walls stand in the straight line.
+          for (const d of [0, -0.18, 0.18, -0.45, 0.45]) {
             const pt = placementPoint(pa + d);
             origins.push({ x: pt.x, z: pt.z, place: pa + d });
           }
@@ -115,14 +117,16 @@ function generateCandidates(ctx: BotContext, p: BotProfile, rng: Rng): Candidate
         const aim = Math.atan2(az, ax);
         const cut = Math.abs(wrap(aim - ea));
         if (cut > 1.15) continue; // too thin to move it meaningfully
-        const blocked = pathBlocked(o.x, o.z, gx, gz, others, t.id);
+        const blocked = pathBlocked(o.x, o.z, gx, gz, others, t.id) || obstacleOnPath(o.x, o.z, gx, gz, ctx.pieces, rS);
+        // A wall or bumper between the mib and the ring line will stop it leaving.
+        const exitBlocked = obstacleOnPath(t.x, t.z, t.x + ex * (WORLD.ringRadius + 0.5), t.z + ez * (WORLD.ringRadius + 0.5), ctx.pieces, rT);
         // Distance the target must travel to leave the ring along the exit line.
         const toEdge = WORLD.ringRadius - (t.x * ex + t.z * ez) + rT;
         for (const pw of powers) {
           for (const sp of spins) {
             const needed = 0.25 + 0.05 * travel + 0.06 * toEdge / Math.max(0.2, Math.cos(cut));
             const powerFit = -Math.abs(pw - Math.min(1, needed + 0.25));
-            const prior = 3 - cut * 2 - (blocked ? 4 : 0) + powerFit * 3 - travel * 0.05 + rng.next() * 0.3;
+            const prior = 3 - cut * 2 - (blocked ? 4 : 0) - (exitBlocked ? 2 : 0) + powerFit * 3 - travel * 0.05 + rng.next() * 0.3;
             out.push({ shot: { placeAngle: o.place, aimAngle: aim, power: pw, spin: sp }, prior });
           }
         }
@@ -142,7 +146,7 @@ function generateCandidates(ctx: BotContext, p: BotProfile, rng: Rng): Candidate
 
 /** Simulate an intended shot exactly as the game would and score the outcome. */
 function imagine(ctx: BotContext, shot: Shot, p: BotProfile): number {
-  const sim = new ShotSim(ctx.layout, ctx.surface, shot, ctx.firstShotOfTurn);
+  const sim = new ShotSim(ctx.layout, ctx.surface, shot, ctx.firstShotOfTurn, ctx.pieces);
   sim.runToEnd();
   const after = sim.resultLayout();
   sim.free();
@@ -167,6 +171,39 @@ function imagine(ctx: BotContext, shot: Shot, p: BotProfile): number {
   }
   if (!shooterIn) v -= 1;
   return v;
+}
+
+/** Does a solid map piece (post, bumper, wall) stand within `clear` of the segment? */
+function obstacleOnPath(x0: number, z0: number, x1: number, z1: number, pieces: Piece[] | undefined, clear: number): boolean {
+  if (!pieces) return false;
+  for (const p of pieces) {
+    if (p.kind === 'post' || p.kind === 'bumper') {
+      if (segPointDist(x0, z0, x1, z1, p.x, p.z) < p.r + clear) return true;
+    } else if (p.kind === 'wall') {
+      const hx = (Math.cos(p.a) * p.len) / 2;
+      const hz = (Math.sin(p.a) * p.len) / 2;
+      if (segSegDist(x0, z0, x1, z1, p.x - hx, p.z - hz, p.x + hx, p.z + hz) < p.thick / 2 + clear) return true;
+    }
+  }
+  return false;
+}
+
+function segPointDist(x0: number, z0: number, x1: number, z1: number, px: number, pz: number): number {
+  const dx = x1 - x0;
+  const dz = z1 - z0;
+  const len2 = dx * dx + dz * dz || 1e-9;
+  const t = clamp(((px - x0) * dx + (pz - z0) * dz) / len2, 0, 1);
+  return Math.hypot(x0 + dx * t - px, z0 + dz * t - pz);
+}
+
+function segSegDist(ax: number, az: number, bx: number, bz: number, cx: number, cz: number, dx: number, dz: number): number {
+  const cross = (ux: number, uz: number, vx: number, vz: number) => ux * vz - uz * vx;
+  const d1 = cross(bx - ax, bz - az, cx - ax, cz - az);
+  const d2 = cross(bx - ax, bz - az, dx - ax, dz - az);
+  const d3 = cross(dx - cx, dz - cz, ax - cx, az - cz);
+  const d4 = cross(dx - cx, dz - cz, bx - cx, bz - cz);
+  if (d1 * d2 < 0 && d3 * d4 < 0) return 0;
+  return Math.min(segPointDist(ax, az, bx, bz, cx, cz), segPointDist(ax, az, bx, bz, dx, dz), segPointDist(cx, cz, dx, dz, ax, az), segPointDist(cx, cz, dx, dz, bx, bz));
 }
 
 function pathBlocked(x0: number, z0: number, x1: number, z1: number, ms: Layout['targets'], skip: number) {

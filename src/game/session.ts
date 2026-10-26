@@ -10,6 +10,7 @@ import type { PeerMsg } from '../net/protocol';
 import { haptic, sound } from '../render/audio';
 import type { AimView, GameView } from '../render/GameView';
 import { ARENAS, arenaId, type ArenaId } from './arenas';
+import { generateMap, type Difficulty, type MapDef } from './maps';
 import { MARBLES } from './marbles';
 import { guideLength, settings } from './settings';
 import { hud, showBanner } from './store';
@@ -26,6 +27,10 @@ export interface SessionResult {
 export interface SessionOptions {
   mode: SessionMode;
   arena: ArenaId;
+  /** The map to play. Given whole by an online host; otherwise built from `level`. */
+  map?: MapDef;
+  /** How hard a generated map is and which one (defaults: medium, from `seed`). */
+  level?: { difficulty: Difficulty; seed?: number };
   players: PlayerInfo[];
   seed: number;
   /** Seats whose input comes from this device. */
@@ -50,6 +55,8 @@ const SLOWMO_RATE = 0.25;
 export class GameSession {
   readonly match: Match;
   readonly opts: SessionOptions;
+  /** The generated map in play. */
+  readonly map: MapDef;
   private view: GameView;
   private aim: AimView;
   private acc = 0;
@@ -79,7 +86,11 @@ export class GameSession {
     // Older peers may send a retired field id; every device maps it the same way.
     opts.arena = arenaId(opts.arena);
     const surface = ARENAS[opts.arena].surface;
-    this.match = new Match({ players: opts.players, seed: opts.seed, surface });
+    this.map =
+      opts.map && opts.map.arena === opts.arena
+        ? opts.map
+        : generateMap({ arena: opts.arena, difficulty: opts.level?.difficulty ?? 'medium', seed: opts.level?.seed ?? opts.seed });
+    this.match = new Match({ players: opts.players, seed: opts.seed, surface, pieces: this.map.pieces });
     this.aim = {
       placeAngle: 0,
       aimAngle: 0,
@@ -98,6 +109,7 @@ export class GameSession {
   start() {
     const v = this.view;
     v.loadArena(this.opts.arena);
+    v.setMap(this.map.pieces);
     v.bindMatch(this.match, this.opts.players.map((p) => MARBLES[p.marble] ?? MARBLES.ember));
     v.aim = this.aim;
     if (this.isDemo) this.aim.guideLength = 0;
@@ -122,7 +134,7 @@ export class GameSession {
 
     sound.setSurface(ARENAS[this.opts.arena].surfaceKind);
     if (!this.isDemo) {
-      const mood = ({ desk: 'calm', culdesac: 'bright', grass: 'bright', sand: 'calm', ice: 'cold' } as const)[this.opts.arena];
+      const mood = ({ desk: 'calm', culdesac: 'bright', grass: 'bright', sand: 'calm', ice: 'cold', gravel: 'bright', minigolf: 'bright' } as const)[this.opts.arena];
       sound.startPad(mood);
     }
     hud.set({
@@ -130,7 +142,7 @@ export class GameSession {
       winners: null,
       banner: null,
       fast: false,
-      arenaName: ARENAS[this.opts.arena].name,
+      arenaName: `${this.map.name} · ${ARENAS[this.opts.arena].name}`,
       netStatus: null,
     });
     this.delay = this.isDemo ? 0.6 : 1.2;
@@ -459,7 +471,7 @@ export class GameSession {
     const rng = new Rng(hashString(`${this.opts.seed}:${m.shotsTaken}:${seat}`));
     const started = performance.now();
     const shot = await planBotShot(
-      { layout: m.layout, firstShotOfTurn: m.firstShotOfTurn, seatAngle: m.seatAngle(seat), surface: m.config.surface },
+      { layout: m.layout, firstShotOfTurn: m.firstShotOfTurn, seatAngle: m.seatAngle(seat), surface: m.config.surface, pieces: m.config.pieces },
       profile,
       rng,
     );

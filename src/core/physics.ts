@@ -1,6 +1,6 @@
 import RAPIER from '@dimforge/rapier3d-deterministic-compat';
 import { QUANT, TARGET_COUNT, WORLD } from './constants';
-import type { Shot, SurfaceParams, Vec3 } from './types';
+import type { Piece, Shot, SurfaceParams, Vec3 } from './types';
 
 let ready: Promise<void> | null = null;
 
@@ -33,7 +33,7 @@ export interface Layout {
 export interface ImpactInfo {
   strength: number;
   pos: Vec3;
-  kind: 'marble' | 'kerb';
+  kind: 'marble' | 'kerb' | 'bumper';
 }
 
 const q = (v: number, step: number) => Math.round(v / step) * step;
@@ -96,15 +96,21 @@ export class ShotSim {
   readonly world: RAPIER.World;
   readonly bodies: BodyRec[] = [];
   private readonly events = new RAPIER.EventQueue(true);
-  private readonly colliderKind = new Map<number, 'marble' | 'kerb' | 'ground'>();
+  private readonly colliderKind = new Map<number, 'marble' | 'kerb' | 'ground' | 'piece' | 'bumper'>();
   private restCount = 0;
   steps = 0;
   done = false;
 
   private readonly surface: SurfaceParams;
+  private readonly zones: Extract<Piece, { kind: 'zone' }>[];
+  private readonly holes: Extract<Piece, { kind: 'hole' }>[];
+  /** Marbles that dropped into a cup this shot, and where. */
+  readonly holed = new Map<number, { x: number; z: number }>();
 
-  constructor(layout: Layout, surface: SurfaceParams, shot: Shot | null, isFirstShotOfTurn: boolean) {
+  constructor(layout: Layout, surface: SurfaceParams, shot: Shot | null, isFirstShotOfTurn: boolean, pieces: readonly Piece[] = []) {
     this.surface = surface;
+    this.zones = pieces.filter((p): p is Extract<Piece, { kind: 'zone' }> => p.kind === 'zone');
+    this.holes = pieces.filter((p): p is Extract<Piece, { kind: 'hole' }> => p.kind === 'hole');
     const L = quantizeLayout(layout);
     this.world = new RAPIER.World({ x: 0, y: WORLD.gravity, z: 0 });
     this.world.timestep = WORLD.dt;
@@ -143,6 +149,8 @@ export class ShotSim {
       this.colliderKind.set(c.handle, 'kerb');
     }
 
+    this.addPieces(pieces);
+
     for (const t of L.targets) this.addMarble(t, WORLD.targetRadius, surface, 2.6);
 
     let shooter = L.shooter;
@@ -155,6 +163,54 @@ export class ShotSim {
       if (shot) launch(rec, quantizeShot(shot));
     }
     if (!shot) this.done = true;
+  }
+
+  /** The map's solid pieces: fixed colliders. Zones and holes act in `step`. */
+  private addPieces(pieces: readonly Piece[]) {
+    if (!pieces.length) return;
+    const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
+    const hard = (d: RAPIER.ColliderDesc, restitution: number, friction: number) =>
+      d
+        .setRestitution(restitution)
+        .setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Max)
+        .setFriction(friction)
+        .setActiveEvents(RAPIER.ActiveEvents.CONTACT_FORCE_EVENTS)
+        .setContactForceEventThreshold(2);
+    for (const p of pieces) {
+      let d: RAPIER.ColliderDesc | null = null;
+      switch (p.kind) {
+        case 'wall':
+          d = hard(RAPIER.ColliderDesc.cuboid(p.len / 2, p.h / 2, p.thick / 2), 0.55, 0.3)
+            .setTranslation(p.x, p.h / 2, p.z)
+            .setRotation(yawQuat(-p.a));
+          break;
+        case 'post':
+          d = hard(RAPIER.ColliderDesc.cylinder(p.h / 2, p.r), 0.5, 0.3).setTranslation(p.x, p.h / 2, p.z);
+          break;
+        case 'bumper':
+          // Rubber with a spring in it: gives back more than it takes.
+          d = hard(RAPIER.ColliderDesc.cylinder(BUMPER_H / 2, p.r), BUMPER_BOUNCE, 0.1).setTranslation(p.x, BUMPER_H / 2, p.z);
+          break;
+        case 'bump':
+          // A sphere mostly buried: its cap is the lump a marble rides over.
+          d = hard(RAPIER.ColliderDesc.ball(p.r), 0.2, 0.6).setTranslation(p.x, p.r * (1 - 2 * p.sink), p.z);
+          break;
+        case 'ridge': {
+          const dx = p.x2 - p.x1;
+          const dz = p.z2 - p.z1;
+          const len = Math.hypot(dx, dz);
+          if (len < 1e-3) break;
+          // A capsule lying flat along the line, sunk so only a sliver stands proud.
+          d = hard(RAPIER.ColliderDesc.capsule(len / 2, p.r), 0.2, 0.5)
+            .setTranslation((p.x1 + p.x2) / 2, -p.r * 0.35, (p.z1 + p.z2) / 2)
+            .setRotation(lyingQuat(Math.atan2(dz, dx)));
+          break;
+        }
+      }
+      if (!d) continue;
+      const c = this.world.createCollider(d, body);
+      this.colliderKind.set(c.handle, p.kind === 'bumper' ? 'bumper' : 'piece');
+    }
   }
 
   private addMarble(m: LayoutMarble, radius: number, surface: SurfaceParams, density: number): BodyRec {
@@ -193,7 +249,7 @@ export class ShotSim {
       const k1 = this.colliderKind.get(e.collider1());
       const k2 = this.colliderKind.get(e.collider2());
       if (k1 === 'ground' || k2 === 'ground') return;
-      const kind = k1 === 'kerb' || k2 === 'kerb' ? 'kerb' : 'marble';
+      const kind = k1 === 'bumper' || k2 === 'bumper' ? 'bumper' : k1 === 'marble' && k2 === 'marble' ? 'marble' : 'kerb';
       const p = this.world.getCollider(e.collider1()).translation();
       impacts.push({ strength: e.totalForceMagnitude(), pos: { x: p.x, y: p.y, z: p.z }, kind });
     });
@@ -204,9 +260,27 @@ export class ShotSim {
     const dv = S.rollDecel * WORLD.dt;
     const pull = ROLL_G * WORLD.dt;
     for (const b of this.bodies) {
+      if (this.holed.has(b.id)) continue;
       const t = b.body.translation();
       if (t.y > b.radius + 0.03) continue;
       let { x: vx, y: vy, z: vz } = b.body.linvel();
+      // A cup takes any marble slow enough to fall in before it reaches the far lip.
+      const cup = this.holes.find((h) => (t.x - h.x) ** 2 + (t.z - h.z) ** 2 < (h.r - b.radius * 0.3) ** 2);
+      if (cup && vx * vx + vz * vz < HOLE_SPEED * HOLE_SPEED) {
+        this.drop(b, cup);
+        continue;
+      }
+      // Patches of different ground under this marble.
+      let decel = dv;
+      for (const z of this.zones) {
+        if ((t.x - z.x) ** 2 + (t.z - z.z) ** 2 > z.r * z.r) continue;
+        if (z.effect === 'sticky') decel *= z.k ?? STICKY;
+        else if (z.effect === 'slick') decel *= z.k ?? SLICK;
+        else {
+          vx += Math.cos(z.a) * BOOST * WORLD.dt;
+          vz += Math.sin(z.a) * BOOST * WORLD.dt;
+        }
+      }
       let sx = S.camber.x;
       let sz = S.camber.z;
       if (S.bumps.amp > 0) {
@@ -226,7 +300,7 @@ export class ShotSim {
         const rise = (sx * vx + sz * vz) / sp;
         if (rise > 0) vy = Math.max(vy, Math.min(HOP_MAX, S.hop * sp * rise));
       }
-      const f = Math.max(0, sp - dv) / sp;
+      const f = Math.max(0, sp - decel) / sp;
       b.body.setLinvel({ x: vx * f, y: vy, z: vz * f }, true);
       const w = b.body.angvel();
       b.body.setAngvel({ x: w.x * f, y: w.y * f, z: w.z * f }, true);
@@ -234,6 +308,7 @@ export class ShotSim {
 
     let resting = true;
     for (const b of this.bodies) {
+      if (this.holed.has(b.id)) continue;
       const v = b.body.linvel();
       const w = b.body.angvel();
       if (Math.hypot(v.x, v.y, v.z) > WORLD.restLinear || Math.hypot(w.x, w.y, w.z) > WORLD.restAngular) {
@@ -244,6 +319,15 @@ export class ShotSim {
     this.restCount = resting ? this.restCount + 1 : 0;
     if (this.restCount >= WORLD.restSteps || this.steps >= WORLD.maxShotSteps) this.done = true;
     return impacts;
+  }
+
+  /** The marble drops into the cup and leaves the table. */
+  private drop(b: BodyRec, cup: { x: number; z: number }) {
+    this.holed.set(b.id, { x: cup.x, z: cup.z });
+    b.body.setLinvel({ x: 0, y: 0, z: 0 }, false);
+    b.body.setAngvel({ x: 0, y: 0, z: 0 }, false);
+    b.body.setTranslation({ x: cup.x, y: -1, z: cup.z }, false);
+    b.body.setEnabled(false);
   }
 
   /** Run to completion (bots, tests, network catch-up). */
@@ -257,7 +341,9 @@ export class ShotSim {
     let shooter: LayoutMarble | null = null;
     for (const b of this.bodies) {
       const t = b.body.translation();
-      const m = { id: b.id, x: t.x, y: t.y, z: t.z };
+      // A holed marble is off the table: report it in a pocket beyond the ring, where
+      // the rules already count it as knocked out (or the shooter as gone).
+      const m = this.holed.has(b.id) ? { id: b.id, ...POCKET } : { id: b.id, x: t.x, y: t.y, z: t.z };
       if (b.id === SHOOTER_ID) shooter = m;
       else targets.push(m);
     }
@@ -281,6 +367,33 @@ const HOP_MAX = 2.6;
 const SETTLE_SPEED = 0.3;
 
 const slope = { x: 0, z: 0 };
+
+/** Map pieces. */
+const BUMPER_H = 0.45;
+const BUMPER_BOUNCE = 1.25;
+/** Faster than this (units/s) a marble rolls straight over a cup's lip. */
+const HOLE_SPEED = 7;
+const STICKY = 2.2;
+const SLICK = 0.2;
+/** Speed-pad push (units/s²). */
+const BOOST = 22;
+/** Where holed marbles are reported: well outside the ring. */
+const POCKET = { x: WORLD.boundaryRadius + 4, y: WORLD.targetRadius, z: 0 };
+
+/** Rotation that lays a capsule (axis +Y) flat along the ground at yaw `a` (radians). */
+function lyingQuat(a: number) {
+  // Tip +Y onto +X (−90° about Z), then turn about Y by −a so +X points along (cos a, sin a).
+  const s = Math.SQRT1_2;
+  const qz = { x: 0, y: 0, z: -s, w: s };
+  const qy = { x: 0, y: Math.sin(-a / 2), z: 0, w: Math.cos(-a / 2) };
+  // q = qy * qz
+  return {
+    x: qy.w * qz.x + qy.x * qz.w + qy.y * qz.z - qy.z * qz.y,
+    y: qy.w * qz.y - qy.x * qz.z + qy.y * qz.w + qy.z * qz.x,
+    z: qy.w * qz.z + qy.x * qz.y - qy.y * qz.x + qy.z * qz.w,
+    w: qy.w * qz.w - qy.x * qz.x - qy.y * qz.y - qy.z * qz.z,
+  };
+}
 
 /** Integer lattice hash to [-1, 1). Integer maths only: identical on every peer. */
 function lattice(ix: number, iz: number): number {

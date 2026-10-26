@@ -6,10 +6,10 @@ import { DEFAULT_SURFACE, type SurfaceParams } from '../core/types';
  * reflections come from an HDRI shot at a matching location, props are scanned models.
  * The surface changes the physics, the sound and the visual effects of every roll.
  */
-export type ArenaId = 'desk' | 'culdesac' | 'grass' | 'sand' | 'ice';
+export type ArenaId = 'desk' | 'culdesac' | 'grass' | 'sand' | 'ice' | 'gravel' | 'minigolf';
 
 /** How the ground behaves and sounds; drives audio and visual surface effects. */
-export type SurfaceKind = 'wood' | 'concrete' | 'grass' | 'sand' | 'ice';
+export type SurfaceKind = 'wood' | 'concrete' | 'grass' | 'sand' | 'ice' | 'gravel' | 'turf';
 
 export interface Arena {
   id: ArenaId;
@@ -181,6 +181,64 @@ export const ARENAS: Record<ArenaId, Arena> = {
     ambient: { sky: '#d6e4f5', ground: '#5d7088', intensity: 0.25 },
     groundColor: '#55697a',
     ring: { color: '#eaf6ff', style: 'etched' },
+    exposure: 1.0,
+    envIntensity: 1,
+    backgroundIntensity: 1,
+  },
+  gravel: {
+    id: 'gravel',
+    name: 'The Gravel Pit',
+    tagline: 'Loose stones under every roll. Nothing goes where you sent it.',
+    // Crunchy and dead-ish: grippy grit, and pebble beds (map pieces) that throw marbles
+    // off line. The bank of loose stone past the ring soaks up runaways.
+    surface: {
+      ...DEFAULT_SURFACE,
+      rollDecel: 12,
+      friction: 0.8,
+      linearDamping: 0.2,
+      angularDamping: 0.5,
+      marbleRestitution: 0.8,
+      bumps: { amp: 0.05, scale: 1.4, stretch: 1 },
+      edge: { restitution: 0.12, friction: 0.9 },
+    },
+    surfaceKind: 'gravel',
+    surfaceLabel: 'Gravel · loose, bumpy',
+    assets: 'gravel',
+    sky: { top: '#6f9ed6', bottom: '#e4ecf3' },
+    fog: { color: '#cfd6dc', near: 80, far: 220 },
+    sun: { color: '#fff3e2', intensity: 2.0, dir: [8.4, 6.0, 6.2] },
+    ambient: { sky: '#bfe0ff', ground: '#6b6256', intensity: 0.25 },
+    groundColor: '#8a8379',
+    // Spray paint: chalk vanishes on pale stone.
+    ring: { color: '#ffd23f', style: 'chalk' },
+    exposure: 1.0,
+    envIntensity: 1,
+    backgroundIntensity: 1,
+  },
+  minigolf: {
+    id: 'minigolf',
+    name: 'The Mini-Golf Course',
+    tagline: 'Bumpers, speed pads and cups. Ringer goes to the seaside arcade.',
+    // Artificial turf: flat and true, so every bounce off the hardware is yours to plan.
+    // The painted rail around the course sends marbles back in play.
+    surface: {
+      ...DEFAULT_SURFACE,
+      rollDecel: 8,
+      friction: 0.6,
+      linearDamping: 0.1,
+      angularDamping: 0.4,
+      marbleRestitution: 0.9,
+      edge: { restitution: 0.6, friction: 0.25 },
+    },
+    surfaceKind: 'turf',
+    surfaceLabel: 'Turf · bumpers, pads, cups',
+    assets: 'minigolf',
+    sky: { top: '#5aa9ff', bottom: '#e6f4ff' },
+    fog: { color: '#d8ecff', near: 80, far: 220 },
+    sun: { color: '#fff4e0', intensity: 3, dir: [4.2, 10.8, 3.1] },
+    ambient: { sky: '#cfe6ff', ground: '#2f6b33', intensity: 0.25 },
+    groundColor: '#2f8f3c',
+    ring: { color: '#ffffff', style: 'chalk' },
     exposure: 1.0,
     envIntensity: 1,
     backgroundIntensity: 1,

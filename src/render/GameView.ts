@@ -11,6 +11,8 @@ import { MIB_LOOKS, uiColor, type MarbleLook } from '../game/marbles';
 import { buildArena, type BuiltArena } from './arenaBuilder';
 import { buildMarble, disposeObject, type Quality } from './marbleMesh';
 import { Juice } from './juice';
+import { buildPieces, type BuiltPieces } from './mapPieces';
+import type { Piece } from '../core/types';
 import { SurfaceFx, type Mover } from './surfaceFx';
 import { radialGlowTexture } from './textures';
 
@@ -40,6 +42,9 @@ interface Leaving {
 }
 
 const R = WORLD.ringRadius;
+/** Camera-distance fog: clear over the whole field, gone by the far bank. */
+const FOG_NEAR = 24;
+const FOG_FAR = 46;
 const tmpV = new THREE.Vector3();
 const tmpQ = new THREE.Quaternion();
 
@@ -74,6 +79,9 @@ export class GameView {
   private movers: Mover[] = [];
   /** Streaks, shockwaves, camera trauma. */
   private juice: Juice;
+  /** This match's map pieces (obstacles, hazards, cups). */
+  private pieces: BuiltPieces | null = null;
+  private mapDef: readonly Piece[] | null = null;
   /** Game-time rate the session is playing at (slow motion < 1); effects follow it. */
   timeScale = 1;
   private baseFov = 48;
@@ -182,6 +190,7 @@ export class GameView {
     const id = this.arenaId;
     this.arenaId = null;
     if (id) this.loadArena(id);
+    this.setMap(this.mapDef);
     if (this.match) this.bindMatch(this.match, this.looks);
     this.resize();
   }
@@ -194,10 +203,16 @@ export class GameView {
       this.scene.remove(this.arena.root);
       this.arena.dispose();
     }
+    // A new field clears the old map; the session lays the next one.
+    const keep = this.mapDef;
+    this.setMap(null);
+    this.mapDef = keep;
     const built = buildArena(def, this.quality);
     this.arena = built;
     this.scene.add(built.root);
-    this.scene.fog = new THREE.Fog(def.fog.color, def.fog.near, def.fog.far);
+    // Beyond the edge of play the world fades into fog: the ring is the whole stage.
+    this.scene.fog = new THREE.Fog(built.fog, FOG_NEAR, FOG_FAR);
+    this.scene.background = built.fog;
     this.renderer.toneMappingExposure = def.exposure;
     this.surfaceFx.setSurface(def.surfaceKind);
     // Gradient reflections until the field's HDRI arrives, then the real place.
@@ -220,6 +235,19 @@ export class GameView {
     this.bloom.radius = 0.25;
     this.bloom.threshold = 0.96;
     this.bloom.enabled = this.quality !== 'low';
+  }
+
+  /** Lay out a map's pieces on the current field (null clears them). */
+  setMap(pieces: readonly Piece[] | null) {
+    this.mapDef = pieces;
+    if (this.pieces) {
+      this.scene.remove(this.pieces.group);
+      this.pieces.dispose();
+      this.pieces = null;
+    }
+    if (!pieces?.length || !this.arenaId) return;
+    this.pieces = buildPieces(pieces, this.arenaId, this.quality);
+    this.scene.add(this.pieces.group);
   }
 
   /** Attach a match: builds marble meshes for the 13 mibs and each player's shooter. */
@@ -368,6 +396,7 @@ export class GameView {
     this.updateEffects(dt);
     this.updateCamera(dt);
     this.arena?.update(this.elapsed, dt);
+    this.pieces?.update(this.elapsed, dt);
     if (this.quality === 'low') this.renderer.render(this.scene, this.camera);
     else this.composer.render(dt);
   };
@@ -560,10 +589,11 @@ export class GameView {
   }
 
   /** A hit with weight: camera jolt and, for hard ones, a shockwave on the ground. */
-  hitFeedback(pos: { x: number; z: number }, strength: number, kind: 'marble' | 'kerb') {
+  hitFeedback(pos: { x: number; z: number }, strength: number, kind: 'marble' | 'kerb' | 'bumper') {
+    if (kind === 'bumper') this.pieces?.pulse(pos.x, pos.z, strength);
     if (strength < 120) return;
-    this.juice.kick(Math.min(kind === 'kerb' ? 0.25 : 0.45, strength / 2400));
-    if (strength > 260) this.juice.shockwave(pos, strength, kind === 'kerb' ? '#ffd9a8' : '#ffffff');
+    this.juice.kick(Math.min(kind === 'marble' ? 0.45 : 0.25, strength / 2400));
+    if (strength > 260) this.juice.shockwave(pos, strength, kind === 'bumper' ? '#ffd23f' : kind === 'kerb' ? '#ffd9a8' : '#ffffff');
   }
 
   /** The flick leaves the thumb. */
@@ -735,6 +765,7 @@ export class GameView {
     this.arena?.dispose();
     this.surfaceFx.dispose();
     this.juice.dispose();
+    this.setMap(null);
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }

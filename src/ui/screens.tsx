@@ -1,12 +1,12 @@
 import { useState, type CSSProperties } from 'react';
 import type { PlayerInfo } from '../core/types';
 import { BOT_PROFILES } from '../ai/profiles';
-import type { ArenaId } from '../game/arenas';
+import { randomSeed } from '../game/maps';
 import { MARBLES, uiColor } from '../game/marbles';
 import { progress, settings, type GuideMode } from '../game/settings';
 import { fighter, FIGHTERS } from '../game/story';
 import type { Quality } from '../render/marbleMesh';
-import { ArenaPicker, Chips, Marble3D, MarbleChip, MarblePicker, Screen, tap } from './components';
+import { Chips, MapPicker, Marble3D, MarbleChip, MarblePicker, Screen, tap, type MapChoice } from './components';
 
 export const PLAYABLE_MARBLES = Object.keys(MARBLES).filter((m) => m !== 'mib' && m !== 'obsidian');
 
@@ -86,12 +86,12 @@ export function MainMenu({ go }: { go: (s: 'story' | 'quick' | 'local' | 'online
   );
 }
 
-const DIFFICULTIES = ['rookie', 'casual', 'skilled', 'expert', 'master', 'legend'] as const;
+const BOT_SKILLS = ['rookie', 'casual', 'skilled', 'expert', 'master', 'legend'] as const;
 
-export function QuickPlay({ onBack, onStart }: { onBack: () => void; onStart: (arena: ArenaId, players: PlayerInfo[]) => void }) {
+export function QuickPlay({ onBack, onStart }: { onBack: () => void; onStart: (map: MapChoice, players: PlayerInfo[]) => void }) {
   const st = settings.use((s) => s);
-  const [arena, setArena] = useState<ArenaId>('culdesac');
-  const [diff, setDiff] = useState<(typeof DIFFICULTIES)[number]>('casual');
+  const [map, setMap] = useState<MapChoice>(() => ({ arena: 'culdesac', difficulty: 'medium', seed: randomSeed() }));
+  const [diff, setDiff] = useState<(typeof BOT_SKILLS)[number]>('casual');
   const [opp, setOpp] = useState('tide');
   const oppOptions = FIGHTERS.filter((f) => f.marble !== st.marble).map((f) => f.id);
 
@@ -117,12 +117,12 @@ export function QuickPlay({ onBack, onStart }: { onBack: () => void; onStart: (a
         })}
       </div>
       <div className="section-title">Bot skill</div>
-      <Chips label="Bot skill" value={diff} options={DIFFICULTIES.map((d) => ({ id: d, label: BOT_PROFILES[d].label }))} onChange={setDiff} />
+      <Chips label="Bot skill" value={diff} options={BOT_SKILLS.map((d) => ({ id: d, label: BOT_PROFILES[d].label }))} onChange={setDiff} />
       <p className="lede" style={{ margin: 0 }}>
         Bots see only what you see and flick with a shaky thumb like anyone else. Higher skill means a steadier hand and better planning.
       </p>
-      <div className="section-title">Field</div>
-      <ArenaPicker value={arena} onChange={setArena} />
+      <div className="section-title">Field &amp; map</div>
+      <MapPicker value={map} onChange={setMap} />
       <div className="section-title">Your shooter</div>
       <div className="taw-preview">
         <Marble3D id={st.marble} size={150} />
@@ -133,7 +133,7 @@ export function QuickPlay({ onBack, onStart }: { onBack: () => void; onStart: (a
         onClick={() => {
           tap();
           const f = fighter(opp);
-          onStart(arena, [
+          onStart(map, [
             { id: 'me', name: st.playerName, marble: st.marble, kind: 'human' },
             { id: 'bot', name: f.name, marble: f.marble, kind: 'bot', botProfile: diff },
           ]);
@@ -145,9 +145,9 @@ export function QuickPlay({ onBack, onStart }: { onBack: () => void; onStart: (a
   );
 }
 
-export function LocalPlay({ onBack, onStart }: { onBack: () => void; onStart: (arena: ArenaId, players: PlayerInfo[]) => void }) {
+export function LocalPlay({ onBack, onStart }: { onBack: () => void; onStart: (map: MapChoice, players: PlayerInfo[]) => void }) {
   const st = settings.get();
-  const [arena, setArena] = useState<ArenaId>('culdesac');
+  const [map, setMap] = useState<MapChoice>(() => ({ arena: 'culdesac', difficulty: 'medium', seed: randomSeed() }));
   const [players, setPlayers] = useState<{ name: string; marble: string }[]>([
     { name: st.playerName, marble: st.marble },
     { name: 'Player 2', marble: st.marble === 'tide' ? 'ember' : 'tide' },
@@ -193,14 +193,14 @@ export function LocalPlay({ onBack, onStart }: { onBack: () => void; onStart: (a
           Add player
         </button>
       )}
-      <div className="section-title">Field</div>
-      <ArenaPicker value={arena} onChange={setArena} />
+      <div className="section-title">Field &amp; map</div>
+      <MapPicker value={map} onChange={setMap} />
       <button
         className="btn primary"
         onClick={() => {
           tap();
           onStart(
-            arena,
+            map,
             players.map((p, i) => ({ id: `p${i}`, name: p.name.trim() || `Player ${i + 1}`, marble: p.marble, kind: 'human' })),
           );
         }}

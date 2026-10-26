@@ -80,9 +80,35 @@ export const DEFAULT_SURFACE: SurfaceParams = {
   edge: { restitution: 0.5, friction: 0.2 },
 };
 
+/**
+ * One thing placed on a map. All coordinates are world units on the ground plane; angles in
+ * radians. Pieces are plain data so a host can send a whole map to its peers.
+ *  wall    a block (book, kerb stone, fence plank): bounces marbles, blocks lines
+ *  post    a round stake or bollard
+ *  bumper  a rubber ring that throws marbles back harder than they came
+ *  bump    a rounded lump sunk into the ground (pebble, molehill, coin): marbles ride over it
+ *          and come off line; `sink` is how much of the sphere is buried (0..1)
+ *  ridge   a low raised line (ice crack, concrete crack, pencil) that kicks marbles that cross it
+ *  zone    a patch of different ground: sticky (mud, sand trap), slick (puddle, black ice) or
+ *          boost (a speed pad pushing along `a`)
+ *  hole    a cup: a slow marble drops in (a mib counts as knocked out; a shooter ends the turn),
+ *          a fast one skims across the lip
+ * `skin` says what the piece is (a book, a rock, a puddle) and only changes how it looks.
+ * A zone's `k` scales its effect (how sticky the mud, how slick the paper).
+ */
+export type Piece = (
+  | { kind: 'wall'; x: number; z: number; len: number; thick: number; h: number; a: number }
+  | { kind: 'post'; x: number; z: number; r: number; h: number }
+  | { kind: 'bumper'; x: number; z: number; r: number }
+  | { kind: 'bump'; x: number; z: number; r: number; sink: number }
+  | { kind: 'ridge'; x1: number; z1: number; x2: number; z2: number; r: number }
+  | { kind: 'zone'; x: number; z: number; r: number; effect: 'sticky' | 'slick' | 'boost'; a: number; k?: number }
+  | { kind: 'hole'; x: number; z: number; r: number }
+) & { skin?: string };
+
 export type MatchEvent =
   | { type: 'shot'; player: number; shot: Shot }
-  | { type: 'impact'; strength: number; pos: Vec3; kind: 'marble' | 'kerb' }
+  | { type: 'impact'; strength: number; pos: Vec3; kind: 'marble' | 'kerb' | 'bumper' }
   | { type: 'capture'; player: number; marbleId: number; pos: Vec3 }
   | { type: 'shooterOut'; player: number }
   | { type: 'shootAgain'; player: number }

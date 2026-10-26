@@ -1,5 +1,6 @@
 import type { PlayerInfo } from '../core/types';
 import { arenaId, type ArenaId } from '../game/arenas';
+import { generateMap, type Difficulty } from '../game/maps';
 import { createStore } from '../game/store';
 import { PROTOCOL_VERSION, type OnlineMatchConfig, type PeerMsg, type RoomInfo, type RosterEntry } from './protocol';
 import type { Link, LinkMode, Matchmaker } from './transport';
@@ -8,6 +9,8 @@ export interface RoomState {
   room: RoomInfo | null;
   roster: RosterEntry[];
   arena: ArenaId;
+  difficulty: Difficulty;
+  mapSeed: number;
   started: boolean;
   error: string | null;
   links: Record<string, LinkMode>;
@@ -35,7 +38,7 @@ const SHOOTER_POOL = ['ember', 'tide', 'jade', 'volt', 'rime', 'nova', 'ironside
 export class OnlineRoom implements NetGame {
   readonly mm: Matchmaker;
   readonly isHost: boolean;
-  readonly state = createStore<RoomState>({ room: null, roster: [], arena: 'culdesac', started: false, error: null, links: {} });
+  readonly state = createStore<RoomState>({ room: null, roster: [], arena: 'culdesac', difficulty: 'medium', mapSeed: 1, started: false, error: null, links: {} });
   private links = new Map<string, Link>();
   private hostId = '';
   private seats: Record<string, number> = {};
@@ -150,6 +153,13 @@ export class OnlineRoom implements NetGame {
     this.pushRoster();
   }
 
+  /** Host: which generated map of the field to play. */
+  setLevel(difficulty: Difficulty, mapSeed: number) {
+    if (!this.isHost) return;
+    this.state.set({ difficulty, mapSeed });
+    this.pushRoster();
+  }
+
   setReady(ready: boolean) {
     if (this.isHost) return;
     this.links.get(this.hostId)?.send({ t: 'ready', ready });
@@ -157,7 +167,7 @@ export class OnlineRoom implements NetGame {
 
   private pushRoster() {
     const s = this.state.get();
-    this.broadcast({ t: 'roster', roster: s.roster, arena: s.arena });
+    this.broadcast({ t: 'roster', roster: s.roster, arena: s.arena, difficulty: s.difficulty, mapSeed: s.mapSeed });
     this.mm.update({ players: s.roster.length, started: s.started, arena: s.arena });
   }
 
@@ -180,7 +190,8 @@ export class OnlineRoom implements NetGame {
       used.add(marble);
       return { id: r.peerId, name: r.name, marble, kind: r.isBot ? 'bot' : 'human', botProfile: r.botProfile };
     });
-    const config: OnlineMatchConfig = { seed: (Math.random() * 2 ** 31) | 0, arena: s.arena, players };
+    const map = generateMap({ arena: s.arena, difficulty: s.difficulty, seed: s.mapSeed });
+    const config: OnlineMatchConfig = { seed: (Math.random() * 2 ** 31) | 0, arena: s.arena, players, map };
     this.seats = seats;
     this.mySeat = seats[this.mm.myId];
     this.state.set({ started: true });
@@ -232,7 +243,7 @@ export class OnlineRoom implements NetGame {
     } else {
       switch (m.t) {
         case 'roster':
-          this.state.set({ roster: m.roster, arena: arenaId(m.arena) });
+          this.state.set((s) => ({ roster: m.roster, arena: arenaId(m.arena), difficulty: m.difficulty ?? s.difficulty, mapSeed: m.mapSeed ?? s.mapSeed }));
           return;
         case 'kick':
           this.state.set({ error: m.reason });

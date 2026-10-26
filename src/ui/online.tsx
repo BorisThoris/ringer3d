@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BOT_PROFILES } from '../ai/profiles';
 import { ARENAS, type ArenaId } from '../game/arenas';
 import { settings } from '../game/settings';
@@ -8,7 +8,8 @@ import type { RoomInfo } from '../net/protocol';
 import { OnlineRoom } from '../net/room';
 import { ServerMatchmaker } from '../net/serverMatchmaker';
 import type { Matchmaker } from '../net/transport';
-import { ArenaPicker, Chips, MarbleChip, Screen, tap } from './components';
+import { ArenaPicker, Chips, MapPicker, MapPreview, MarbleChip, Screen, tap } from './components';
+import { generateMap, type Difficulty } from '../game/maps';
 
 let shared: { key: string; mm: Matchmaker } | null = null;
 /** One matchmaker per connection mode; switching mode in Settings swaps it. */
@@ -206,6 +207,22 @@ export function OnlineHub({ onBack, onRoom }: { onBack: () => void; onRoom: (r: 
 
 const BOT_NAMES = FIGHTERS.filter((f) => f.id !== 'obsidian');
 
+/** What a guest sees of the host's chosen map. */
+function GuestMapView({ arena, difficulty, seed }: { arena: ArenaId; difficulty: Difficulty; seed: number }) {
+  const map = useMemo(() => generateMap({ arena, difficulty, seed }), [arena, difficulty, seed]);
+  return (
+    <div className="map-card">
+      <MapPreview map={map} size={150} />
+      <div className="map-meta">
+        <b className="map-name">{map.name}</b>
+        <span className="map-sum">
+          {ARENAS[arena].name} · {difficulty}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function RoomLobby({ room, onLeave }: { room: OnlineRoom; onLeave: () => void }) {
   const s = room.state.use((x) => x);
   const [ready, setReady] = useState(false);
@@ -298,8 +315,14 @@ export function RoomLobby({ room, onLeave }: { room: OnlineRoom; onLeave: () => 
               </button>
             </div>
           )}
-          <div className="section-title">Field</div>
-          <ArenaPicker value={s.arena} onChange={(a) => room.setArena(a)} />
+          <div className="section-title">Field &amp; map</div>
+          <MapPicker
+            value={{ arena: s.arena, difficulty: s.difficulty, seed: s.mapSeed }}
+            onChange={(v) => {
+              if (v.arena !== s.arena) room.setArena(v.arena);
+              room.setLevel(v.difficulty, v.seed);
+            }}
+          />
           <button
             className="btn primary"
             disabled={!room.canStart}
@@ -313,8 +336,9 @@ export function RoomLobby({ room, onLeave }: { room: OnlineRoom; onLeave: () => 
         </>
       ) : (
         <>
+          <GuestMapView arena={s.arena} difficulty={s.difficulty} seed={s.mapSeed} />
           <p className="lede" style={{ margin: 0 }}>
-            Field: {ARENAS[s.arena].name}. The host starts the match once everyone is ready.
+            The host picks the map and starts the match once everyone is ready.
           </p>
           <button
             className={`btn ${ready ? '' : 'primary'}`}
