@@ -12,6 +12,35 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./icon-192.png" />
+    <script>
+      // Boot rescue: if the app's script fails to load (a page left over from an earlier
+      // deploy pointing at a script that no longer exists), drop the service worker and its
+      // caches and reload once, so a stale copy can never leave a blank page.
+      (function () {
+        var KEY = 'ringer3d.rescued';
+        function rescue() {
+          try {
+            if (sessionStorage.getItem(KEY)) return;
+            sessionStorage.setItem(KEY, '1');
+          } catch (e) {}
+          var jobs = [];
+          if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+            jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.unregister(); })); }));
+          }
+          if (window.caches && caches.keys) {
+            jobs.push(caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }));
+          }
+          Promise.all(jobs).then(function () { location.reload(); }, function () { location.reload(); });
+        }
+        window.addEventListener('error', function (e) {
+          var t = e.target;
+          if (t && t.tagName === 'SCRIPT' && t.type === 'module') rescue();
+        }, true);
+        // A script served as the wrong type (the host's page in place of a missing file)
+        // can fail without an error event: if nothing has started after a while, rescue.
+        setTimeout(function () { if (!window.__ringerBooted) rescue(); }, 30000);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

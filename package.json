@@ -18,7 +18,7 @@
     "android": "npm run mobile:sync && cap open android",
     "ios": "npm run mobile:sync && cap open ios",
     "e2e:online": "node scripts/e2e-online.mjs",
-    "deploy": "npm run build && wrangler deploy"
+    "deploy": "npm run build && node scripts/keep-old-assets.mjs && wrangler deploy"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.3",

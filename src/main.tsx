@@ -6,6 +6,9 @@ import { sound } from './render/audio';
 import { initPlatform } from './platform';
 import './ui/styles.css';
 
+// Tells the boot rescue in index.html that the app's script really loaded.
+(window as unknown as { __ringerBooted: boolean }).__ringerBooted = true;
+
 function Root() {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
