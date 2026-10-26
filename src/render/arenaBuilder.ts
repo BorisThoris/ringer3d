@@ -1,20 +1,21 @@
 import * as THREE from 'three';
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { WORLD } from '../core/constants';
 import { Rng } from '../core/rng';
 import type { Arena, ArenaId } from '../game/arenas';
-import { applyPBR, hdri, model, pbr } from './assets';
+import { hdri } from './assets';
+import { groundArt } from './groundArt';
 import type { Quality } from './marbleMesh';
 import { radialGlowTexture, ringTexture } from './textures';
 
 /**
- * Builds a field as a stage: a disc of the field's scanned ground (CC0), a low bank along
- * the edge of play that matches what the physics edge does (a stone kerb bounces, a
- * snowbank or a sand berm swallows), and fog beyond it. The field's HDRI never shows: it
- * only lights the scene and fills the glass marbles with a real place to reflect.
+ * Builds a field as a toy diorama: a disc of hand-painted ground (groundArt.ts), a chunky
+ * bank along the edge of play that looks like what the physics edge does (a stone kerb
+ * bounces, a snowbank or a sand berm swallows), a few rounded props standing out in the
+ * fog, and soft, bright light. Everything is made in code; the field's HDRI is never shown,
+ * it only fills the glossy marbles with a real place to reflect.
  *
  * Map pieces (obstacles, hazards) are built separately (mapPieces.ts), per match.
- * Everything that needs a download is applied when it arrives; until then the field shows
- * flat colours and stays fully playable.
  */
 export interface BuiltArena {
   root: THREE.Group;
@@ -35,35 +36,20 @@ const B = WORLD.boundaryRadius;
 const GROUND_SOLID = B + 4;
 const GROUND_OUTER = B + 16;
 
-/** The scanned ground of each field: texture set, metres per tile, normal strength. */
-const GROUND: Record<ArenaId, { id: string; tile: number; normal: number; roughness?: number; tint?: string }> = {
-  desk: { id: 'wood_table_001', tile: 1.5, normal: 1 },
-  culdesac: { id: 'brushed_concrete', tile: 2.5, normal: 0.8 },
-  grass: { id: 'Grass006', tile: 2, normal: 1.1 },
-  sand: { id: 'aerial_beach_01', tile: 3, normal: 1.6 },
-  ice: { id: 'Ice003', tile: 2, normal: 0.6, roughness: 0.35 },
-  gravel: { id: 'gravel_floor_02', tile: 1.2, normal: 1.4, tint: '#b9b1a6' },
-  // Artificial turf: the lawn scan, fine-tiled, flattened and dyed.
-  minigolf: { id: 'Grass006', tile: 0.35, normal: 0.25, tint: '#55d65f' },
-};
-
 /** The bank along the edge of play, as a lathe profile (radius offset from B, height). */
-const BANK: Record<ArenaId, { profile: [number, number][]; color: string; texture?: string; tile?: number }> = {
-  // A wooden lip, like a tray rim on the desk.
-  desk: { profile: [[-0.1, 0], [-0.1, 0.45], [0.05, 0.55], [0.6, 0.55], [0.7, 0]], color: '#6b4127', texture: 'wood_table_001', tile: 1.5 },
-  // A stone kerb: square, hard.
-  culdesac: { profile: [[0, 0], [0, 0.62], [0.12, 0.7], [1.4, 0.7], [1.5, 0]], color: '#a29f97', texture: 'concrete_pavement', tile: 1.8 },
-  // Long grass handled by tufts; a gentle green berm under them.
-  grass: { profile: [[-0.2, 0], [0.6, 0.35], [1.6, 0.55], [3, 0.2], [3.8, 0]], color: '#4e6d2a', texture: 'Grass006', tile: 2 },
-  sand: { profile: [[-0.3, 0], [0.8, 0.55], [2, 0.75], [3.4, 0.3], [4.2, 0]], color: '#d1bf9b', texture: 'aerial_beach_01', tile: 3 },
-  ice: { profile: [[-0.3, 0], [0.4, 0.6], [1.6, 1.05], [3, 0.6], [4, 0]], color: '#eef3f8', texture: 'snow_02', tile: 2 },
-  gravel: { profile: [[-0.2, 0], [0.6, 0.5], [1.8, 0.7], [3.2, 0.25], [4, 0]], color: '#8a8379', texture: 'gravel_floor_02', tile: 1.2 },
-  // A painted wooden rail, like every course's border.
-  minigolf: { profile: [[0, 0], [0, 0.55], [0.06, 0.62], [0.42, 0.62], [0.48, 0.55], [0.48, 0]], color: '#f4efe4' },
+const BANK: Record<ArenaId, { profile: [number, number][]; color: string; rough?: number }> = {
+  // A rounded wooden lip, like a tray rim on the desk.
+  desk: { profile: [[-0.1, 0], [-0.1, 0.4], [0.05, 0.55], [0.55, 0.55], [0.7, 0.4], [0.7, 0]], color: '#8a5634', rough: 0.6 },
+  // A stone kerb: square and hard, edges softened.
+  culdesac: { profile: [[0, 0], [0, 0.58], [0.08, 0.68], [1.35, 0.7], [1.5, 0.6], [1.5, 0]], color: '#c9c3b8' },
+  // A soft green berm; tufts sit on it.
+  grass: { profile: [[-0.2, 0], [0.6, 0.35], [1.6, 0.55], [3, 0.2], [3.8, 0]], color: '#4f9a37' },
+  sand: { profile: [[-0.3, 0], [0.8, 0.55], [2, 0.75], [3.4, 0.3], [4.2, 0]], color: '#d6b67f' },
+  ice: { profile: [[-0.3, 0], [0.4, 0.6], [1.6, 1.05], [3, 0.6], [4, 0]], color: '#f4f8fc' },
+  gravel: { profile: [[-0.2, 0], [0.6, 0.5], [1.8, 0.7], [3.2, 0.25], [4, 0]], color: '#a39a8f' },
+  // A painted rail, like every course's border.
+  minigolf: { profile: [[0, 0], [0, 0.55], [0.06, 0.62], [0.42, 0.62], [0.48, 0.55], [0.48, 0]], color: '#f6f2e8', rough: 0.5 },
 };
-
-/** Where the texture for a bank lives when it is not the field's own folder. */
-const TEXTURE_FOLDER: Record<string, string> = { concrete_pavement: 'culdesac', snow_02: 'ice', Grass006: 'grass', wood_table_001: 'desk' };
 
 export function buildArena(arena: Arena, quality: Quality): BuiltArena {
   const root = new THREE.Group();
@@ -71,10 +57,9 @@ export function buildArena(arena: Arena, quality: Quality): BuiltArena {
   const updaters: ((t: number, dt: number) => void)[] = [];
   const owned: { dispose(): void }[] = [];
   const rng = new Rng(arena.id.length * 1013 + 7);
-  let disposed = false;
   const own = <T extends { dispose(): void }>(x: T) => (owned.push(x), x);
-  const folder = arena.assets;
   const fog = new THREE.Color(arena.fog.color);
+  const shadows = quality !== 'low';
 
   // ---- Fallback reflections (until the HDRI arrives) ------------------------------------
   const skyMat = own(
@@ -95,28 +80,27 @@ export function buildArena(arena: Arena, quality: Quality): BuiltArena {
   envGround.rotation.x = -Math.PI / 2;
   envScene.add(envGround);
 
-  // ---- Lights ---------------------------------------------------------------------------
-  const hemi = new THREE.HemisphereLight(arena.ambient.sky, arena.ambient.ground, arena.ambient.intensity);
+  // ---- Lights: a soft, bright toy-box key and a generous sky fill ------------------------
+  const hemi = new THREE.HemisphereLight(arena.ambient.sky, arena.ambient.ground, 0.5);
   root.add(hemi);
-  const sun = new THREE.DirectionalLight(arena.sun.color, arena.sun.intensity);
+  const sun = new THREE.DirectionalLight(arena.sun.color, Math.min(2.4, arena.sun.intensity) * 0.6 + 0.35);
   sun.position.set(...arena.sun.dir);
-  sun.castShadow = quality !== 'low';
+  sun.castShadow = shadows;
   const sm = quality === 'high' ? 4096 : 2048;
   sun.shadow.mapSize.set(sm, sm);
-  // The stage is small now: a tight shadow frustum keeps shadows crisp.
   const sc = sun.shadow.camera;
-  sc.left = sc.bottom = -(B + 5);
-  sc.right = sc.top = B + 5;
+  sc.left = sc.bottom = -(B + 9);
+  sc.right = sc.top = B + 9;
   sc.near = 1;
   sc.far = 90;
   sun.position.multiplyScalar(4);
   sun.shadow.bias = -0.0003;
   sun.shadow.normalBias = 0.03;
-  sun.shadow.radius = 3;
+  // Soft-edged shadows, like a studio light over a model.
+  sun.shadow.radius = 6;
   root.add(sun, sun.target);
 
   // ---- Helpers --------------------------------------------------------------------------
-  const texFolder = (id: string) => TEXTURE_FOLDER[id] ?? folder;
   /** Planar UVs in world units so neighbouring ground pieces tile seamlessly. */
   const planarUV = (geo: THREE.BufferGeometry, size: number) => {
     const pos = geo.attributes.position as THREE.BufferAttribute;
@@ -124,12 +108,62 @@ export function buildArena(arena: Arena, quality: Quality): BuiltArena {
     for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getX(i) / size + 0.5, pos.getY(i) / size + 0.5);
     return geo;
   };
+  const matte = (color: string, rough = 0.9) => own(new THREE.MeshStandardMaterial({ color, roughness: rough, envMapIntensity: 0.4 }));
+  const place = (m: THREE.Object3D, r: number, a: number, y = 0) => {
+    m.position.set(Math.cos(a) * r, y, Math.sin(a) * r);
+    m.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (mesh.isMesh) {
+        mesh.castShadow = shadows;
+        mesh.receiveShadow = true;
+      }
+    });
+    root.add(m);
+    return m;
+  };
+  /** A smooth, slightly lumpy blob (bushes, boulders, snow mounds). */
+  const blobGeo = (seed: number, detail = 3) => {
+    const g = mergeVertices(new THREE.IcosahedronGeometry(1, detail));
+    const p = g.attributes.position as THREE.BufferAttribute;
+    const r = new Rng(seed);
+    const dirs = Array.from({ length: 4 }, () => new THREE.Vector3(r.range(-1, 1), r.range(-0.4, 1), r.range(-1, 1)).normalize());
+    const v = new THREE.Vector3();
+    for (let i = 0; i < p.count; i++) {
+      v.fromBufferAttribute(p, i);
+      let k = 1;
+      for (const d of dirs) k += Math.max(0, v.dot(d)) ** 2 * 0.12;
+      p.setXYZ(i, v.x * k, v.y * k, v.z * k);
+    }
+    g.computeVertexNormals();
+    return own(g);
+  };
 
   // ---- Ground: opaque where the game is played, fading into the fog beyond ---------------
-  const g = GROUND[arena.id];
+  const art = groundArt(arena.id);
   const size = GROUND_OUTER * 2;
-  const inner = own(new THREE.MeshStandardMaterial({ color: arena.groundColor, roughness: 0.9 }));
-  const rim = own(new THREE.MeshStandardMaterial({ color: arena.groundColor, roughness: 0.9, transparent: true, depthWrite: false }));
+  const reps = size / art.tile;
+  const map = art.map.clone();
+  const normalMap = art.normalMap.clone();
+  for (const t of [map, normalMap]) {
+    t.repeat.set(reps, reps);
+    t.needsUpdate = true;
+    own(t);
+  }
+  const groundMat = (transparent: boolean) =>
+    own(
+      new THREE.MeshStandardMaterial({
+        map,
+        normalMap,
+        normalScale: new THREE.Vector2(art.normalScale, art.normalScale),
+        roughness: art.roughness,
+        // Matte ground: it should not throw glints that compete with the glass.
+        envMapIntensity: arena.id === 'ice' ? 0.45 : 0.3,
+        transparent,
+        depthWrite: !transparent,
+      }),
+    );
+  const inner = groundMat(false);
+  const rim = groundMat(true);
   const fade = (() => {
     const c = document.createElement('canvas');
     c.width = c.height = 256;
@@ -151,70 +185,22 @@ export function buildArena(arena: Arena, quality: Quality): BuiltArena {
     root.add(m);
   }
   outer.renderOrder = -1;
-  if (arena.id === 'desk') inner.envMapIntensity = rim.envMapIntensity = 0.55;
-  void pbr(texFolder(g.id), g.id).then((set) => {
-    if (!set || disposed) return;
-    applyPBR(inner, set, [size, size], g.tile, g.normal);
-    applyPBR(rim, set, [size, size], g.tile, g.normal);
-    rim.alphaMap = fade;
-    if (g.roughness !== undefined) inner.roughness = rim.roughness = g.roughness;
-    if (g.tint) {
-      inner.color.set(g.tint);
-      rim.color.set(g.tint);
-    }
-  });
 
-  // ---- The edge of play: a bank that looks like what the physics edge does --------------
+  // ---- The edge of play: a chunky bank that looks like what the physics edge does --------
   const bank = BANK[arena.id];
   const pts = bank.profile.map(([dr, h]) => new THREE.Vector2(B + dr, h));
-  const bankGeo = own(new THREE.LatheGeometry(pts, 160));
   // The lathe winds its faces inward: draw both sides so the bank is lit from outside.
-  const bankMat = own(new THREE.MeshStandardMaterial({ color: bank.color, roughness: 0.95, side: THREE.DoubleSide }));
-  const bankMesh = new THREE.Mesh(bankGeo, bankMat);
+  const bankMat = own(new THREE.MeshStandardMaterial({ color: bank.color, roughness: bank.rough ?? 0.92, side: THREE.DoubleSide, envMapIntensity: 0.4 }));
+  const bankMesh = new THREE.Mesh(own(new THREE.LatheGeometry(pts, 180)), bankMat);
   bankMesh.receiveShadow = true;
   bankMesh.castShadow = quality === 'high';
   root.add(bankMesh);
-  if (bank.texture) {
-    const id = bank.texture;
-    void pbr(texFolder(id), id).then((set) => {
-      if (set && !disposed) applyPBR(bankMat, set, [2 * Math.PI * B, 4], bank.tile ?? 2, 1);
-    });
-  }
-  // The lawn's long grass: tufts along the berm, never inside the ring.
-  if (arena.id === 'grass') {
-    void model(folder, 'grass_medium_01').then((m) => {
-      if (!m || disposed) return;
-      m.updateMatrixWorld(true);
-      const box = new THREE.Box3().setFromObject(m);
-      const base = 1.2 / Math.max(1e-6, box.max.y - box.min.y);
-      const n = quality === 'low' ? 70 : 180;
-      const xf: THREE.Matrix4[] = [];
-      const q = new THREE.Quaternion();
-      for (let i = 0; i < n; i++) {
-        const a = rng.next() * Math.PI * 2;
-        const r = B + rng.range(-0.2, 3.4);
-        const s = base * rng.range(0.7, 1.3);
-        q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rng.next() * Math.PI * 2);
-        xf.push(new THREE.Matrix4().compose(new THREE.Vector3(Math.cos(a) * r, 0.25, Math.sin(a) * r), q, new THREE.Vector3(s, s, s)));
-      }
-      m.traverse((o) => {
-        const mesh = o as THREE.Mesh;
-        if (!mesh.isMesh) return;
-        const inst = new THREE.InstancedMesh(mesh.geometry, mesh.material, n);
-        inst.userData.shared = true;
-        xf.forEach((t, i) => inst.setMatrixAt(i, t.clone().multiply(mesh.matrixWorld)));
-        inst.instanceMatrix.needsUpdate = true;
-        inst.computeBoundingSphere();
-        inst.receiveShadow = true;
-        root.add(inst);
-      });
-    });
-  }
 
-  // ---- Fog banks drifting just past the edge --------------------------------------------
-  const mistMat = own(
-    new THREE.SpriteMaterial({ map: radialGlowTexture(), color: fog, transparent: true, opacity: 0.35, depthWrite: false, fog: false }),
-  );
+  // ---- Scenery: a few rounded props out past the edge, fading into the fog --------------
+  SCENERY[arena.id]({ rng, matte, place, blobGeo, own, updaters, quality });
+
+  // ---- Fog banks drifting out beyond the scenery ----------------------------------------
+  const mistMat = own(new THREE.SpriteMaterial({ map: radialGlowTexture(), color: fog, transparent: true, opacity: 0.35, depthWrite: false, fog: false }));
   const mists: { s: THREE.Sprite; a: number; r: number; speed: number }[] = [];
   const mistCount = quality === 'low' ? 10 : 18;
   for (let i = 0; i < mistCount; i++) {
@@ -279,7 +265,7 @@ export function buildArena(arena: Arena, quality: Quality): BuiltArena {
     root.add(ring);
   }
 
-  // ---- Air: dust motes in the lamplight, snow over the lake, grit over the pit -----------
+  // ---- Air: dust motes in the lamplight, snow over the lake ------------------------------
   if (arena.id === 'desk' || arena.id === 'ice') {
     const snow = arena.id === 'ice';
     const count = quality === 'low' ? 80 : 240;
@@ -321,15 +307,167 @@ export function buildArena(arena: Arena, quality: Quality): BuiltArena {
     envScene,
     sun,
     fog,
-    sky: hdri(folder).then((hdr) => ({ hdr })),
+    sky: hdri(arena.assets).then((hdr) => ({ hdr })),
     update: (t, dt) => {
       for (const u of updaters) u(t, dt);
     },
     dispose: () => {
-      disposed = true;
       for (const o of owned) o.dispose();
-      // Instanced grass shares geometry and materials with the asset cache.
     },
   };
 }
 
+// ---- Scenery ------------------------------------------------------------------------------
+
+interface Kit {
+  rng: Rng;
+  matte: (color: string, rough?: number) => THREE.MeshStandardMaterial;
+  place: (m: THREE.Object3D, r: number, a: number, y?: number) => THREE.Object3D;
+  blobGeo: (seed: number, detail?: number) => THREE.BufferGeometry;
+  own: <T extends { dispose(): void }>(x: T) => T;
+  updaters: ((t: number, dt: number) => void)[];
+  quality: Quality;
+}
+
+/** Evenly spread angles with a little jitter, so props ring the field without clumping. */
+function around(k: Kit, n: number, offset = 0): number[] {
+  return Array.from({ length: n }, (_, i) => offset + (i / n) * Math.PI * 2 + k.rng.range(-0.25, 0.25));
+}
+
+/** A round bush: three or four soft blobs. */
+function bush(k: Kit, size: number, colors: string[]): THREE.Group {
+  const g = new THREE.Group();
+  const n = 3 + k.rng.int(2);
+  for (let i = 0; i < n; i++) {
+    const m = new THREE.Mesh(k.blobGeo(k.rng.int(1e6), 2), k.matte(colors[i % colors.length], 0.95));
+    const s = size * k.rng.range(0.55, 0.85);
+    m.scale.set(s, s * 0.85, s);
+    m.position.set(k.rng.range(-0.5, 0.5) * size, s * 0.6, k.rng.range(-0.5, 0.5) * size);
+    g.add(m);
+  }
+  return g;
+}
+
+/** A toy pine: stacked cones, optionally snow-capped. */
+function pine(k: Kit, h: number, snow: boolean): THREE.Group {
+  const g = new THREE.Group();
+  const trunk = new THREE.Mesh(k.own(new THREE.CylinderGeometry(h * 0.05, h * 0.07, h * 0.3, 8)), k.matte('#6b4a30'));
+  trunk.position.y = h * 0.15;
+  g.add(trunk);
+  for (let i = 0; i < 3; i++) {
+    const r = h * (0.32 - i * 0.07);
+    const cone = new THREE.Mesh(k.own(new THREE.ConeGeometry(r, h * 0.42, 10)), k.matte(i % 2 ? '#2f6b45' : '#2a5f3e'));
+    cone.position.y = h * (0.36 + i * 0.2);
+    g.add(cone);
+    if (snow) {
+      const cap = new THREE.Mesh(k.own(new THREE.ConeGeometry(r * 0.62, h * 0.17, 10)), k.matte('#f4f8fc'));
+      cap.position.y = h * (0.48 + i * 0.2);
+      g.add(cap);
+    }
+  }
+  return g;
+}
+
+/** A tuft of grass: a fan of thin blades. */
+function tufts(k: Kit, n: number, rMin: number, rMax: number, color: string, height: number) {
+  const blade = k.own(new THREE.ConeGeometry(0.05, 1, 4));
+  blade.translate(0, 0.5, 0);
+  const per = 7;
+  const inst = new THREE.InstancedMesh(blade, k.matte(color, 0.9), n * per);
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const e = new THREE.Euler();
+  let i = 0;
+  for (let t = 0; t < n; t++) {
+    const a = k.rng.next() * Math.PI * 2;
+    const r = k.rng.range(rMin, rMax);
+    const cx = Math.cos(a) * r;
+    const cz = Math.sin(a) * r;
+    for (let b = 0; b < per; b++) {
+      e.set(k.rng.range(-0.45, 0.45), k.rng.next() * Math.PI * 2, k.rng.range(-0.45, 0.45));
+      q.setFromEuler(e);
+      const h = height * k.rng.range(0.6, 1.1);
+      m.compose(new THREE.Vector3(cx + k.rng.range(-0.12, 0.12), 0, cz + k.rng.range(-0.12, 0.12)), q, new THREE.Vector3(1, h, 1));
+      inst.setMatrixAt(i++, m);
+    }
+  }
+  inst.instanceMatrix.needsUpdate = true;
+  inst.castShadow = k.quality === 'high';
+  inst.receiveShadow = true;
+  return inst;
+}
+
+const SCENERY: Record<ArenaId, (k: Kit) => void> = {
+  // On the desk: a lamp's chunky base and a stack of books, out at the edge of the light.
+  desk(k) {
+    for (const a of around(k, 3, 0.4)) {
+      const stack = new THREE.Group();
+      let y = 0;
+      for (let i = 0; i < 3; i++) {
+        const h = k.rng.range(0.45, 0.7);
+        const book = new THREE.Mesh(k.own(new THREE.BoxGeometry(k.rng.range(2.6, 3.4), h, k.rng.range(1.8, 2.2))), k.matte(['#a8322d', '#244c7a', '#2f6b3a', '#c99a2e'][k.rng.int(4)], 0.75));
+        book.position.y = y + h / 2;
+        book.rotation.y = k.rng.range(-0.3, 0.3);
+        y += h;
+        stack.add(book);
+      }
+      k.place(stack, B + k.rng.range(4, 7), a);
+    }
+  },
+  // A street's edge: round hedges along the far side of the kerb.
+  culdesac(k) {
+    for (const a of around(k, 9)) k.place(bush(k, k.rng.range(1.4, 2.2), ['#3f7f3a', '#4b8f40', '#376f33']), B + k.rng.range(4, 7), a);
+  },
+  // The lawn: tufts on the berm, round shrubs beyond.
+  grass(k) {
+    k.place(tufts(k, k.quality === 'low' ? 70 : 160, B - 0.2, B + 3.4, '#3f8a2e', 0.7), 0, 0);
+    for (const a of around(k, 8, 0.3)) k.place(bush(k, k.rng.range(1.6, 2.4), ['#3b7d33', '#4a9140', '#2f6d2b']), B + k.rng.range(5, 8), a);
+  },
+  // The beach: marram grass on the dune, a few smooth rocks.
+  sand(k) {
+    k.place(tufts(k, k.quality === 'low' ? 40 : 90, B + 0.5, B + 3.6, '#a8a85a', 0.9), 0, 0);
+    for (const a of around(k, 5, 1)) {
+      const rock = new THREE.Mesh(k.blobGeo(k.rng.int(1e6)), k.matte(['#a89a86', '#97887a'][k.rng.int(2)], 0.9));
+      const s = k.rng.range(0.8, 1.6);
+      rock.scale.set(s * 1.3, s * 0.8, s);
+      k.place(rock, B + k.rng.range(4.5, 7.5), a, s * 0.3);
+    }
+  },
+  // The lake: snowy pines along the shore.
+  ice(k) {
+    for (const a of around(k, 10)) k.place(pine(k, k.rng.range(4, 6.5), true), B + k.rng.range(5, 8.5), a);
+  },
+  // The pit: rounded boulders.
+  gravel(k) {
+    for (const a of around(k, 7, 0.5)) {
+      const rock = new THREE.Mesh(k.blobGeo(k.rng.int(1e6)), k.matte(['#8f877d', '#7d766d', '#9c9286'][k.rng.int(3)], 0.92));
+      const s = k.rng.range(1, 2);
+      rock.scale.set(s * 1.2, s * 0.85, s * 1.1);
+      k.place(rock, B + k.rng.range(4.5, 7.5), a, s * 0.35);
+    }
+  },
+  // The course: a little windmill turning out past the rail, and round hedges.
+  minigolf(k) {
+    const mill = new THREE.Group();
+    const tower = new THREE.Mesh(k.own(new THREE.CylinderGeometry(0.9, 1.3, 3.2, 12)), k.matte('#f2e6d0', 0.8));
+    tower.position.y = 1.6;
+    const roof = new THREE.Mesh(k.own(new THREE.ConeGeometry(1.25, 1.4, 12)), k.matte('#d1453b', 0.7));
+    roof.position.y = 3.9;
+    const hub = new THREE.Group();
+    hub.position.set(0, 3.2, 1.05);
+    for (let i = 0; i < 4; i++) {
+      const sail = new THREE.Mesh(k.own(new THREE.BoxGeometry(0.42, 2.1, 0.06)), k.matte(i % 2 ? '#f6f2e8' : '#e5323f', 0.7));
+      sail.position.y = 1.05;
+      const arm = new THREE.Group();
+      arm.rotation.z = (i / 4) * Math.PI * 2;
+      arm.add(sail);
+      hub.add(arm);
+    }
+    mill.add(tower, roof, hub);
+    const a = k.rng.range(0, Math.PI * 2);
+    k.place(mill, B + 6, a);
+    mill.lookAt(0, 0, 0);
+    k.updaters.push((_t, dt) => (hub.rotation.z += dt * 0.9));
+    for (const b of around(k, 7, a + 0.45).slice(0, 6)) k.place(bush(k, k.rng.range(1.2, 1.8), ['#2f8f3c', '#3aa047']), B + k.rng.range(4, 6.5), b);
+  },
+};

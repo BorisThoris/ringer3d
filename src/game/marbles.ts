@@ -37,14 +37,18 @@ export const MARBLES: Record<string, MarbleLook> = {
   mib: { id: 'mib', name: 'Mib', core: 'catseye', base: '#f4f7fb', accent: '#4dd2ff', accent2: '#ffffff', clarity: 0.92, glow: 0, ui: '#4dd2ff' },
 };
 
-/** The 13 targets: a mixed bag, as in any real bag of marbles. */
+/**
+ * The 13 targets: a bag of strongly coloured glass, spread round the colour wheel so no two
+ * neighbours match and none reads as a clear bubble against the ground. Tinted glass (clarity
+ * ~0.6) shows its own colour instead of whatever lies behind it.
+ */
 export const MIB_LOOKS: MarbleLook[] = [
-  { id: 'mib-a', name: 'Mib', core: 'catseye', base: '#eaf6ff', accent: '#1f7bff', accent2: '#5ad1ff', clarity: 0.95, glow: 0.1 },
-  { id: 'mib-b', name: 'Mib', core: 'catseye', base: '#fff4e6', accent: '#ff5a36', accent2: '#ffd23f', clarity: 0.95, glow: 0.1 },
-  { id: 'mib-c', name: 'Mib', core: 'catseye', base: '#e9ffe9', accent: '#17b35a', accent2: '#c2ff7a', clarity: 0.95, glow: 0.1 },
-  { id: 'mib-d', name: 'Mib', core: 'swirl', base: '#f2e9ff', accent: '#8a4dff', accent2: '#ff7ad9', clarity: 0.9, glow: 0.1 },
-  { id: 'mib-e', name: 'Mib', core: 'clearie', base: '#9fe8ff', accent: '#ffffff', accent2: '#ffffff', clarity: 1, glow: 0 },
-  { id: 'mib-f', name: 'Mib', core: 'swirl', base: '#e6fbff', accent: '#00b3c7', accent2: '#004e7c', clarity: 0.9, glow: 0.1 },
-  { id: 'mib-g', name: 'Mib', core: 'clearie', base: '#ffd9a8', accent: '#ffffff', accent2: '#ffffff', clarity: 1, glow: 0 },
-  { id: 'mib-h', name: 'Mib', core: 'onionskin', base: '#fff6ea', accent: '#c2185b', accent2: '#ffd23f', clarity: 0.9, glow: 0.1 },
+  { id: 'mib-a', name: 'Mib', core: 'catseye', base: '#1f6fe0', accent: '#ffe14d', accent2: '#ffffff', clarity: 0.34, glow: 0.25 },
+  { id: 'mib-b', name: 'Mib', core: 'catseye', base: '#e8401a', accent: '#ffffff', accent2: '#ffd23f', clarity: 0.32, glow: 0.25 },
+  { id: 'mib-c', name: 'Mib', core: 'catseye', base: '#0fa356', accent: '#ffffff', accent2: '#c2ff7a', clarity: 0.34, glow: 0.25 },
+  { id: 'mib-d', name: 'Mib', core: 'swirl', base: '#7b3ff0', accent: '#ffd23f', accent2: '#ff7ad9', clarity: 0.34, glow: 0.25 },
+  { id: 'mib-e', name: 'Mib', core: 'swirl', base: '#f0b400', accent: '#c41f2f', accent2: '#ffffff', clarity: 0.3, glow: 0.25 },
+  { id: 'mib-f', name: 'Mib', core: 'catseye', base: '#009fb3', accent: '#ff3d7f', accent2: '#ffffff', clarity: 0.34, glow: 0.25 },
+  { id: 'mib-g', name: 'Mib', core: 'swirl', base: '#e0215f', accent: '#ffffff', accent2: '#ffe14d', clarity: 0.34, glow: 0.25 },
+  { id: 'mib-h', name: 'Mib', core: 'onionskin', base: '#f06a00', accent: '#1f5fbf', accent2: '#ffffff', clarity: 0.3, glow: 0.2 },
 ];

@@ -4,6 +4,7 @@ import { ARENA_LIST, ARENAS, type ArenaId } from '../game/arenas';
 import { DIFFICULTIES, generateMap, randomSeed, type Difficulty, type MapDef } from '../game/maps';
 import { MARBLES, type MarbleLook } from '../game/marbles';
 import { sound } from '../render/audio';
+import { groundSwatch } from '../render/groundArt';
 import { MarblePreview } from '../render/preview';
 import { settings } from '../game/settings';
 
@@ -93,8 +94,8 @@ export function ArenaPicker({ value, onChange, allowed }: { value: ArenaId; onCh
             className="sky"
             style={
               {
-                // A crop of the field's real panorama, over its colours while it loads.
-                background: `center / cover url(./assets/${a.assets}/thumb.jpg), linear-gradient(180deg, ${a.sky.top}, ${a.sky.bottom})`,
+                // A swatch of the field's own hand-painted ground.
+                background: `center / cover url(${groundSwatch(a.id)}), ${a.groundColor}`,
                 '--ringc': a.ring.color,
                 '--glow': 0,
                 '--groundc': a.groundColor,

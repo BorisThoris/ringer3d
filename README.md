@@ -11,7 +11,7 @@ Knuckle down on the ring line, flick your shooter into the cross of 13 marbles, 
 - **Online, no server required**: server browser, private rooms with 4-letter codes, 2–4 players. Games are found through public Nostr relays and matches run directly between devices over WebRTC; bots take dropped seats. An optional self-hosted lobby server is also supported.
 - **Pass and play** for 2–4 players on one device.
 - **Real glass marbles**: twisted cat's-eye blades, swirl ribbons, onionskins, aventurine galaxies, clearies with bubbles, dispersion and coloured caustics, plus a 3D close-up you can spin in the marble picker and versus screen.
-- Marbles and music are procedural (the ambient pad is synthesised). The fields use real, CC0-licensed photographic assets — see `public/assets/CREDITS.md`.
+- Toy-diorama look, made in code: hand-painted ground tiles (`src/render/groundArt.ts`), chunky scenery and map pieces, soft bright light, and glossy glass marbles in strong colours that stand out on every field. The only third-party files are CC0 HDRIs (lighting and reflections) and sound effects — see `public/assets/CREDITS.md`.
 
 ## Quick start
 

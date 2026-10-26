@@ -1,49 +1,23 @@
 # Asset credits
 
-Every third-party asset in this folder is **CC0 1.0 (public domain)**: free for any use,
-commercial included, no attribution required. We credit the sources anyway.
+The fields, their grounds, scenery and map pieces are made in code (`src/render/groundArt.ts`,
+`arenaBuilder.ts`, `mapPieces.ts`). The only third-party files here are **CC0 1.0 (public
+domain)**: free for any use, commercial included, no attribution required. We credit the
+sources anyway.
 
-- **Poly Haven** — HDRIs, textures and a 3D model. License: CC0 1.0 (https://polyhaven.com/license).
-- **ambientCG** — Ice003 and Grass006 materials. License: CC0 1.0 (https://docs.ambientcg.com/license/).
+- **Poly Haven** — HDRIs. License: CC0 1.0 (https://polyhaven.com/license).
 - **Kenney** — *Impact Sounds* pack (sfx/). License: CC0 1.0 (https://kenney.nl/assets/impact-sounds).
 
-Files were resized/re-encoded for the web (JPEG textures, a meshopt-compressed GLB model);
-the originals are linked below. The HDRIs are never shown: they light each field and fill
-the glass marbles with a real place to reflect. Map pieces (books, bollards, bumpers, cups)
-are built in code.
+## HDRIs (`<field>/sky.hdr`)
 
-## The Desk (`desk/`)
+Never shown: each one lights its field and fills the glass marbles with a real place to
+reflect. Resized to 1k.
 
-- Lighting and reflections: [reading_room](https://polyhaven.com/a/reading_room) (Poly Haven HDRI)
-- Ground, desk rim and wooden map pieces: [wood_table_001](https://polyhaven.com/a/wood_table_001) (Poly Haven texture)
-
-## The Cul-de-sac (`culdesac/`)
-
-- Lighting and reflections: [stuttgart_suburbs](https://polyhaven.com/a/stuttgart_suburbs) (Poly Haven HDRI)
-- Ground: [brushed_concrete](https://polyhaven.com/a/brushed_concrete) (Poly Haven texture)
-- Kerb and stone map pieces: [concrete_pavement](https://polyhaven.com/a/concrete_pavement) (Poly Haven texture)
-
-## The Back Lawn (`grass/`)
-
-- Lighting and reflections: [suburban_garden](https://polyhaven.com/a/suburban_garden) (Poly Haven HDRI)
-- Lawn: [Grass006](https://ambientcg.com/view?id=Grass006) (ambientCG)
-- Long grass along the edge: [grass_medium_01](https://polyhaven.com/a/grass_medium_01) (Poly Haven model)
-
-## The Beach (`sand/`)
-
-- Lighting and reflections: [secluded_beach](https://polyhaven.com/a/secluded_beach) (Poly Haven HDRI)
-- Sand: [aerial_beach_01](https://polyhaven.com/a/aerial_beach_01) (Poly Haven texture)
-
-## The Frozen Lake (`ice/`)
-
-- Lighting and reflections: [frozen_lake](https://polyhaven.com/a/frozen_lake) (Poly Haven HDRI)
-- Ice: [Ice003](https://ambientcg.com/view?id=Ice003) (ambientCG)
-- Snowbank: [snow_02](https://polyhaven.com/a/snow_02) (Poly Haven texture)
-
-## The Gravel Pit (`gravel/`)
-
-- Lighting and reflections: [stuttgart_suburbs](https://polyhaven.com/a/stuttgart_suburbs) (Poly Haven HDRI, shared with the cul-de-sac)
-- Gravel: [gravel_floor_02](https://polyhaven.com/a/gravel_floor_02) (Poly Haven texture)
+- The Desk: [reading_room](https://polyhaven.com/a/reading_room)
+- The Cul-de-sac and the Gravel Pit: [stuttgart_suburbs](https://polyhaven.com/a/stuttgart_suburbs)
+- The Back Lawn and the Mini-Golf Course: [suburban_garden](https://polyhaven.com/a/suburban_garden)
+- The Beach: [secluded_beach](https://polyhaven.com/a/secluded_beach)
+- The Frozen Lake: [frozen_lake](https://polyhaven.com/a/frozen_lake)
 
 ## Sound effects (`sfx/`)
 

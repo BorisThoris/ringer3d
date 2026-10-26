@@ -103,6 +103,7 @@ export class MarblePreview {
     if (this.marble) {
       this.scene.remove(this.marble.group);
       disposeObject(this.marble.group);
+      (this.marble.contact.material as THREE.Material).dispose();
       if (this.marble.caustic) {
         this.scene.remove(this.marble.caustic);
         (this.marble.caustic.material as THREE.Material).dispose();

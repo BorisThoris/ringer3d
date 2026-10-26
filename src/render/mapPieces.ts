@@ -23,7 +23,6 @@ export interface BuiltPieces {
 
 const BUMPER_H = 0.45;
 type Tex = [folder: string, id: string];
-const STONE: Tex = ['culdesac', 'concrete_pavement'];
 
 interface MatOpts {
   rough?: number;
@@ -192,7 +191,7 @@ export function buildPieces(pieces: readonly Piece[], arena: ArenaId, quality: Q
         break;
       case 'kerbstone':
       case 'slab':
-        g.add(mesh(geo(new RoundedBoxGeometry(L, H, T, 2, 0.03)), mat(skin === 'slab' ? '#8d8a85' : '#b0ada6', { tex: STONE, tile: 0.8 })));
+        g.add(mesh(geo(new RoundedBoxGeometry(L, H, T, 3, 0.05)), mat(skin === 'slab' ? '#9a948b' : '#c9c3b8', { rough: 0.92 })));
         break;
       case 'log':
       case 'driftwood': {

@@ -42,6 +42,18 @@ interface Leaving {
 }
 
 const R = WORLD.ringRadius;
+/** The menu backdrop's camera shots, each held this long (seconds). */
+const ATTRACT_SHOT = 9;
+const ATTRACT_LOOKS = [
+  // A low sweep at marble height.
+  { pitch: 0.3, dist: 8.5, spin: 0.11 },
+  // A high crane over the whole field.
+  { pitch: 1.0, dist: 13, spin: 0.04 },
+  // A close orbit of the cross.
+  { pitch: 0.55, dist: 6, spin: -0.08 },
+];
+/** The follow camera rides behind the shooter while it is faster than this. */
+const CHASE_SPEED = 3.5;
 /** Camera-distance fog: clear over the whole field, gone by the far bank. */
 const FOG_NEAR = 24;
 const FOG_FAR = 46;
@@ -67,6 +79,8 @@ export class GameView {
   private activeShooter: THREE.Group | null = null;
   /** Ground caustic for each glass marble (kept flat, follows position only). */
   private caustics = new Map<THREE.Object3D, THREE.Mesh>();
+  /** Soft dark patch under each marble, anchoring it to the ground. */
+  private contacts = new Map<THREE.Object3D, THREE.Mesh>();
   private sunDir = new THREE.Vector3(0, 1, 0);
   private causticStrength = 1;
   private visualQuat = new Map<number, THREE.Quaternion>();
@@ -86,6 +100,8 @@ export class GameView {
   timeScale = 1;
   private baseFov = 48;
   private camTarget = new THREE.Vector3();
+  /** Current camera bank (radians). */
+  private roll = 0;
   private tmpColor = new THREE.Color();
 
   private match: Match | null = null;
@@ -275,8 +291,10 @@ export class GameView {
   }
 
   private addMarble(look: MarbleLook, radius: number, seed: number): THREE.Group {
-    const { group, caustic } = buildMarble(look, radius, this.quality, seed);
+    const { group, caustic, contact } = buildMarble(look, radius, this.quality, seed);
     this.marbleRoot.add(group);
+    this.marbleRoot.add(contact);
+    this.contacts.set(group, contact);
     if (caustic && this.quality !== 'low') {
       this.marbleRoot.add(caustic);
       this.caustics.set(group, caustic);
@@ -292,6 +310,12 @@ export class GameView {
       this.marbleRoot.remove(c);
       (c.material as THREE.Material).dispose();
       this.caustics.delete(g);
+    }
+    const s = this.contacts.get(g);
+    if (s) {
+      this.marbleRoot.remove(s);
+      (s.material as THREE.Material).dispose();
+      this.contacts.delete(g);
     }
   }
 
@@ -311,6 +335,16 @@ export class GameView {
       (c.material as THREE.MeshBasicMaterial).opacity = (0.32 * this.causticStrength * g.scale.x) / (1 + lift * 0.3);
       c.scale.set(1 + slen * 0.35, 1, 1);
       c.rotation.z = -ang;
+    }
+    // Contact shadows sit right under each marble and fade as it leaves the ground.
+    for (const [g, s] of this.contacts) {
+      const radius = g.userData.radius ?? WORLD.targetRadius;
+      const lift = Math.max(0, g.position.y - radius);
+      s.visible = g.visible;
+      s.position.set(g.position.x, 0.008, g.position.z);
+      const k = 1 / (1 + lift * 6);
+      s.scale.setScalar(g.scale.x * (1 + lift * 0.8));
+      (s.material as THREE.MeshBasicMaterial).opacity = 0.72 * k;
     }
   }
 
@@ -644,13 +678,17 @@ export class GameView {
     const a = this.aim;
 
     switch (this.camMode) {
-      case 'attract':
-        // A slow orbit, high enough to read the cross, close enough to see the glass.
-        want.yaw = this.cam.yaw + dt * 0.06;
-        want.pitch = 0.66;
-        want.dist = 11 * Math.min(fit, 1.6);
+      case 'attract': {
+        // Behind the menus the camera works like an operator: a low sweep at marble
+        // height, a high crane over the whole field, a close orbit of the cross, in turn.
+        const shot = Math.floor(this.elapsed / ATTRACT_SHOT) % 3;
+        const s = ATTRACT_LOOKS[shot];
+        want.yaw = this.cam.yaw + dt * s.spin;
+        want.pitch = s.pitch;
+        want.dist = s.dist * Math.min(fit, 1.6);
         want.ty = 0;
         break;
+      }
       case 'aim':
         if (anchor && a) {
           // Over the shoulder: the shooter in the lower third, the line of the shot and
@@ -678,34 +716,51 @@ export class GameView {
         let sx = 0;
         let sz = 0;
         let w = 0;
+        let chase: { x: number; z: number; vx: number; vz: number; sp: number } | null = null;
         if (sim) {
           for (const b of sim.bodies) {
             const v = b.body.linvel();
             const sp = Math.hypot(v.x, v.z);
-            if (sp < 0.3) continue;
             const t = b.body.translation();
+            if (b.id === SHOOTER_ID && sp > CHASE_SPEED) chase = { x: t.x, z: t.z, vx: v.x, vz: v.z, sp };
+            if (sp < 0.3) continue;
             const k = b.id === SHOOTER_ID ? 2 + sp : sp;
             sx += t.x * k;
             sz += t.z * k;
             w += k;
           }
         }
-        if (w > 0) {
-          want.tx = THREE.MathUtils.clamp(sx / w, -R - 2, R + 2) * 0.6;
-          want.tz = THREE.MathUtils.clamp(sz / w, -R - 2, R + 2) * 0.6;
+        if (chase) {
+          // Ride behind the shooter while it is flying: low, close, looking where it goes.
+          const ux = chase.vx / chase.sp;
+          const uz = chase.vz / chase.sp;
+          want.tx = chase.x + ux * 1.6;
+          want.tz = chase.z + uz * 1.6;
+          want.yaw = Math.atan2(-uz, -ux);
+          want.pitch = 0.5;
+          want.dist = 7.5 * Math.min(fit, 1.5);
+          this.lastYaw = want.yaw;
         } else {
-          want.tx = this.cam.tx;
-          want.tz = this.cam.tz;
+          // Then rise and watch the scatter settle.
+          if (w > 0) {
+            want.tx = THREE.MathUtils.clamp(sx / w, -R - 2, R + 2) * 0.6;
+            want.tz = THREE.MathUtils.clamp(sz / w, -R - 2, R + 2) * 0.6;
+          } else {
+            want.tx = this.cam.tx;
+            want.tz = this.cam.tz;
+          }
+          want.yaw = this.lastYaw + dt * 0.05;
+          this.lastYaw = want.yaw;
+          want.pitch = 0.82;
+          want.dist = 10.5 * Math.min(fit, 1.6);
         }
-        want.yaw = this.lastYaw;
-        want.pitch = 0.95;
-        want.dist = 11 * Math.min(fit, 1.6);
         break;
       }
       case 'overview':
-        want.yaw = this.cam.yaw + dt * 0.04;
-        want.pitch = 1.0;
-        want.dist = 13.5 * Math.min(fit, 1.7);
+        // A slow dolly round the ring, low enough to feel like you are standing at it.
+        want.yaw = this.cam.yaw + dt * 0.05;
+        want.pitch = 0.76;
+        want.dist = (11 + Math.sin(this.elapsed * 0.21) * 1.2) * Math.min(fit, 1.7);
         break;
     }
     if (this.camMode !== 'follow') this.lastYaw = want.yaw;
@@ -721,15 +776,28 @@ export class GameView {
     this.cam.ty += (want.ty - this.cam.ty) * k;
     this.cam.tz += (want.tz - this.cam.tz) * k;
 
+    // A hand on the camera: two slow, unrelated sways on the aim point and the angle.
+    // Barely there while aiming (precision first), more when just watching.
+    const t = this.elapsed;
+    const sway = this.camMode === 'aim' ? 0.15 : this.camMode === 'top' ? 0 : 1;
     const c = this.cam;
+    const ox = (Math.sin(t * 0.37) + Math.sin(t * 0.83 + 1.3) * 0.5) * 0.18 * sway;
+    const oz = (Math.sin(t * 0.29 + 2.1) + Math.sin(t * 0.71) * 0.5) * 0.18 * sway;
+    const pitch = c.pitch + Math.sin(t * 0.23 + 0.7) * 0.025 * sway;
+    const yaw = c.yaw + Math.sin(t * 0.17 + 1.9) * 0.03 * sway;
     tmpV.set(
-      c.tx + Math.cos(c.yaw) * Math.cos(c.pitch) * c.dist,
-      c.ty + Math.sin(c.pitch) * c.dist,
-      c.tz + Math.sin(c.yaw) * Math.cos(c.pitch) * c.dist,
+      c.tx + ox + Math.cos(yaw) * Math.cos(pitch) * c.dist,
+      c.ty + Math.sin(pitch) * c.dist,
+      c.tz + oz + Math.sin(yaw) * Math.cos(pitch) * c.dist,
     );
     this.camera.position.copy(tmpV);
-    this.camera.lookAt(c.tx, c.ty, c.tz);
-    this.juice.applyToCamera(this.camera, this.camTarget.set(c.tx, c.ty, c.tz), this.baseFov, dt);
+    this.camera.lookAt(c.tx + ox, c.ty, c.tz + oz);
+    this.juice.applyToCamera(this.camera, this.camTarget.set(c.tx + ox, c.ty, c.tz + oz), this.baseFov, dt);
+    // Bank into turns, like a camera on a dolly track; a slow tilt when idle.
+    const yawRate = dt > 0 ? (dy * k) / dt : 0;
+    const wantRoll = THREE.MathUtils.clamp(-yawRate * 0.05, -0.07, 0.07) + Math.sin(t * 0.19) * 0.012 * sway;
+    this.roll += (wantRoll - this.roll) * (1 - Math.exp(-dt * 2));
+    if (this.camMode !== 'top') this.camera.rotateZ(this.roll);
 
     // Only landscape screens have room beside the menu; phones keep the ring centred.
     const shift = aspect > 1.15 ? this.frameShift : 0;

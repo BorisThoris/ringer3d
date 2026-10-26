@@ -19,6 +19,8 @@ export interface BuiltMarble {
   group: THREE.Group;
   /** Lies flat on the ground and follows position only (null for opaque marbles). */
   caustic: THREE.Mesh | null;
+  /** The soft dark patch where the marble meets the ground; follows position only. */
+  contact: THREE.Mesh;
 }
 
 function rng(seed: number): () => number {
@@ -111,6 +113,66 @@ class SpiralCurve extends THREE.Curve<THREE.Vector3> {
   }
 }
 
+let contactTex: THREE.Texture | null = null;
+/** A soft dark disc: the ambient occlusion where a ball meets the ground. */
+function contactTexture(): THREE.Texture {
+  if (contactTex) return contactTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d')!;
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, 'rgba(0,0,0,1)');
+  grad.addColorStop(0.35, 'rgba(0,0,0,0.75)');
+  grad.addColorStop(0.7, 'rgba(0,0,0,0.22)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  contactTex = new THREE.CanvasTexture(c);
+  return contactTex;
+}
+
+function contactShadow(r: number): THREE.Mesh {
+  const m = new THREE.Mesh(
+    cached(`contact-${r}`, () => new THREE.PlaneGeometry(r * 2.8, r * 2.8)),
+    new THREE.MeshBasicMaterial({ map: contactTexture(), color: '#000000', transparent: true, opacity: 0.55, depthWrite: false }),
+  );
+  m.rotation.x = -Math.PI / 2;
+  m.renderOrder = 1;
+  return m;
+}
+
+/**
+ * Real glass goes dark at grazing angles. A thin shell that darkens toward the silhouette
+ * reads as glass and outlines every marble against bright ground (sand, snow, paper).
+ */
+function edgeMaterial(): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    uniforms: { color: { value: new THREE.Color('#0b0912') }, strength: { value: 0.9 } },
+    vertexShader: `
+      varying vec3 vN;
+      varying vec3 vV;
+      void main() {
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vN = normalize(normalMatrix * normal);
+        vV = normalize(-mv.xyz);
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: `
+      uniform vec3 color;
+      uniform float strength;
+      varying vec3 vN;
+      varying vec3 vV;
+      void main() {
+        float f = 1.0 - abs(dot(normalize(vN), normalize(vV)));
+        float a = pow(f, 1.7) * strength;
+        gl_FragColor = vec4(color, a);
+        #include <colorspace_fragment>
+      }`,
+  });
+}
+
 let causticTex: THREE.Texture | null = null;
 function causticTexture(): THREE.Texture {
   if (causticTex) return causticTex;
@@ -153,7 +215,7 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
     );
     s.castShadow = true;
     group.add(s);
-    return { group, caustic: null };
+    return { group, caustic: null, contact: contactShadow(r) };
   }
   if (look.core === 'solid' || look.clarity < 0.05) {
     const s = new THREE.Mesh(
@@ -162,7 +224,7 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
     );
     s.castShadow = true;
     group.add(s);
-    return { group, caustic: null };
+    return { group, caustic: null, contact: contactShadow(r) };
   }
 
   // ---- Interiors ---------------------------------------------------------------------------
@@ -279,7 +341,8 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
           // The part that is not transmitted shows the shell colour: white made every
           // low-clarity marble (a dark galaxy, a neon core) read as milky haze. Tint it
           // toward the marble's own base, more so the less clear the glass is.
-          color: new THREE.Color('#ffffff').lerp(tint, 1 - look.clarity),
+          // Tinted glass (the targets) takes its colour straight; clear glass only a touch.
+          color: look.clarity < 0.5 ? tint.clone() : new THREE.Color('#ffffff').lerp(tint, 1 - look.clarity),
           roughness: 0,
           transmission: look.clarity,
           // three's transmission is screen-space: thickness sets how far the refracted image
@@ -288,7 +351,8 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
           thickness: r * 0.6,
           ior: 1.5,
           attenuationColor: tint,
-          attenuationDistance: look.core === 'clearie' ? r * 2.6 : r * 7,
+          // Tinted glass deepens its colour quickly; clear glass barely at all.
+          attenuationDistance: look.core === 'clearie' ? r * 2.6 : look.clarity < 0.5 ? r * 2.2 : r * 7,
           dispersion: quality === 'high' ? 0.35 : 0,
           specularIntensity: 1,
           envMapIntensity: 1.15,
@@ -299,6 +363,10 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
   shell.castShadow = true;
   shell.renderOrder = 2;
   group.add(shell);
+  // The dark edge, drawn just outside the glass.
+  const edge = new THREE.Mesh(sphere(r * 1.003, seg), edgeMaterial());
+  edge.renderOrder = 3;
+  group.add(edge);
 
   // Coloured caustic: the light focused through the glass lands on the ground.
   const cc = new THREE.Color(look.core === 'clearie' ? look.base : look.accent).lerp(new THREE.Color('#ffffff'), 0.35);
@@ -308,7 +376,7 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
   );
   caustic.rotation.x = -Math.PI / 2;
   caustic.renderOrder = 1;
-  return { group, caustic };
+  return { group, caustic, contact: contactShadow(r) };
 }
 
 export function disposeObject(o: THREE.Object3D) {
