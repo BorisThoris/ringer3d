@@ -1,6 +1,8 @@
-2026-10-26 15:02:12.056 E  App[24350:11570] [com.apple.TextInputUI:CandidateGeneration] Attempted to update accumulator from source type: 0, after completion has already been called for token:[335B80A8]. This is an error and will be ignored.
-2026-10-26 15:02:13.057 Df App[24350:11555] [com.apple.xpc:connection] [0x10090d150] Re-initialization successful; calling out to event handler with XPC_ERROR_CONNECTION_INTERRUPTED
-2026-10-26 15:02:14.378 E  App[24350:11543] [com.apple.WebKit:ResourceLoadStatistics] Failed to request known fingerprinting scripts from WebPrivacy: Error Domain=WebPrivacyErrorDomain Code=1001 "List data not found" UserInfo={NSLocalizedDescription=List data not found}
-2026-10-26 15:02:14.733 Df App[24350:11550] [com.apple.AppSSO:SOClient] configurationWithCompletion: success = YES, error = (null)
-2026-10-26 15:02:28.227 E  App[24350:115db] [com.apple.imageio:com.apple.WebKit.WebContent] WebContent[24364] makeImagePlus:3798: *** ERROR: 'JPEG'-_reader->initImage[0] failed err=3
-2026-10-26 15:03:19.477 E  App[24350:115db] [com.apple.imageio:com.apple.WebKit.WebContent] WebContent[24364] makeImagePlus:3798: *** ERROR: 'JPEG'-_reader->initImage[0] failed err=3
+2026-10-26 16:20:45.983 E  App[5131:4f5c] [com.apple.TextInputUI:CandidateGeneration] Attempted to update accumulator from source type: 0, after completion has already been called for token:[95A6129C]. This is an error and will be ignored.
+2026-10-26 16:20:46.221 E  App[5131:4f37] [com.apple.WebKit:ResourceLoadStatistics] Failed to request known fingerprinting scripts from WebPrivacy: Error Domain=WebPrivacyErrorDomain Code=1001 "List data not found" UserInfo={NSLocalizedDescription=List data not found}
+2026-10-26 16:20:47.367 Df App[5131:4f60] [com.apple.xpc:connection] [0x100d14220] Re-initialization successful; calling out to event handler with XPC_ERROR_CONNECTION_INTERRUPTED
+2026-10-26 16:20:49.107 Df App[5131:4f60] [com.apple.AppSSO:SOClient] configurationWithCompletion: success = YES, error = (null)
+2026-10-26 16:22:50.490 E  App[5131:4fe4] [com.apple.imageio:com.apple.WebKit.WebContent] WebContent[5145] makeImagePlus:3798: *** ERROR: 'JPEG'-_reader->initImage[0] failed err=3
+2026-10-26 16:22:50.504 E  App[5131:4fe4] [com.apple.imageio:com.apple.WebKit.WebContent] WebContent[5145] makeImagePlus:3798: *** ERROR: 'JPEG'-_reader->initImage[0] failed err=3
+2026-10-26 16:22:50.506 E  App[5131:4fe4] [com.apple.imageio:com.apple.WebKit.WebContent] WebContent[5145] makeImagePlus:3798: *** ERROR: 'JPEG'-_reader->initImage[0] failed err=3
+2026-10-26 16:23:32.341 E  App[5131:4fe4] [com.apple.imageio:com.apple.WebKit.WebContent] WebContent[5145] makeImagePlus:3798: *** ERROR: 'JPEG'-_reader->initImage[0] failed err=3
