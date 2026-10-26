@@ -1,3 +1,6 @@
-10-26 16:20:29.435  3091  3091 W Capacitor/Console: File: https://localhost/assets/index-DmqqkZ50.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
-10-26 16:20:56.811  3091  3091 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-10-26 16:20:58.371  3091  3091 I Capacitor/Console: File:  - Line 333 - Msg: undefined
+10-26 17:59:19.804  3305  3305 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
+10-26 17:59:21.135  3305  3305 W Capacitor/Console: File: https://localhost/assets/index-CRXtzkhU.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+10-26 17:59:36.452  3305  3305 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+10-26 17:59:37.298  3305  3305 I Capacitor/Console: File:  - Line 333 - Msg: undefined
+10-26 17:59:56.969  1039  4222 E JavaBinder: *** Uncaught remote exception! Exceptions are not yet supported across processes. Client PID 4142 UID 10118.
+10-26 17:59:57.535  1039  1065 E JavaBinder: *** Uncaught remote exception! Exceptions are not yet supported across processes. Client PID 4142 UID 10118.
