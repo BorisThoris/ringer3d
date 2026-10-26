@@ -193,6 +193,8 @@ export function buildArena(arena: Arena, quality: Quality): BuiltArena {
       const D = 1.2 * M;
       const T = 0.035 * M;
       const top = standard(arena.groundColor, 0.5);
+      // Satin varnish: a soft sheen of the window, not a mirror of it.
+      top.envMapIntensity = 0.55;
       const desk = new THREE.Mesh(own(new THREE.BoxGeometry(W, T, D)), top);
       desk.position.y = -T / 2;
       desk.receiveShadow = true;

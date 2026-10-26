@@ -196,7 +196,7 @@ export class GameSession {
             }
           }
           this.delay = demo ? 0.5 : 0.7;
-          if (!demo) showBanner('Shoot again', 'Your shooter stayed in the ring', 'good');
+          if (!demo) showBanner('Shoot again', 'Your shooter stayed in the ring', 'gold');
         }
         this.aim.power = 0;
         this.aim.spin = 0;

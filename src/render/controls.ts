@@ -78,7 +78,7 @@ export class Controls {
       const w = this.view.canvas.clientWidth || 800;
       // A full-width drag ≈ 120° of aim.
       s.rotateAim((dx / w) * 2.1 * fine * sens);
-      this.view.userPitch = Math.min(1.15, Math.max(0.14, this.view.userPitch + dy * 0.0035));
+      this.view.userPitch = Math.min(1.15, Math.max(0.3, this.view.userPitch + dy * 0.0035));
     }
   };
 
@@ -148,7 +148,7 @@ export class Controls {
     if (this.keysDown.has('KeyA')) s.nudgePlace(-rate * 0.6);
     if (this.keysDown.has('KeyD')) s.nudgePlace(rate * 0.6);
     if (this.keysDown.has('ArrowUp')) this.view.userPitch = Math.min(1.15, this.view.userPitch + dt * 0.8);
-    if (this.keysDown.has('ArrowDown')) this.view.userPitch = Math.max(0.14, this.view.userPitch - dt * 0.8);
+    if (this.keysDown.has('ArrowDown')) this.view.userPitch = Math.max(0.3, this.view.userPitch - dt * 0.8);
   };
 
   dispose() {

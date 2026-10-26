@@ -1,22 +1,35 @@
-/* Ringer 3D — "glass and chalk".
-   Menus are frosted glass over a live 3D ring; colour comes from the marbles themselves. */
+/* Ringer 3D — "candy glass".
+   Menus are tinted glass over the live field: every panel takes the colour of a marble
+   (yours, by default), type is chunky and loud, and things bounce when you touch them. */
 
 :root {
-  --ink: #121a33;
-  --ink-2: #1c2647;
-  --glass: rgba(18, 26, 51, 0.56);
-  --glass-strong: rgba(14, 20, 40, 0.78);
-  --glass-line: rgba(255, 255, 255, 0.14);
-  --chalk: #f4f2ea;
-  --chalk-dim: rgba(244, 242, 234, 0.66);
-  --chalk-faint: rgba(244, 242, 234, 0.38);
-  --cobalt: #2f6bff;
-  --sun: #ffc93c;
+  --ink: #120d24;
+  --ink-2: #1d1638;
+  --chalk: #fff8ec;
+  --chalk-dim: rgba(255, 248, 236, 0.74);
+  --chalk-faint: rgba(255, 248, 236, 0.42);
+
+  /* The marble palette */
+  --ember: #ff5a2a;
+  --tide: #1a7cff;
+  --volt: #00d8ff;
+  --nova: #8b5cff;
+  --jade: #14c06c;
+  --sun: #ffd23f;
+  --cherry: #ff3d7f;
   --mint: #3ddc97;
-  --cherry: #ff4d6d;
+
+  /* The marble this panel speaks for: the player's own, unless a screen says otherwise. */
+  --accent: #1a7cff;
+  --accent-ink: #0e0a1f;
+
+  --glass: rgba(18, 12, 38, 0.62);
+  --glass-tint: rgba(18, 12, 38, 0.62);
+  --glass-line: rgba(255, 255, 255, 0.16);
 
   --display: 'Bricolage Grotesque', system-ui, sans-serif;
   --ui: 'Manrope', system-ui, -apple-system, sans-serif;
+  --marker: 'Permanent Marker', 'Bricolage Grotesque', cursive;
 
   /* Type scale (1.25) */
   --t-xs: 0.8rem;
@@ -26,17 +39,31 @@
   --t-xl: 1.56rem;
   --t-2xl: 1.95rem;
   --t-3xl: 2.44rem;
-  --t-hero: clamp(3.2rem, 11vw, 6.4rem);
+  --t-hero: clamp(3.4rem, 18vw, 7rem);
 
-  /* Radii carry hierarchy: sheets > cards > controls (pills) */
-  --r-sheet: 30px;
-  --r-card: 18px;
+  --r-sheet: 28px;
+  --r-card: 20px;
   --r-pill: 999px;
+
+  /* Springy easing: overshoots a little, then settles. */
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --out: cubic-bezier(0.2, 0.9, 0.25, 1);
+
+  /* Film grain over every panel so glass never looks like flat plastic. */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-l: env(safe-area-inset-left, 0px);
   --safe-r: env(safe-area-inset-right, 0px);
+}
+
+/* Browsers that can mix colours tint the glass with the accent. */
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+  :root {
+    --glass-tint: color-mix(in srgb, var(--accent) 22%, rgba(16, 10, 34, 0.7));
+    --glass-line: color-mix(in srgb, var(--accent) 45%, rgba(255, 255, 255, 0.2));
+  }
 }
 
 * {
@@ -91,6 +118,8 @@ button {
   display: flex;
   flex-direction: column;
   padding: calc(16px + var(--safe-t)) calc(16px + var(--safe-r)) calc(16px + var(--safe-b)) calc(16px + var(--safe-l));
+  /* A soft vignette so text holds up over a bright field (snow, sand). */
+  background: radial-gradient(120% 90% at 30% 60%, transparent 40%, rgba(10, 6, 24, 0.38) 100%);
 }
 
 .overlay > * {
@@ -99,12 +128,12 @@ button {
 
 /* ---------- Glass sheet --------------------------------------------------------------- */
 .sheet {
-  background: var(--glass);
-  backdrop-filter: blur(22px) saturate(170%);
-  -webkit-backdrop-filter: blur(22px) saturate(170%);
-  border: 1px solid var(--glass-line);
+  background: var(--grain), linear-gradient(160deg, var(--glass-tint), rgba(14, 9, 30, 0.74));
+  backdrop-filter: blur(20px) saturate(185%);
+  -webkit-backdrop-filter: blur(20px) saturate(185%);
+  border: 1.5px solid var(--glass-line);
   border-radius: var(--r-sheet);
-  box-shadow: 0 30px 80px rgba(4, 8, 20, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  box-shadow: 0 24px 70px rgba(6, 3, 18, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 .screen {
@@ -112,11 +141,11 @@ button {
   width: min(560px, 100%);
   max-height: 100%;
   overflow-y: auto;
-  padding: 26px 22px 22px;
+  padding: 24px 22px 22px;
   display: flex;
   flex-direction: column;
   gap: 18px;
-  animation: sheet-in 260ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  animation: sheet-in 420ms var(--spring) both;
   scrollbar-width: none;
 }
 .screen::-webkit-scrollbar {
@@ -129,7 +158,7 @@ button {
 @keyframes sheet-in {
   from {
     opacity: 0;
-    transform: translateY(18px) scale(0.98);
+    transform: translateY(26px) scale(0.94) rotate(-0.6deg);
   }
 }
 
@@ -141,11 +170,15 @@ button {
 
 .screen-head h2 {
   font-family: var(--display);
-  font-size: var(--t-2xl);
+  font-size: var(--t-3xl);
   font-weight: 800;
-  letter-spacing: -0.02em;
+  font-stretch: 85%;
+  font-variation-settings: 'wdth' 85;
+  letter-spacing: -0.03em;
+  line-height: 1;
   margin: 0;
   flex: 1;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.25);
 }
 
 .lede {
@@ -156,14 +189,32 @@ button {
   max-width: 60ch;
 }
 
+/* Section labels are a strip of coloured tape with a marker scrawl on it. */
 .section-title {
-  font-family: var(--display);
-  font-weight: 700;
-  font-size: var(--t-lg);
+  align-self: flex-start;
+  font-family: var(--marker);
+  font-weight: 400;
+  font-size: var(--t-md);
+  letter-spacing: 0.02em;
   margin: 4px 0 -6px;
+  padding: 3px 12px 2px;
+  color: var(--accent-ink);
+  background: var(--sun);
+  border-radius: 4px;
+  transform: rotate(-1.5deg);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
+}
+.section-title:nth-of-type(2n) {
+  background: var(--mint);
+  transform: rotate(1deg);
+}
+.section-title:nth-of-type(3n) {
+  background: #ff9ec4;
+  transform: rotate(-0.8deg);
 }
 
 /* ---------- Buttons ------------------------------------------------------------------- */
+/* Buttons sit on a lip and press down into it. */
 .btn {
   border: 0;
   border-radius: var(--r-pill);
@@ -172,29 +223,49 @@ button {
   font-weight: 800;
   font-size: var(--t-md);
   cursor: pointer;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid var(--glass-line);
-  transition: transform 120ms ease, background 160ms ease;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1.5px solid var(--glass-line);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.32);
+  transition: transform 140ms var(--spring), box-shadow 140ms ease, background 160ms ease, filter 160ms ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
 }
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.32);
+}
 .btn:active {
-  transform: scale(0.96);
+  transform: translateY(3px) scale(0.98);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.32);
 }
 .btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+  transform: none;
 }
 .btn.primary {
-  background: var(--chalk);
-  color: var(--ink);
-  border-color: transparent;
-  box-shadow: 0 8px 24px rgba(244, 242, 234, 0.18);
+  background: linear-gradient(180deg, #ffe066, var(--sun) 55%, #ffb81f);
+  color: var(--accent-ink);
+  border-color: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 5px 0 #b97a00, 0 12px 28px rgba(255, 196, 0, 0.32);
+  font-family: var(--display);
+  font-size: var(--t-lg);
+  letter-spacing: -0.01em;
+}
+.btn.primary:hover {
+  box-shadow: 0 7px 0 #b97a00, 0 16px 34px rgba(255, 196, 0, 0.4);
+}
+.btn.primary:active {
+  box-shadow: 0 1px 0 #b97a00, 0 6px 16px rgba(255, 196, 0, 0.3);
 }
 .btn.ghost {
   background: transparent;
+  box-shadow: none;
+}
+.btn.ghost:hover {
+  background: rgba(255, 255, 255, 0.1);
 }
 .btn.icon {
   width: 48px;
@@ -204,13 +275,14 @@ button {
   font-size: 1.2rem;
 }
 .btn.small {
-  min-height: 40px;
+  min-height: 42px;
   padding: 8px 16px;
   font-size: var(--t-sm);
 }
 .btn.danger {
-  color: #ffd6dd;
-  border-color: rgba(255, 77, 109, 0.5);
+  color: #ffd6e2;
+  background: rgba(255, 61, 127, 0.18);
+  border-color: rgba(255, 61, 127, 0.6);
 }
 
 .row {
@@ -235,31 +307,49 @@ button {
   font-family: var(--display);
   font-weight: 800;
   font-size: var(--t-hero);
+  font-variation-settings: 'wdth' 80;
   line-height: 0.86;
-  letter-spacing: -0.045em;
-  margin: 0 0 6px;
-  text-shadow: 0 6px 40px rgba(0, 0, 0, 0.35);
+  letter-spacing: -0.05em;
+  margin: 0 0 8px;
   position: relative;
 }
-.logo .ring-o {
+/* Each letter is a marble colour and drops in on its own beat. */
+.logo .l {
   display: inline-block;
-  width: 0.62em;
-  height: 0.62em;
-  border-radius: 50%;
-  border: 0.085em dashed var(--chalk);
-  vertical-align: -0.02em;
-  margin: 0 0.02em;
-  animation: spin 22s linear infinite;
+  color: var(--lc, var(--chalk));
+  text-shadow: 0 5px 0 rgba(0, 0, 0, 0.28), 0 14px 40px rgba(0, 0, 0, 0.35);
+  animation: letter-drop 760ms var(--spring) both, letter-bob 4.8s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 70ms), calc(900ms + var(--i) * 180ms);
+  transform-origin: 50% 90%;
+}
+@keyframes letter-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-60px) rotate(-12deg) scale(0.7);
+  }
+}
+@keyframes letter-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0);
+  }
+  50% {
+    transform: translateY(-4px) rotate(calc((var(--i) - 3) * 0.8deg));
+  }
 }
 .logo small {
   display: block;
-  font-family: var(--ui);
-  font-weight: 600;
-  font-size: var(--t-md);
-  letter-spacing: 0;
-  color: var(--chalk-dim);
+  font-family: var(--marker);
+  font-weight: 400;
+  font-size: var(--t-lg);
+  letter-spacing: 0.01em;
+  color: var(--sun);
   margin-top: 12px;
-  line-height: 1.4;
+  line-height: 1.3;
+  transform: rotate(-2deg);
+  transform-origin: left center;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+  animation: sheet-in 600ms 520ms var(--spring) both;
 }
 @keyframes spin {
   to {
@@ -268,7 +358,7 @@ button {
 }
 
 .title-in {
-  animation: title-in 900ms cubic-bezier(0.2, 0.9, 0.25, 1) both;
+  animation: title-in 900ms var(--out) both;
 }
 @keyframes title-in {
   from {
@@ -278,43 +368,97 @@ button {
   }
 }
 
+/* Mode cards wear their marble's colour. */
 .menu-card {
+  --c: var(--accent);
+  position: relative;
   display: grid;
-  grid-template-columns: 52px 1fr auto;
+  grid-template-columns: 56px 1fr auto;
   align-items: center;
   gap: 14px;
-  padding: 14px 16px;
+  padding: 14px 18px 14px 14px;
   border-radius: var(--r-card);
-  border: 1px solid var(--glass-line);
-  background: var(--glass);
-  backdrop-filter: blur(18px) saturate(160%);
-  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  border: 1.5px solid rgba(255, 255, 255, 0.28);
+  background: var(--grain), linear-gradient(115deg, var(--c), rgba(20, 12, 40, 0.75) 85%);
+  backdrop-filter: blur(16px) saturate(170%);
+  -webkit-backdrop-filter: blur(16px) saturate(170%);
+  box-shadow: 0 5px 0 rgba(0, 0, 0, 0.3), 0 14px 34px rgba(0, 0, 0, 0.25);
   cursor: pointer;
   text-align: left;
-  transition: transform 120ms ease, background 160ms ease;
+  overflow: hidden;
+  transition: transform 220ms var(--spring), box-shadow 200ms ease;
+}
+.menu-card:hover {
+  transform: translateY(-3px) rotate(-0.6deg) scale(1.01);
+  box-shadow: 0 8px 0 rgba(0, 0, 0, 0.3), 0 20px 40px rgba(0, 0, 0, 0.3);
 }
 .menu-card:active {
-  transform: scale(0.98);
+  transform: translateY(3px) scale(0.98);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
+}
+/* A light sweep that crosses the card now and then. */
+.menu-card::after {
+  content: '';
+  position: absolute;
+  inset: -40% auto -40% -30%;
+  width: 26%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+  transform: skewX(-20deg) translateX(-200%);
+  animation: sheen 6s ease-in-out infinite;
+  animation-delay: var(--sheen, 1.2s);
+  pointer-events: none;
+}
+@keyframes sheen {
+  0%,
+  72% {
+    transform: skewX(-20deg) translateX(-200%);
+  }
+  100% {
+    transform: skewX(-20deg) translateX(620%);
+  }
+}
+.menu-card .marble {
+  animation: marble-roll 9s linear infinite;
+}
+.menu-card:hover .marble {
+  animation-duration: 1.4s;
+}
+@keyframes marble-roll {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .menu-card.hero {
-  padding: 18px;
-  background: linear-gradient(120deg, rgba(47, 107, 255, 0.55), rgba(255, 77, 109, 0.4));
+  padding: 20px 18px 20px 14px;
+  background: var(--grain), linear-gradient(115deg, var(--c), #2a0d08 70%, #120a1c);
+  border-color: rgba(255, 170, 120, 0.5);
+}
+.menu-card.hero h3 {
+  font-size: var(--t-2xl);
 }
 .menu-card h3 {
   margin: 0;
   font-family: var(--display);
   font-size: var(--t-xl);
   font-weight: 800;
+  font-variation-settings: 'wdth' 85;
   letter-spacing: -0.02em;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
 }
 .menu-card p {
   margin: 2px 0 0;
   font-size: var(--t-sm);
+  font-weight: 600;
   color: var(--chalk-dim);
 }
 .menu-card .chev {
-  font-size: 1.4rem;
-  opacity: 0.6;
+  font-size: 1.6rem;
+  font-weight: 800;
+  opacity: 0.85;
+  transition: transform 220ms var(--spring);
+}
+.menu-card:hover .chev {
+  transform: translateX(4px);
 }
 .menu-foot {
   display: flex;
@@ -327,7 +471,7 @@ button {
   border-radius: 50%;
   flex: none;
   position: relative;
-  box-shadow: inset -6px -8px 14px rgba(0, 0, 0, 0.35), inset 5px 6px 10px rgba(255, 255, 255, 0.35), 0 6px 14px rgba(0, 0, 0, 0.3);
+  box-shadow: inset -6px -8px 14px rgba(0, 0, 0, 0.35), inset 5px 6px 10px rgba(255, 255, 255, 0.35), 0 6px 14px rgba(0, 0, 0, 0.35);
 }
 .marble::after {
   content: '';
@@ -349,42 +493,93 @@ button {
 }
 .chip {
   border-radius: var(--r-pill);
-  border: 1px solid var(--glass-line);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1.5px solid var(--glass-line);
+  background: rgba(255, 255, 255, 0.08);
   padding: 10px 16px;
   min-height: 44px;
-  font-weight: 700;
+  font-weight: 800;
   font-size: var(--t-sm);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.28);
+  transition: transform 180ms var(--spring), background 160ms ease, box-shadow 140ms ease;
+}
+.chip:hover {
+  transform: translateY(-2px);
+}
+.chip:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.28);
 }
 .chip[aria-pressed='true'] {
   background: var(--chalk);
-  color: var(--ink);
+  color: var(--accent-ink);
   border-color: transparent;
+  transform: rotate(-2deg) scale(1.06);
+  box-shadow: 0 4px 0 var(--accent), 0 8px 20px rgba(0, 0, 0, 0.25);
+  animation: pop 320ms var(--spring);
+}
+@keyframes pop {
+  from {
+    transform: scale(0.86);
+  }
 }
 
+/* Field cards are polaroids taped to the panel. */
 .arena-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 10px;
+  gap: 14px 12px;
+  padding: 6px 2px 4px;
 }
 .arena-card {
-  border-radius: var(--r-card);
-  border: 2px solid transparent;
-  padding: 0;
-  overflow: hidden;
+  position: relative;
+  border-radius: 6px;
+  border: 0;
+  padding: 7px 7px 0;
   cursor: pointer;
-  background: var(--ink-2);
+  background: #fbf6ec;
+  color: var(--accent-ink);
   text-align: left;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+  transform: rotate(-1.6deg);
+  transition: transform 260ms var(--spring), box-shadow 200ms ease;
+}
+.arena-card:nth-child(2n) {
+  transform: rotate(1.4deg);
+}
+.arena-card:nth-child(3n) {
+  transform: rotate(-0.6deg);
+}
+.arena-card:hover {
+  transform: rotate(0) translateY(-4px) scale(1.03);
+  z-index: 1;
+}
+/* The tape. */
+.arena-card::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  width: 46px;
+  height: 16px;
+  margin-left: -23px;
+  background: rgba(255, 236, 170, 0.75);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transform: rotate(-4deg);
+  z-index: 1;
 }
 .arena-card[aria-pressed='true'] {
-  border-color: var(--chalk);
+  transform: rotate(0) scale(1.06);
+  box-shadow: 0 0 0 4px var(--sun), 0 12px 28px rgba(0, 0, 0, 0.45);
+  z-index: 2;
+  animation: pop 360ms var(--spring);
 }
 .arena-card .sky {
-  height: 64px;
+  height: 78px;
+  border-radius: 2px;
   position: relative;
 }
 .arena-card .sky::after {
@@ -394,24 +589,28 @@ button {
   left: 50%;
   bottom: 8px;
   width: 64%;
-  height: 18px;
+  height: 16px;
   transform: translateX(-50%);
   border-radius: 50%;
   border: 2px solid var(--ringc, #fff);
   box-shadow: 0 0 calc(var(--glow, 0) * 8px) var(--ringc, #fff);
   background: var(--groundc, #444);
+  opacity: 0.85;
 }
 .arena-card .meta {
-  padding: 10px 12px 12px;
+  padding: 8px 4px 10px;
 }
 .arena-card b {
   display: block;
-  font-family: var(--display);
+  font-family: var(--marker);
+  font-weight: 400;
   font-size: var(--t-md);
+  line-height: 1.1;
 }
 .arena-card span {
   font-size: var(--t-xs);
-  color: var(--chalk-dim);
+  font-weight: 700;
+  color: rgba(18, 13, 36, 0.62);
 }
 
 .marble-grid {
@@ -420,9 +619,9 @@ button {
   gap: 10px;
 }
 .marble-pick {
-  border: 2px solid transparent;
+  border: 1.5px solid transparent;
   border-radius: var(--r-card);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.07);
   padding: 12px 6px 10px;
   display: flex;
   flex-direction: column;
@@ -430,15 +629,25 @@ button {
   gap: 8px;
   cursor: pointer;
   font-size: var(--t-xs);
-  font-weight: 700;
+  font-weight: 800;
+  transition: transform 200ms var(--spring), background 160ms ease;
+}
+.marble-pick:hover {
+  transform: translateY(-3px);
+}
+.marble-pick:hover .marble {
+  animation: marble-roll 1.2s linear infinite;
 }
 .marble-pick[aria-pressed='true'] {
-  border-color: var(--chalk);
-  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--sun);
+  background: rgba(255, 210, 63, 0.16);
+  transform: scale(1.06);
+  animation: pop 340ms var(--spring);
 }
 .marble-pick:disabled {
   opacity: 0.35;
   cursor: not-allowed;
+  transform: none;
 }
 
 .field {
@@ -446,16 +655,16 @@ button {
   flex-direction: column;
   gap: 6px;
   font-size: var(--t-sm);
-  font-weight: 700;
+  font-weight: 800;
 }
 .field input[type='text'],
 .field input:not([type]),
 .field select {
   font: inherit;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--chalk);
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid var(--glass-line);
+  background: rgba(0, 0, 0, 0.22);
+  border: 1.5px solid var(--glass-line);
   border-radius: 14px;
   padding: 13px 14px;
   min-height: 48px;
@@ -464,11 +673,11 @@ button {
 }
 .field input[type='range'] {
   width: 100%;
-  accent-color: var(--chalk);
+  accent-color: var(--sun);
   height: 32px;
 }
 .field .hint {
-  font-weight: 500;
+  font-weight: 600;
   color: var(--chalk-faint);
 }
 
@@ -483,14 +692,14 @@ button {
 .notice {
   border-radius: var(--r-card);
   padding: 12px 14px;
-  background: rgba(255, 77, 109, 0.14);
-  border: 1px solid rgba(255, 77, 109, 0.4);
+  background: rgba(255, 61, 127, 0.16);
+  border: 1.5px solid rgba(255, 61, 127, 0.5);
   font-size: var(--t-sm);
   line-height: 1.45;
 }
 .notice.info {
-  background: rgba(47, 107, 255, 0.14);
-  border-color: rgba(47, 107, 255, 0.4);
+  background: rgba(26, 124, 255, 0.16);
+  border-color: rgba(26, 124, 255, 0.5);
 }
 
 /* ---------- Lists (server browser, roster, tower) ------------------------------------ */
@@ -505,14 +714,19 @@ button {
   gap: 12px;
   padding: 12px 14px;
   border-radius: var(--r-card);
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1.5px solid transparent;
 }
 .list-item.clickable {
   cursor: pointer;
-  border: 1px solid var(--glass-line);
+  border: 1.5px solid var(--glass-line);
   text-align: left;
   width: 100%;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.25);
+  transition: transform 200ms var(--spring);
+}
+.list-item.clickable:hover {
+  transform: translateX(4px);
 }
 .list-item .grow {
   flex: 1;
@@ -535,15 +749,15 @@ button {
   padding: 4px 10px;
   font-size: var(--t-xs);
   font-weight: 800;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.12);
   white-space: nowrap;
 }
 .pill.ok {
-  background: rgba(61, 220, 151, 0.2);
+  background: rgba(61, 220, 151, 0.24);
   color: #b8ffdf;
 }
 .pill.wait {
-  background: rgba(255, 201, 60, 0.18);
+  background: rgba(255, 210, 63, 0.22);
   color: #ffe7a6;
 }
 
@@ -553,8 +767,9 @@ button {
   gap: 8px;
 }
 .tower .list-item.current {
-  border: 1px solid var(--chalk);
-  background: rgba(255, 255, 255, 0.12);
+  border: 1.5px solid var(--sun);
+  background: rgba(255, 210, 63, 0.14);
+  box-shadow: 0 0 0 4px rgba(255, 210, 63, 0.14);
 }
 .tower .list-item.done {
   opacity: 0.55;
@@ -568,7 +783,7 @@ button {
   color: var(--chalk-faint);
 }
 .tower .boss {
-  background: linear-gradient(100deg, rgba(255, 61, 0, 0.3), rgba(20, 5, 5, 0.5));
+  background: linear-gradient(100deg, rgba(255, 61, 0, 0.38), rgba(20, 5, 5, 0.5));
 }
 
 /* ---------- Story ----------------------------------------------------------------------- */
@@ -591,13 +806,15 @@ button {
 .fighter-detail h3 {
   margin: 0;
   font-family: var(--display);
-  font-size: var(--t-2xl);
-  letter-spacing: -0.02em;
+  font-size: var(--t-3xl);
+  font-variation-settings: 'wdth' 85;
+  letter-spacing: -0.03em;
+  line-height: 1;
 }
 .fighter-detail .title {
-  color: var(--chalk-dim);
-  font-weight: 700;
-  font-size: var(--t-sm);
+  font-family: var(--marker);
+  color: var(--sun);
+  font-size: var(--t-md);
 }
 .fighter-detail p {
   margin: 6px 0 0;
@@ -621,49 +838,59 @@ button {
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  animation: vs-left 520ms cubic-bezier(0.2, 0.9, 0.25, 1) both;
+  animation: vs-left 620ms var(--spring) both;
 }
 .versus .side.right {
   animation-name: vs-right;
 }
 .versus .vs {
-  font-family: var(--display);
-  font-weight: 800;
-  font-size: var(--t-3xl);
-  font-style: italic;
+  font-family: var(--marker);
+  font-size: calc(var(--t-3xl) * 1.4);
   color: var(--sun);
-  text-shadow: 0 0 30px rgba(255, 201, 60, 0.6);
+  text-shadow: 0 4px 0 #b97a00, 0 0 40px rgba(255, 210, 63, 0.7);
+  transform: rotate(-8deg);
+  animation: vs-slam 700ms 380ms var(--spring) both;
+}
+@keyframes vs-slam {
+  from {
+    opacity: 0;
+    transform: rotate(-30deg) scale(3);
+  }
 }
 .versus h3 {
   font-family: var(--display);
-  font-size: var(--t-2xl);
+  font-size: var(--t-3xl);
+  font-variation-settings: 'wdth' 85;
   margin: 0;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
+  text-shadow: 0 4px 0 rgba(0, 0, 0, 0.3);
 }
 .versus .quote {
   grid-column: 1 / -1;
-  font-family: var(--display);
-  font-size: var(--t-lg);
-  font-weight: 500;
-  line-height: 1.35;
-  max-width: 34ch;
+  font-family: var(--marker);
+  font-size: var(--t-xl);
+  line-height: 1.3;
+  max-width: 30ch;
   margin: 8px auto 0;
+  transform: rotate(-1deg);
+  animation: sheet-in 500ms 700ms var(--spring) both;
 }
 .versus .arena-name {
   grid-column: 1 / -1;
   color: var(--chalk-dim);
   font-size: var(--t-sm);
+  font-weight: 700;
 }
 @keyframes vs-left {
   from {
     opacity: 0;
-    transform: translateX(-60px);
+    transform: translateX(-90px) rotate(-6deg);
   }
 }
 @keyframes vs-right {
   from {
     opacity: 0;
-    transform: translateX(60px);
+    transform: translateX(90px) rotate(6deg);
   }
 }
 
@@ -692,26 +919,33 @@ button {
 }
 .scoreboard {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
   flex: 1;
 }
+/* Each player is a sticker in their marble's colour; whoever is up bounces forward. */
 .score-pill {
+  --c: var(--accent);
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px 6px 6px;
+  padding: 5px 14px 5px 5px;
   border-radius: var(--r-pill);
-  background: var(--glass);
+  background: var(--grain), linear-gradient(110deg, rgba(20, 12, 40, 0.7), rgba(20, 12, 40, 0.55));
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--glass-line);
-  transition: transform 200ms ease, background 200ms ease;
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.25);
+  transition: transform 320ms var(--spring), background 240ms ease, box-shadow 240ms ease;
 }
 .score-pill.active {
-  background: rgba(244, 242, 234, 0.92);
-  color: var(--ink);
-  transform: scale(1.04);
+  background: var(--grain), linear-gradient(110deg, var(--c), rgba(20, 12, 40, 0.6) 130%);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: scale(1.08) translateY(2px);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.3), 0 0 0 4px rgba(255, 255, 255, 0.12), 0 8px 26px var(--c);
+}
+.score-pill.active .marble {
+  animation: marble-roll 2.4s linear infinite;
 }
 .score-pill .name {
   font-weight: 800;
@@ -724,33 +958,69 @@ button {
 .score-pill .score {
   font-family: var(--display);
   font-weight: 800;
-  font-size: var(--t-lg);
+  font-size: var(--t-xl);
   min-width: 1.2em;
   text-align: right;
+  display: inline-block;
+  animation: score-pop 520ms var(--spring);
+}
+@keyframes score-pop {
+  0% {
+    transform: scale(2.2) rotate(-12deg);
+    color: var(--sun);
+  }
+  60% {
+    color: var(--sun);
+  }
 }
 .score-pill.off {
   opacity: 0.5;
 }
 
+/* The mibs still in the ring, as a row of tiny marbles. */
 .remaining {
   position: absolute;
   left: 50%;
-  top: calc(64px + var(--safe-t));
+  top: calc(66px + var(--safe-t));
   transform: translateX(-50%);
   display: flex;
-  gap: 4px;
+  gap: 5px;
   pointer-events: none;
+  padding: 5px 9px;
+  border-radius: var(--r-pill);
+  background: rgba(14, 9, 30, 0.42);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+/* Phones: the score stickers wrap to two rows, so the counter drops below them. */
+@media (max-width: 560px) {
+  .remaining {
+    top: calc(112px + var(--safe-t));
+    gap: 4px;
+  }
+  .score-pill .name {
+    max-width: 7ch;
+  }
 }
 .remaining i {
-  width: 9px;
-  height: 9px;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
-  background: var(--chalk);
-  box-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
+  background: radial-gradient(circle at 35% 30%, #fff 0 18%, var(--mc, #9fe8ff) 45%, rgba(0, 0, 0, 0.45) 110%);
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.4);
+  transition: transform 300ms var(--spring), opacity 300ms ease;
 }
 .remaining i.gone {
   background: transparent;
   box-shadow: inset 0 0 0 1.5px var(--chalk-faint);
+  transform: scale(0.7);
+  animation: mib-gone 600ms var(--spring);
+}
+@keyframes mib-gone {
+  0% {
+    transform: scale(2.2);
+    box-shadow: 0 0 0 3px var(--sun), 0 0 18px var(--sun);
+  }
 }
 
 .banner {
@@ -760,7 +1030,7 @@ button {
   transform: translate(-50%, -50%);
   text-align: center;
   pointer-events: none;
-  animation: banner 1900ms cubic-bezier(0.2, 0.9, 0.25, 1) both;
+  animation: banner 1900ms var(--out) both;
   width: max-content;
   max-width: 90vw;
 }
@@ -768,102 +1038,170 @@ button {
   margin: 0;
   font-family: var(--display);
   font-weight: 800;
-  font-size: clamp(2.2rem, 9vw, 4.2rem);
-  letter-spacing: -0.035em;
-  text-shadow: 0 6px 30px rgba(0, 0, 0, 0.5);
+  font-variation-settings: 'wdth' 80;
+  font-size: clamp(2.6rem, 10vw, 5rem);
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+  transform: rotate(-3deg);
+  text-shadow: 0 5px 0 rgba(0, 0, 0, 0.45), 0 10px 40px rgba(0, 0, 0, 0.5);
 }
 .banner p {
-  margin: 4px 0 0;
-  font-weight: 700;
-  color: var(--chalk-dim);
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+  margin: 8px 0 0;
+  font-family: var(--marker);
+  font-size: var(--t-lg);
+  color: var(--chalk);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5), 0 2px 14px rgba(0, 0, 0, 0.6);
 }
 .banner.good h1 {
-  color: #c7ffe6;
+  color: #8dffc9;
 }
 .banner.bad h1 {
-  color: #ffc2cd;
+  color: #ff9cbb;
 }
 .banner.gold h1 {
   color: var(--sun);
 }
 .banner.sticky {
-  animation: banner-in 500ms cubic-bezier(0.2, 0.9, 0.25, 1.3) both;
+  animation: banner-in 640ms var(--spring) both;
 }
 @keyframes banner {
   0% {
     opacity: 0;
-    transform: translate(-50%, -40%) scale(0.9);
+    transform: translate(-50%, -40%) scale(0.5) rotate(8deg);
   }
-  12%,
+  14% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.08) rotate(-2deg);
+  }
+  22%,
   78% {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
+    transform: translate(-50%, -50%) scale(1) rotate(0);
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, -56%) scale(1);
+    transform: translate(-50%, -58%) scale(0.96);
   }
 }
 @keyframes banner-in {
   from {
     opacity: 0;
-    transform: translate(-50%, -40%) scale(0.85);
+    transform: translate(-50%, -40%) scale(0.5) rotate(8deg);
   }
 }
 
-/* Power slider: pull the thumb down, let go to flick. */
+/* Confetti for captures and wins: pieces fly out from the banner and fall. */
+.confetti {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.confetti i {
+  position: absolute;
+  width: 9px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--cc);
+  opacity: 0;
+  animation: confetti 1500ms var(--d, 0ms) cubic-bezier(0.15, 0.6, 0.4, 1) both;
+}
+@keyframes confetti {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0) scale(0.4);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--x), var(--y)) rotate(var(--r)) scale(1);
+  }
+}
+
+/* Power: a candy tube that fills as you pull. */
 .power {
   position: absolute;
   right: calc(14px + var(--safe-r));
   top: 50%;
   transform: translateY(-46%);
-  width: 76px;
+  width: 78px;
   height: min(54vh, 360px);
   border-radius: var(--r-pill);
-  background: var(--glass);
+  background: var(--grain), rgba(14, 9, 30, 0.55);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--glass-line);
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.45), 0 4px 0 rgba(0, 0, 0, 0.25);
   touch-action: none;
   overflow: hidden;
-  transition: opacity 200ms ease;
+  transition: opacity 200ms ease, transform 300ms var(--spring);
 }
 .power.disabled {
   opacity: 0.25;
   pointer-events: none;
+  transform: translateY(-46%) scale(0.92);
 }
 .power .fill {
   position: absolute;
   left: 0;
   right: 0;
   top: 0;
-  background: linear-gradient(180deg, var(--mint), var(--sun) 60%, var(--cherry));
-  opacity: 0.85;
+  background: repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.22) 0 10px, transparent 10px 20px), linear-gradient(180deg, var(--mint), var(--sun) 55%, var(--cherry));
+  background-size: 28px 28px, 100% 100%;
+  animation: candy 700ms linear infinite;
+  box-shadow: 0 4px 18px rgba(255, 210, 63, 0.5);
+}
+@keyframes candy {
+  to {
+    background-position: 28px 0, 0 0;
+  }
 }
 .power .thumb {
   position: absolute;
   left: 50%;
-  width: 54px;
-  height: 54px;
-  margin-left: -27px;
+  width: 58px;
+  height: 58px;
+  margin-left: -29px;
   border-radius: 50%;
-  background: var(--chalk);
-  color: var(--ink);
+  background: radial-gradient(circle at 35% 30%, #fff 0 14%, var(--c, var(--accent)) 55%, rgba(0, 0, 0, 0.5) 120%);
+  color: #fff;
   display: grid;
   place-items: center;
+  font-family: var(--display);
   font-weight: 800;
-  font-size: var(--t-xs);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  font-size: var(--t-md);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4), 0 0 0 3px rgba(255, 255, 255, 0.5);
+}
+.power:not(.disabled) .thumb {
+  animation: nudge 1.8s ease-in-out infinite;
+}
+@keyframes nudge {
+  0%,
+  70%,
+  100% {
+    translate: 0 0;
+  }
+  80% {
+    translate: 0 10px;
+  }
+  90% {
+    translate: 0 0;
+  }
 }
 .power .label {
   position: absolute;
   bottom: 14px;
   width: 100%;
   text-align: center;
-  font-size: var(--t-xs);
-  font-weight: 800;
-  color: var(--chalk-dim);
+  font-family: var(--marker);
+  font-size: var(--t-md);
+  color: var(--chalk);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
 }
 
 .hud-bottom {
@@ -879,6 +1217,7 @@ button {
   flex: 1;
 }
 
+/* Spin: strike your own marble high or low. */
 .spin-pad {
   width: 96px;
   height: 96px;
@@ -887,7 +1226,8 @@ button {
   touch-action: none;
   cursor: pointer;
   background: radial-gradient(circle at 35% 30%, #ffffff, #d9dde6 60%, #9aa1b2);
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35), inset -6px -8px 14px rgba(0, 0, 0, 0.18);
+  background: radial-gradient(circle at 35% 30%, #ffffff 0 10%, color-mix(in srgb, var(--c, var(--accent)) 35%, #eef1f7) 50%, color-mix(in srgb, var(--c, var(--accent)) 70%, #2a2440) 100%);
+  box-shadow: 0 5px 0 rgba(0, 0, 0, 0.3), 0 12px 26px rgba(0, 0, 0, 0.35), inset -6px -8px 14px rgba(0, 0, 0, 0.2);
 }
 .spin-pad::before {
   content: '';
@@ -897,24 +1237,26 @@ button {
   bottom: 10%;
   width: 2px;
   margin-left: -1px;
-  background: rgba(18, 26, 51, 0.2);
+  background: rgba(18, 13, 36, 0.25);
 }
 .spin-pad .dot {
   position: absolute;
   left: 50%;
-  width: 18px;
-  height: 18px;
-  margin: -9px 0 0 -9px;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
   border-radius: 50%;
   background: var(--cherry);
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 3px #fff, 0 0 12px var(--cherry);
+  transition: top 160ms var(--spring);
 }
 .spin-label {
-  font-size: var(--t-xs);
-  font-weight: 800;
+  font-family: var(--marker);
+  font-size: var(--t-sm);
   text-align: center;
   margin-top: 6px;
-  color: var(--chalk-dim);
+  color: var(--chalk);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
   width: 96px;
 }
 
@@ -922,9 +1264,11 @@ button {
   padding: 10px 14px;
   border-radius: var(--r-card);
   font-size: var(--t-sm);
+  font-weight: 600;
   line-height: 1.45;
   max-width: 36ch;
-  color: var(--chalk-dim);
+  color: var(--chalk);
+  animation: sheet-in 500ms 600ms var(--spring) both;
 }
 
 .thinking {
@@ -934,40 +1278,46 @@ button {
   transform: translateX(-50%);
   padding: 8px 16px;
   border-radius: var(--r-pill);
-  font-weight: 700;
+  font-weight: 800;
   font-size: var(--t-sm);
   display: flex;
   align-items: center;
   gap: 8px;
 }
 .thinking i {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: var(--chalk);
-  animation: blink 1s infinite;
+  background: var(--sun);
+  animation: bounce-dot 900ms var(--spring) infinite;
 }
 .thinking i:nth-child(2) {
-  animation-delay: 0.15s;
+  animation-delay: 0.12s;
 }
 .thinking i:nth-child(3) {
-  animation-delay: 0.3s;
+  animation-delay: 0.24s;
 }
-@keyframes blink {
-  50% {
-    opacity: 0.2;
+@keyframes bounce-dot {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-6px);
   }
 }
 
 .toast {
   position: absolute;
   left: 50%;
-  top: calc(96px + var(--safe-t));
+  top: calc(104px + var(--safe-t));
   transform: translateX(-50%);
   padding: 8px 14px;
   border-radius: var(--r-pill);
   font-size: var(--t-sm);
-  font-weight: 700;
+  font-weight: 800;
+  animation: sheet-in 420ms var(--spring) both;
 }
 
 .emotes {
@@ -992,6 +1342,10 @@ button {
     animation-iteration-count: 1 !important;
     transition-duration: 1ms !important;
   }
+  .menu-card::after,
+  .confetti {
+    display: none;
+  }
 }
 
 @media (min-width: 900px) {
@@ -1004,7 +1358,9 @@ button {
 .menu {
   max-height: 100%;
   overflow-y: auto;
+  overflow-x: visible;
   scrollbar-width: none;
+  padding: 4px 6px 8px;
 }
 .menu::-webkit-scrollbar {
   display: none;
@@ -1014,23 +1370,26 @@ button {
     gap: 8px;
   }
   .logo {
-    font-size: clamp(2.4rem, 8.5vh, 4.2rem);
+    font-size: clamp(2.6rem, 9vh, 4.6rem);
   }
   .logo small {
     margin-top: 6px;
-    font-size: var(--t-sm);
+    font-size: var(--t-md);
   }
   .menu-card {
-    grid-template-columns: 38px 1fr auto;
+    grid-template-columns: 40px 1fr auto;
     padding: 9px 12px;
     gap: 12px;
   }
   .menu-card.hero {
-    padding: 11px 12px;
+    padding: 12px;
+  }
+  .menu-card.hero h3 {
+    font-size: var(--t-xl);
   }
   .menu-card .marble {
-    width: 38px !important;
-    height: 38px !important;
+    width: 40px !important;
+    height: 40px !important;
   }
   .menu-card h3 {
     font-size: var(--t-lg);
@@ -1039,7 +1398,7 @@ button {
     font-size: var(--t-xs);
   }
   .menu-foot .btn {
-    min-height: 40px;
+    min-height: 42px;
   }
 }
 

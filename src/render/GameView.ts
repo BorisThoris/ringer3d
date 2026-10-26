@@ -7,7 +7,7 @@ import { WORLD } from '../core/constants';
 import { placementPoint, SHOOTER_ID, type Layout } from '../core/physics';
 import type { Match } from '../core/match';
 import { ARENAS, type ArenaId } from '../game/arenas';
-import { MIB_LOOKS, type MarbleLook } from '../game/marbles';
+import { MIB_LOOKS, uiColor, type MarbleLook } from '../game/marbles';
 import { buildArena, type BuiltArena } from './arenaBuilder';
 import { buildMarble, disposeObject, type Quality } from './marbleMesh';
 import { Juice } from './juice';
@@ -78,6 +78,7 @@ export class GameView {
   timeScale = 1;
   private baseFov = 48;
   private camTarget = new THREE.Vector3();
+  private tmpColor = new THREE.Color();
 
   private match: Match | null = null;
   private looks: MarbleLook[] = [];
@@ -94,7 +95,13 @@ export class GameView {
 
   // Camera rig
   camMode: CamMode = 'attract';
-  userPitch = 0.36;
+  userPitch = 0.62;
+  /**
+   * Slide the picture sideways (fraction of the width) so the ring sits in the open space
+   * beside a menu column instead of behind it. Eased, so it glides when screens change.
+   */
+  frameShift = 0;
+  private shiftNow = 0;
   userZoom = 1;
   private cam = { tx: 0, ty: 0, tz: 0, yaw: 0.8, pitch: 0.6, dist: 14 };
   private lastYaw = 0.8;
@@ -150,8 +157,8 @@ export class GameView {
     this.chargeRing.rotation.x = -Math.PI / 2;
     // A bright band along the ring line either side of the shooter: "you can slide along here".
     this.placeArc = new THREE.Mesh(
-      new THREE.RingGeometry(R - 0.05, R + 0.05, 64, 1, -0.32, 0.64),
-      new THREE.MeshBasicMaterial({ color: '#ffe27a', transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false }),
+      new THREE.RingGeometry(R - 0.035, R + 0.035, 64, 1, -0.32, 0.64),
+      new THREE.MeshBasicMaterial({ color: '#ffe27a', transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false }),
     );
     this.placeArc.rotation.x = -Math.PI / 2;
     this.placeArc.position.y = 0.012;
@@ -207,7 +214,11 @@ export class GameView {
     this.sunDir.set(...def.sun.dir).normalize();
     // Overcast fields throw weaker sunlight caustics.
     this.causticStrength = Math.min(1, def.sun.intensity / 3);
-    this.bloom.strength = 0.3;
+    // A whisper of glow on the hottest highlights only (glints, the shockwaves), never a
+    // haze over sunlit string, chalk or wet ice.
+    this.bloom.strength = 0.12;
+    this.bloom.radius = 0.25;
+    this.bloom.threshold = 0.96;
     this.bloom.enabled = this.quality !== 'low';
   }
 
@@ -269,7 +280,7 @@ export class GameView {
       const off = radius * (0.55 + slen * 0.6) + lift * slen;
       c.visible = g.visible;
       c.position.set(g.position.x + Math.cos(ang) * off, 0.012, g.position.z + Math.sin(ang) * off);
-      (c.material as THREE.MeshBasicMaterial).opacity = (0.55 * this.causticStrength * g.scale.x) / (1 + lift * 0.3);
+      (c.material as THREE.MeshBasicMaterial).opacity = (0.32 * this.causticStrength * g.scale.x) / (1 + lift * 0.3);
       c.scale.set(1 + slen * 0.35, 1, 1);
       c.rotation.z = -ang;
     }
@@ -465,6 +476,11 @@ export class GameView {
       return;
     }
     this.guide.visible = true;
+    // The aim line, ghost and placement band wear the colour of whoever is shooting.
+    const c = this.tmpColor.set(uiColor(this.looks[m.current]));
+    for (const mesh of [this.guideLine1, this.guideLine2, this.guideLine3, this.ghost, this.placeArc]) {
+      (mesh.material as THREE.MeshBasicMaterial).color.copy(c);
+    }
     const y = 0.015;
     const ox = anchor.x;
     const oz = anchor.z;
@@ -599,21 +615,25 @@ export class GameView {
 
     switch (this.camMode) {
       case 'attract':
+        // A slow orbit, high enough to read the cross, close enough to see the glass.
         want.yaw = this.cam.yaw + dt * 0.06;
-        want.pitch = 0.5;
-        want.dist = 12.5 * Math.min(fit, 1.6);
-        want.ty = 0.3;
+        want.pitch = 0.66;
+        want.dist = 11 * Math.min(fit, 1.6);
+        want.ty = 0;
         break;
       case 'aim':
         if (anchor && a) {
+          // Over the shoulder: the shooter in the lower third, the line of the shot and
+          // what it will hit filling the frame, the horizon kept near the top edge.
           const dx = Math.cos(a.aimAngle);
           const dz = Math.sin(a.aimAngle);
-          want.tx = anchor.x + dx * 1.4;
-          want.tz = anchor.z + dz * 1.4;
-          want.ty = 0.1;
+          const ahead = 1 + this.userZoom * 0.8;
+          want.tx = anchor.x + dx * ahead;
+          want.tz = anchor.z + dz * ahead;
+          want.ty = 0;
           want.yaw = a.aimAngle + Math.PI;
           want.pitch = this.userPitch;
-          want.dist = 4.6 * this.userZoom * Math.min(fit, 1.5);
+          want.dist = 6.4 * this.userZoom * Math.min(fit, 1.5);
         }
         break;
       case 'top': {
@@ -680,6 +700,14 @@ export class GameView {
     this.camera.position.copy(tmpV);
     this.camera.lookAt(c.tx, c.ty, c.tz);
     this.juice.applyToCamera(this.camera, this.camTarget.set(c.tx, c.ty, c.tz), this.baseFov, dt);
+
+    // Only landscape screens have room beside the menu; phones keep the ring centred.
+    const shift = aspect > 1.15 ? this.frameShift : 0;
+    this.shiftNow += (shift - this.shiftNow) * (1 - Math.exp(-dt * 2.5));
+    const w = this.renderer.domElement.width;
+    const h = this.renderer.domElement.height;
+    if (Math.abs(this.shiftNow) > 0.001) this.camera.setViewOffset(w, h, -this.shiftNow * w, 0, w, h);
+    else if (this.camera.view) this.camera.clearViewOffset();
   }
 
   resize() {

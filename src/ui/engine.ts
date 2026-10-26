@@ -21,6 +21,7 @@ class Engine {
     await initPhysics();
     if (this.view) return; // React StrictMode runs effects twice in development
     this.view = new GameView(container, settings.get().quality);
+    this.view.frameShift = 0.2; // the app opens on the main menu
     this.controls = new Controls(this.view, () => this.session);
     settings.subscribe(() => {
       const s = settings.get();

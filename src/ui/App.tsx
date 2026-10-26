@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { PlayerInfo } from '../core/types';
 import type { ArenaId } from '../game/arenas';
 import type { SessionMode, SessionResult } from '../game/session';
-import { progress } from '../game/settings';
+import { MARBLES, uiColor } from '../game/marbles';
+import { progress, settings } from '../game/settings';
 import { buildTower, fighter } from '../game/story';
 import type { OnlineMatchConfig } from '../net/protocol';
 import type { OnlineRoom } from '../net/room';
@@ -35,6 +36,17 @@ interface PlayArgs {
 export function App() {
   const [screen, setScreen] = useState<ScreenState>({ name: 'menu' });
   const roomRef = useRef<OnlineRoom | null>(null);
+  const myMarble = settings.use((s) => s.marble);
+
+  // The main menu is a column on the left: slide the live ring into the space beside it.
+  useEffect(() => {
+    if (engine.view) engine.view.frameShift = screen.name === 'menu' ? 0.2 : 0;
+  }, [screen.name]);
+
+  // Every panel is tinted with the player's own marble.
+  useEffect(() => {
+    document.documentElement.style.setProperty('--accent', uiColor(MARBLES[myMarble]));
+  }, [myMarble]);
 
   const toMenu = () => {
     roomRef.current?.leave();

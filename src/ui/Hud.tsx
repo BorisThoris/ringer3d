@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { TARGET_COUNT } from '../core/constants';
+import { MARBLES, MIB_LOOKS, uiColor } from '../game/marbles';
 import { hud } from '../game/store';
 import { engine } from './engine';
 import { MarbleChip, tap } from './components';
@@ -24,19 +25,28 @@ export function Hud({ onQuit, online }: { onQuit: () => void; online: boolean })
 
   if (!s.active) return null;
   const session = engine.session;
+  // The player who is up colours the controls.
+  const upColour = uiColor(MARBLES[s.players[s.current]?.marble]);
 
   return (
-    <div className="hud">
+    <div className="hud" style={{ '--c': upColour } as CSSProperties}>
       <div className="hud-top">
         <div className="scoreboard" aria-label="Scores">
           {s.players.map((p, i) => (
-            <div key={i} className={`score-pill${i === s.current ? ' active' : ''}${p.connected ? '' : ' off'}`}>
-              <MarbleChip id={p.marble} size={30} />
+            <div
+              key={i}
+              className={`score-pill${i === s.current ? ' active' : ''}${p.connected ? '' : ' off'}`}
+              style={{ '--c': uiColor(MARBLES[p.marble]) } as CSSProperties}
+            >
+              <MarbleChip id={p.marble} size={32} />
               <span className="name">
                 {p.name}
                 {p.kind === 'bot' && !p.local ? ' · bot' : ''}
               </span>
-              <span className="score">{p.score}</span>
+              {/* Keyed on the score so every point pops. */}
+              <span key={p.score} className="score">
+                {p.score}
+              </span>
             </div>
           ))}
         </div>
@@ -54,12 +64,13 @@ export function Hud({ onQuit, online }: { onQuit: () => void; online: boolean })
 
       <div className="remaining" aria-label={`${s.remaining} marbles left in the ring`}>
         {Array.from({ length: TARGET_COUNT }, (_, i) => (
-          <i key={i} className={i < s.remaining ? '' : 'gone'} />
+          <i key={i} className={i < s.remaining ? '' : 'gone'} style={{ '--mc': MIB_LOOKS[i % MIB_LOOKS.length].accent } as CSSProperties} />
         ))}
       </div>
 
       {s.banner && (
         <div key={s.banner.id} className={`banner ${s.banner.tone}${s.winners ? ' sticky' : ''}`}>
+          {s.banner.tone === 'gold' && <Confetti count={s.winners ? 60 : 28} />}
           <h1>{s.banner.title}</h1>
           {s.banner.sub && <p>{s.banner.sub}</p>}
         </div>
@@ -162,6 +173,34 @@ export function Hud({ onQuit, online }: { onQuit: () => void; online: boolean })
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+const CONFETTI_COLOURS = ['#ff5a2a', '#ffd23f', '#14c06c', '#1a7cff', '#8b5cff', '#00d8ff', '#ff3d7f'];
+
+/** A burst of paper confetti behind a banner; each piece gets its own flight. */
+function Confetti({ count }: { count: number }) {
+  const pieces = useMemo(
+    () =>
+      Array.from({ length: count }, (_, i) => {
+        const a = (i / count) * Math.PI * 2 + Math.random() * 0.4;
+        const d = 120 + Math.random() * 220;
+        return {
+          '--cc': CONFETTI_COLOURS[i % CONFETTI_COLOURS.length],
+          '--x': `${Math.cos(a) * d}px`,
+          '--y': `${Math.sin(a) * d * 0.7 + 140 + Math.random() * 120}px`,
+          '--r': `${(Math.random() - 0.5) * 900}deg`,
+          '--d': `${Math.random() * 120}ms`,
+        } as CSSProperties;
+      }),
+    [count],
+  );
+  return (
+    <div className="confetti" aria-hidden>
+      {pieces.map((st, i) => (
+        <i key={i} style={st} />
+      ))}
     </div>
   );
 }

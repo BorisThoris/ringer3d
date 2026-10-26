@@ -1,14 +1,24 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import type { PlayerInfo } from '../core/types';
 import { BOT_PROFILES } from '../ai/profiles';
 import type { ArenaId } from '../game/arenas';
-import { MARBLES } from '../game/marbles';
+import { MARBLES, uiColor } from '../game/marbles';
 import { progress, settings, type GuideMode } from '../game/settings';
 import { fighter, FIGHTERS } from '../game/story';
 import type { Quality } from '../render/marbleMesh';
 import { ArenaPicker, Chips, Marble3D, MarbleChip, MarblePicker, Screen, tap } from './components';
 
 export const PLAYABLE_MARBLES = Object.keys(MARBLES).filter((m) => m !== 'mib' && m !== 'obsidian');
+
+/** The title, one marble colour per letter (Ember, sunshine, Jade, Tide, Nova, Volt). */
+const LOGO: [string, string][] = [
+  ['R', '#ff5a2a'],
+  ['i', '#ffd23f'],
+  ['n', '#14c06c'],
+  ['g', '#1a7cff'],
+  ['e', '#8b5cff'],
+  ['r', '#00d8ff'],
+];
 
 export function MainMenu({ go }: { go: (s: 'story' | 'quick' | 'local' | 'online' | 'settings' | 'howto') => void }) {
   const run = progress.use((p) => p.run);
@@ -20,15 +30,25 @@ export function MainMenu({ go }: { go: (s: 'story' | 'quick' | 'local' | 'online
   ];
   return (
     <div className="menu">
-      <h1 className="logo title-in">
-        Ringer
-        <small>Knuckle down. Knock them out. Keep what you win.</small>
+      <h1 className="logo" aria-label="Ringer">
+        {LOGO.map(([ch, colour], i) => (
+          <span key={i} className="l" aria-hidden style={{ '--i': i, '--lc': colour } as CSSProperties}>
+            {ch}
+          </span>
+        ))}
+        <small>Knuckle down. Knock 'em out. Keep what you win.</small>
       </h1>
       {items.map((it, i) => (
         <button
           key={it.id}
           className={`menu-card${it.hero ? ' hero' : ''}`}
-          style={{ animation: `sheet-in 380ms ${80 + i * 60}ms both cubic-bezier(0.2,0.9,0.3,1.1)` }}
+          style={
+            {
+              '--c': uiColor(MARBLES[it.marble]),
+              '--sheen': `${1.2 + i * 1.4}s`,
+              animation: `sheet-in 520ms ${260 + i * 90}ms both cubic-bezier(0.34, 1.56, 0.64, 1)`,
+            } as CSSProperties
+          }
           onClick={() => {
             tap();
             go(it.id);
