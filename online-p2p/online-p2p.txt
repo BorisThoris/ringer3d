@@ -1,5 +1,5 @@
-[p2p] room code RUUH
+[p2p] room code CWLM
 [p2p] room listed in browser: true
 [p2p] host roster: Room code | Host | Connected peer to peer
-[p2p] shot logs identical: true (6 shots compared)
+[p2p] shot logs identical: true (5 shots compared)
 PASS [p2p]
