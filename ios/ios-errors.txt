@@ -1,8 +1,6 @@
-2026-10-25 16:52:16.508 E  App[85526:31439] [com.apple.WebKit:ResourceLoadStatistics] Failed to request known fingerprinting scripts from WebPrivacy: Error Domain=WebPrivacyErrorDomain Code=1001 "List data not found" UserInfo={NSLocalizedDescription=List data not found}
-2026-10-25 16:52:17.222 E  App[85526:3145b] [com.apple.TextInputUI:CandidateGeneration] Attempted to update accumulator from source type: 0, after completion has already been called for token:[DA4959E3]. This is an error and will be ignored.
-2026-10-25 16:52:25.794 E  App[85526:31490] [com.apple.imageio:com.apple.WebKit.WebContent] WebContent[85535] makeImagePlus:3798: *** ERROR: 'JPEG'-_reader->initImage[0] failed err=3
-2026-10-25 16:52:59.971 E  App[85526:31490] [com.apple.imageio:com.apple.WebKit.WebContent] WebContent[85535] makeImagePlus:3798: *** ERROR: 'JPEG'-_reader->initImage[0] failed err=3
-2026-10-25 16:53:31.072 E  App[85526:31490] [com.apple.imageio:com.apple.WebKit.WebContent] WebContent[85535] makeImagePlus:3798: *** ERROR: 'JPEG'-_reader->initImage[0] failed err=3
-2026-10-25 16:53:31.752 E  App[85526:31490] [com.apple.imageio:com.apple.WebKit.WebContent] WebContent[85535] makeImagePlus:3798: *** ERROR: 'JPEG'-_reader->initImage[0] failed err=3
-2026-10-25 16:53:31.752 E  App[85526:31490] [com.apple.imageio:com.apple.WebKit.WebContent] WebContent[85535] makeImagePlus:3798: *** ERROR: 'JPEG'-_reader->initImage[0] failed err=3
-2026-10-25 16:53:31.755 E  App[85526:31490] [com.apple.imageio:com.apple.WebKit.WebContent] WebContent[85535] makeImagePlus:3798: *** ERROR: 'JPEG'-_reader->initImage[0] failed err=3
+2026-10-26 15:02:12.056 E  App[24350:11570] [com.apple.TextInputUI:CandidateGeneration] Attempted to update accumulator from source type: 0, after completion has already been called for token:[335B80A8]. This is an error and will be ignored.
+2026-10-26 15:02:13.057 Df App[24350:11555] [com.apple.xpc:connection] [0x10090d150] Re-initialization successful; calling out to event handler with XPC_ERROR_CONNECTION_INTERRUPTED
+2026-10-26 15:02:14.378 E  App[24350:11543] [com.apple.WebKit:ResourceLoadStatistics] Failed to request known fingerprinting scripts from WebPrivacy: Error Domain=WebPrivacyErrorDomain Code=1001 "List data not found" UserInfo={NSLocalizedDescription=List data not found}
+2026-10-26 15:02:14.733 Df App[24350:11550] [com.apple.AppSSO:SOClient] configurationWithCompletion: success = YES, error = (null)
+2026-10-26 15:02:28.227 E  App[24350:115db] [com.apple.imageio:com.apple.WebKit.WebContent] WebContent[24364] makeImagePlus:3798: *** ERROR: 'JPEG'-_reader->initImage[0] failed err=3
+2026-10-26 15:03:19.477 E  App[24350:115db] [com.apple.imageio:com.apple.WebKit.WebContent] WebContent[24364] makeImagePlus:3798: *** ERROR: 'JPEG'-_reader->initImage[0] failed err=3
