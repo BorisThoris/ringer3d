@@ -1,8 +1,7 @@
-10-26 18:46:07.023  3166  3166 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
-10-26 18:46:07.023  3166  3166 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
-10-26 18:46:07.024  3166  3166 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
-10-26 18:46:07.026  3166  3166 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
-10-26 18:46:08.443  3166  3166 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-10-26 18:46:08.476  3166  3166 I Capacitor/Console: File:  - Line 333 - Msg: undefined
-10-26 18:46:08.545  3166  3166 W Capacitor/Console: File: https://localhost/assets/index-DOuffTsm.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
-10-26 18:46:57.898  1051  1083 E JavaBinder: *** Uncaught remote exception! Exceptions are not yet supported across processes. Client PID 4116 UID 10118.
+10-26 22:20:47.955  2322  2889 W org.webrtc.Logging: ConferenceCrashRecorder: Uncaught exception in thread Blocking Thread #4
+10-26 22:20:47.956  2322  2889 W kch     : [Conf] ConferenceCrashRecorder: Uncaught exception in thread Blocking Thread #4
+10-26 22:20:48.055  2322  2889 E AndroidRuntime: FATAL EXCEPTION: Blocking Thread #4
+10-26 22:20:49.277  2970  2970 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
+10-26 22:20:51.844  2970  2970 W Capacitor/Console: File: https://localhost/assets/index-B6uXtNzA.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+10-26 22:21:07.987  2970  2970 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+10-26 22:21:13.375  2970  2970 I Capacitor/Console: File:  - Line 333 - Msg: undefined
