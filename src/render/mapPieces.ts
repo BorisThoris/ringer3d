@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Rng } from '../core/rng';
+import { propTraits } from '../core/props';
 import type { Piece } from '../core/types';
 import type { ArenaId } from '../game/arenas';
 import { ink, toon } from './toon';
@@ -18,6 +19,10 @@ export interface BuiltPieces {
   update(t: number, dt: number): void;
   /** A hit near (x, z): bumpers there flash and swell. */
   pulse(x: number, z: number, strength: number): void;
+  /** Move a loose prop (piece index `i`) to (x, z) at yaw `a`, or hide it once broken. */
+  setProp(i: number, x: number, z: number, a: number, broken: boolean): void;
+  /** Smash prop `i` into toon shards. */
+  shatter(i: number): void;
   dispose(): void;
 }
 
@@ -101,15 +106,20 @@ export function buildPieces(pieces: readonly Piece[], arena: ArenaId, quality: Q
   const rockTone = arena === 'sand' ? ['#b4a184', '#a89070', '#c2b192'] : arena === 'ice' ? ['#5f6a74', '#6f7a84', '#55606a'] : ['#7c776f', '#6d6862', '#8a8278', '#5f5a54'];
   const pebbles: { x: number; y: number; z: number; r: number; tone: string[] }[] = [];
 
-  for (const p of pieces) {
+  // Loose and breakable obstacles by piece index, so physics can move and smash them.
+  const props = new Map<number, THREE.Object3D>();
+  const shards: { m: THREE.Mesh; vx: number; vy: number; vz: number; spin: THREE.Vector3; t: number; s: number }[] = [];
+  const shardGeo = geo(new THREE.DodecahedronGeometry(1, 0));
+  for (const [idx, p] of pieces.entries()) {
     const skin = p.skin ?? p.kind;
     switch (p.kind) {
       case 'wall':
-        group.add(wallMesh(p, skin));
+      case 'post': {
+        const o = p.kind === 'wall' ? wallMesh(p, skin) : postMesh(p, skin);
+        group.add(o);
+        if (propTraits(p)) props.set(idx, o);
         break;
-      case 'post':
-        group.add(postMesh(p, skin));
-        break;
+      }
       case 'bumper': {
         const g = new THREE.Group();
         const core = mesh(geo(new THREE.CylinderGeometry(p.r * 0.86, p.r * 0.9, BUMPER_H, 28)), mat('#f4f1ea', { rough: 0.4 }));
@@ -525,6 +535,30 @@ export function buildPieces(pieces: readonly Piece[], arena: ArenaId, quality: Q
         b.ring.scale.set(s, s, 1 + b.k * 0.4);
         b.cap.emissiveIntensity = 0.15 + b.k * 2.2;
       }
+      // Shards fall, bounce once or twice, then shrink away.
+      for (const s of shards) {
+        s.t += dt;
+        s.vy -= 14 * dt;
+        s.m.position.x += s.vx * dt;
+        s.m.position.y += s.vy * dt;
+        s.m.position.z += s.vz * dt;
+        if (s.m.position.y < s.s * 0.5) {
+          s.m.position.y = s.s * 0.5;
+          s.vy = Math.abs(s.vy) * 0.35;
+          s.vx *= 0.6;
+          s.vz *= 0.6;
+        }
+        s.m.rotation.x += s.spin.x * dt;
+        s.m.rotation.y += s.spin.y * dt;
+        s.m.rotation.z += s.spin.z * dt;
+        s.m.scale.setScalar(s.s * Math.max(0.001, Math.min(1, (1.6 - s.t) / 0.5)));
+      }
+      for (let k = shards.length - 1; k >= 0; k--) {
+        if (shards[k].t > 1.6) {
+          group.remove(shards[k].m);
+          shards.splice(k, 1);
+        }
+      }
       // Flags ripple in the breeze.
       for (const f of flags) {
         const pos = f.geometry.attributes.position as THREE.BufferAttribute;
@@ -534,6 +568,40 @@ export function buildPieces(pieces: readonly Piece[], arena: ArenaId, quality: Q
           pos.setZ(i, Math.sin(t * 5 + x * 9) * 0.06 * (x + 0.21));
         }
         pos.needsUpdate = true;
+      }
+    },
+    setProp: (i, x, z, a, broken) => {
+      const o = props.get(i);
+      if (!o) return;
+      o.visible = !broken;
+      o.position.x = x;
+      o.position.z = z;
+      o.rotation.y = -a;
+    },
+    shatter: (i) => {
+      const o = props.get(i);
+      if (!o || !o.visible) return;
+      // Shards in the prop's own colours, flung out and up from where it stood.
+      const colors: THREE.Color[] = [];
+      o.traverse((c) => {
+        const m = (c as THREE.Mesh).material as THREE.MeshToonMaterial | undefined;
+        if ((c as THREE.Mesh).isMesh && m?.color && !c.userData.isInk) colors.push(m.color);
+      });
+      const box = new THREE.Box3().setFromObject(o);
+      const size = box.getSize(new THREE.Vector3());
+      const centre = box.getCenter(new THREE.Vector3());
+      o.visible = false;
+      const n = 14;
+      for (let k = 0; k < n; k++) {
+        const m = new THREE.Mesh(shardGeo, mat(`#${(colors[k % Math.max(1, colors.length)] ?? new THREE.Color('#cccccc')).getHexString()}`));
+        const s = Math.max(0.04, Math.min(size.x, size.z) * (0.12 + rng.next() * 0.14));
+        m.scale.setScalar(s);
+        m.position.set(centre.x + (rng.next() - 0.5) * size.x * 0.7, centre.y + (rng.next() - 0.3) * size.y * 0.6, centre.z + (rng.next() - 0.5) * size.z * 0.7);
+        m.castShadow = shadows;
+        const ang = rng.next() * Math.PI * 2;
+        const sp = 1.2 + rng.next() * 2.2;
+        shards.push({ m, vx: Math.cos(ang) * sp, vy: 2 + rng.next() * 2.5, vz: Math.sin(ang) * sp, spin: new THREE.Vector3(rng.next(), rng.next(), rng.next()).multiplyScalar(12), t: 0, s });
+        group.add(m);
       }
     },
     pulse: (x, z, strength) => {

@@ -227,6 +227,13 @@ export class GameSession {
         if (!demo) this.view.hitFeedback(e.pos, e.strength, e.kind);
         if (!demo && e.strength > 400 && settings.get().haptics) haptic(8);
         break;
+      case 'break':
+        this.view.smash(e.piece, e.pos);
+        if (!demo) {
+          sound.clack(900, 'kerb');
+          if (settings.get().haptics) haptic(18);
+        }
+        break;
       case 'capture': {
         const look = MARBLES[this.opts.players[e.player].marble];
         this.view.burst(e.pos, look?.accent ?? '#ffffff');

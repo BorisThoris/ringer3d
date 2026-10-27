@@ -1,5 +1,6 @@
 import RAPIER from '@dimforge/rapier3d-deterministic-compat';
 import { QUANT, TARGET_COUNT, WORLD } from './constants';
+import { initialProps, propTraits, type PropPiece, type PropState, type PropTraits } from './props';
 import type { Piece, Shot, SurfaceParams, Vec3 } from './types';
 
 let ready: Promise<void> | null = null;
@@ -28,6 +29,8 @@ export interface LayoutMarble {
 export interface Layout {
   targets: LayoutMarble[];
   shooter: LayoutMarble | null;
+  /** Loose and breakable obstacles where the last shot left them. Unset: as the map put them. */
+  props?: PropState[];
 }
 
 export interface ImpactInfo {
@@ -50,10 +53,16 @@ export function quantizeShot(s: Shot): Shot {
 
 export function quantizeLayout(l: Layout): Layout {
   const qm = (m: LayoutMarble): LayoutMarble => ({ id: m.id, x: qPos(m.x), y: qPos(m.y), z: qPos(m.z) });
-  return {
+  const out: Layout = {
     targets: l.targets.map(qm).sort((a, b) => a.id - b.id),
     shooter: l.shooter ? qm(l.shooter) : null,
   };
+  if (l.props) {
+    out.props = l.props
+      .map((p) => ({ i: p.i, x: qPos(p.x), z: qPos(p.z), a: qPos(p.a), ...(p.broken ? { broken: true } : {}) }))
+      .sort((a, b) => a.i - b.i);
+  }
+  return out;
 }
 
 /** Classic starting cross: one in the centre and three along each arm. */
@@ -91,12 +100,35 @@ interface BodyRec {
   radius: number;
 }
 
+/** A loose or breakable obstacle in this shot's world. */
+export interface PropRec {
+  /** Index in the map's pieces. */
+  i: number;
+  piece: PropPiece;
+  traits: PropTraits;
+  body: RAPIER.RigidBody;
+  /** Where it started this shot, so a set prop that never moves reports exactly that. */
+  start: PropState;
+  broken: boolean;
+}
+
 /** One shot's worth of physics. Create, step until `done`, read results, `free()`. */
 export class ShotSim {
   readonly world: RAPIER.World;
   readonly bodies: BodyRec[] = [];
   private readonly events = new RAPIER.EventQueue(true);
   private readonly colliderKind = new Map<number, 'marble' | 'kerb' | 'ground' | 'piece' | 'bumper'>();
+  private readonly marbleOf = new Map<number, BodyRec>();
+  private readonly struck = new Set<BodyRec>();
+  readonly props: PropRec[] = [];
+  private readonly propOf = new Map<number, PropRec>();
+  /** Props broken during the last `step` (for effects). */
+  readonly broke: PropRec[] = [];
+  /** Props broken in earlier shots: no body, passed straight through to the result. */
+  private readonly carried: PropState[] = [];
+  private breakable = false;
+  private readonly preStep = new Map<BodyRec, { x: number; y: number; z: number }>();
+  private readonly smashers = new Set<BodyRec>();
   private restCount = 0;
   steps = 0;
   done = false;
@@ -150,6 +182,7 @@ export class ShotSim {
     }
 
     this.addPieces(pieces);
+    this.addProps(pieces, L.props ?? initialProps(pieces), surface);
 
     for (const t of L.targets) this.addMarble(t, WORLD.targetRadius, surface, 2.6);
 
@@ -177,6 +210,8 @@ export class ShotSim {
         .setActiveEvents(RAPIER.ActiveEvents.CONTACT_FORCE_EVENTS)
         .setContactForceEventThreshold(2);
     for (const p of pieces) {
+      // Props get bodies of their own (addProps).
+      if (propTraits(p)) continue;
       let d: RAPIER.ColliderDesc | null = null;
       switch (p.kind) {
         case 'wall':
@@ -213,6 +248,53 @@ export class ShotSim {
     }
   }
 
+  /**
+   * Loose props are dynamic bodies that stay upright (they slide and turn, never topple);
+   * set ones that can only break are fixed. Broken props are simply left out.
+   */
+  private addProps(pieces: readonly Piece[], states: readonly PropState[], surface: SurfaceParams) {
+    for (const s of states) {
+      const piece = pieces[s.i] as PropPiece | undefined;
+      const traits = piece && propTraits(piece);
+      if (!piece || !traits) continue;
+      if (s.broken) {
+        this.carried.push(s);
+        continue;
+      }
+      const h = piece.h;
+      const loose = traits.density !== undefined;
+      const desc = (loose ? RAPIER.RigidBodyDesc.dynamic() : RAPIER.RigidBodyDesc.fixed())
+        .setTranslation(s.x, h / 2, s.z)
+        .setRotation(yawQuat(-s.a));
+      if (loose) {
+        desc
+          .enabledRotations(false, true, false)
+          // Props drag along the ground and come to rest quickly, whatever the field.
+          .setLinearDamping(PROP_DAMPING + surface.linearDamping)
+          .setAngularDamping(PROP_DAMPING * 2)
+          .setCanSleep(false);
+      }
+      const body = this.world.createRigidBody(desc);
+      const shape =
+        piece.kind === 'wall'
+          ? RAPIER.ColliderDesc.cuboid(piece.len / 2, h / 2, piece.thick / 2)
+          : RAPIER.ColliderDesc.cylinder(h / 2, piece.r);
+      shape
+        .setRestitution(0.35)
+        .setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Max)
+        .setFriction(PROP_FRICTION)
+        .setActiveEvents(RAPIER.ActiveEvents.CONTACT_FORCE_EVENTS)
+        .setContactForceEventThreshold(2);
+      if (loose) shape.setDensity(traits.density!);
+      const c = this.world.createCollider(shape, body);
+      this.colliderKind.set(c.handle, 'piece');
+      if (traits.breakAt !== undefined) this.breakable = true;
+      const rec: PropRec = { i: s.i, piece, traits, body, start: { ...s }, broken: false };
+      this.props.push(rec);
+      this.propOf.set(c.handle, rec);
+    }
+  }
+
   private addMarble(m: LayoutMarble, radius: number, surface: SurfaceParams, density: number): BodyRec {
     const body = this.world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic()
@@ -235,6 +317,7 @@ export class ShotSim {
     );
     this.colliderKind.set(c.handle, 'marble');
     const rec = { id: m.id, body, radius };
+    this.marbleOf.set(c.handle, rec);
     this.bodies.push(rec);
     return rec;
   }
@@ -242,6 +325,9 @@ export class ShotSim {
   /** Advance one fixed step. Returns impacts that happened during the step (for audio/FX). */
   step(): ImpactInfo[] {
     if (this.done) return [];
+    this.broke.length = 0;
+    // Only needed to undo a bounce off a prop that broke; skipped when nothing can break.
+    if (this.breakable) for (const b of this.bodies) this.preStep.set(b, b.body.linvel());
     this.world.step(this.events);
     this.steps++;
     const impacts: ImpactInfo[] = [];
@@ -252,7 +338,40 @@ export class ShotSim {
       const kind = k1 === 'bumper' || k2 === 'bumper' ? 'bumper' : k1 === 'marble' && k2 === 'marble' ? 'marble' : 'kerb';
       const p = this.world.getCollider(e.collider1()).translation();
       impacts.push({ strength: e.totalForceMagnitude(), pos: { x: p.x, y: p.y, z: p.z }, kind });
+      if (kind !== 'marble') {
+        const m = this.marbleOf.get(e.collider1()) ?? this.marbleOf.get(e.collider2());
+        if (m) this.struck.add(m);
+      }
+      const prop = this.propOf.get(e.collider1()) ?? this.propOf.get(e.collider2());
+      const at = prop?.traits.breakAt;
+      if (prop && at !== undefined && !prop.broken && e.totalForceMagnitude() > at) {
+        prop.broken = true;
+        this.broke.push(prop);
+        const m = this.marbleOf.get(e.collider1()) ?? this.marbleOf.get(e.collider2());
+        if (m) this.smashers.add(m);
+      }
     });
+    // A broken prop leaves the table at once, and the marble that smashed it punches on
+    // through, slowed, instead of bouncing off something that is no longer there.
+    for (const p of this.broke) p.body.setEnabled(false);
+    for (const m of this.smashers) {
+      const v = this.preStep.get(m);
+      if (!v) continue;
+      const k = SMASH_KEEP;
+      m.body.setLinvel({ x: v.x * k, y: v.y * k, z: v.z * k }, true);
+      m.body.setAngvel({ x: (v.z * k) / m.radius, y: 0, z: (-v.x * k) / m.radius }, true);
+      this.struck.delete(m);
+    }
+    this.smashers.clear();
+    // An obstacle meets a marble at its middle, so the rebound leaves it rolling the new way.
+    // Keeping the old forward roll let ground friction drag it straight back into the
+    // obstacle: every bounce died on the spot, as if the hit had been undone.
+    for (const b of this.struck) {
+      const v = b.body.linvel();
+      const w = b.body.angvel();
+      b.body.setAngvel({ x: v.z / b.radius, y: w.y, z: -v.x / b.radius }, true);
+    }
+    this.struck.clear();
 
     // The ground underfoot: slopes steer, bumps throw fast marbles up, and rolling
     // resistance brings everything to rest (it outweighs every slope, so nothing creeps).
@@ -316,6 +435,17 @@ export class ShotSim {
         break;
       }
     }
+    // A shoved prop still sliding keeps the shot going too.
+    if (resting) {
+      for (const p of this.props) {
+        if (p.broken || p.traits.density === undefined) continue;
+        const v = p.body.linvel();
+        if (Math.hypot(v.x, v.z) > WORLD.restLinear || Math.abs(p.body.angvel().y) > WORLD.restAngular) {
+          resting = false;
+          break;
+        }
+      }
+    }
     this.restCount = resting ? this.restCount + 1 : 0;
     if (this.restCount >= WORLD.restSteps || this.steps >= WORLD.maxShotSteps) this.done = true;
     return impacts;
@@ -347,7 +477,18 @@ export class ShotSim {
       if (b.id === SHOOTER_ID) shooter = m;
       else targets.push(m);
     }
-    return quantizeLayout({ targets, shooter });
+    if (!this.props.length && !this.carried.length) return quantizeLayout({ targets, shooter });
+    const props: PropState[] = [...this.carried];
+    for (const p of this.props) {
+      if (p.broken) props.push({ ...p.start, broken: true });
+      else if (p.traits.density === undefined) props.push(p.start);
+      else {
+        const t = p.body.translation();
+        const r = p.body.rotation();
+        props.push({ i: p.i, x: t.x, z: t.z, a: -2 * Math.atan2(r.y, r.w) });
+      }
+    }
+    return quantizeLayout({ targets, shooter, props });
   }
 
   free(): void {
@@ -357,6 +498,11 @@ export class ShotSim {
 }
 
 const MARBLE_FRICTION = 0.25;
+/** Loose props: grip on the ground (scaled by the field's) and how fast they settle. */
+const PROP_FRICTION = 0.45;
+const PROP_DAMPING = 1.6;
+/** Share of its speed a marble keeps after smashing through a breakable prop. */
+const SMASH_KEEP = 0.6;
 /** A rolling solid sphere accelerates down a slope at 5/7 g. */
 const ROLL_G = (5 / 7) * -WORLD.gravity;
 /** Below this speed bumps steer but never lift. */
@@ -469,6 +615,13 @@ export function layoutHash(l: Layout): string {
   if (l.shooter) {
     mix(l.shooter.x);
     mix(l.shooter.z);
+  }
+  for (const p of l.props ?? []) {
+    mix(p.i);
+    mix(p.x);
+    mix(p.z);
+    mix(p.a);
+    mix(p.broken ? 1 : 0);
   }
   return (h >>> 0).toString(16).padStart(8, '0');
 }

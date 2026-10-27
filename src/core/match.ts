@@ -120,6 +120,10 @@ export class Match {
   step(): void {
     if (this.phase !== 'rolling' || !this.sim) return;
     for (const imp of this.sim.step()) this.emit({ type: 'impact', ...imp });
+    for (const p of this.sim.broke) {
+      const t = p.body.translation();
+      this.emit({ type: 'break', piece: p.i, skin: p.piece.skin ?? p.piece.kind, pos: { x: t.x, y: t.y, z: t.z } });
+    }
     if (this.sim.done) this.resolve();
   }
 

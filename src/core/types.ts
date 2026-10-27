@@ -110,6 +110,8 @@ export type MatchEvent =
   | { type: 'shot'; player: number; shot: Shot }
   | { type: 'impact'; strength: number; pos: Vec3; kind: 'marble' | 'kerb' | 'bumper' }
   | { type: 'capture'; player: number; marbleId: number; pos: Vec3 }
+  /** A breakable prop (map piece `piece`) was smashed. */
+  | { type: 'break'; piece: number; skin: string; pos: Vec3 }
   | { type: 'shooterOut'; player: number }
   | { type: 'shootAgain'; player: number }
   | { type: 'turnStart'; player: number }

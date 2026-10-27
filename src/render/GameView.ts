@@ -15,6 +15,7 @@ import { buildPieces, type BuiltPieces } from './mapPieces';
 import type { Piece } from '../core/types';
 import { SurfaceFx, type Mover } from './surfaceFx';
 import { radialGlowTexture } from './textures';
+import { Reticle } from './reticle';
 
 export type CamMode = 'attract' | 'aim' | 'top' | 'follow' | 'overview';
 
@@ -42,6 +43,8 @@ interface Leaving {
 }
 
 const R = WORLD.ringRadius;
+/** How far ahead the reticle floats when the aim guide is off. */
+const FREE_RETICLE = 1.3;
 /** The menu backdrop's camera shots, each held this long (seconds). */
 const ATTRACT_SHOT = 9;
 const ATTRACT_LOOKS = [
@@ -114,6 +117,7 @@ export class GameView {
   private guideLine2: THREE.Mesh;
   private guideLine3: THREE.Mesh;
   private ghost: THREE.Mesh;
+  private reticle = new Reticle(WORLD.shooterRadius * 1.5);
   private chargeRing: THREE.Mesh;
   private placeArc: THREE.Mesh;
 
@@ -186,7 +190,7 @@ export class GameView {
     );
     this.placeArc.rotation.x = -Math.PI / 2;
     this.placeArc.position.y = 0.012;
-    this.guide.add(this.guideLine1, this.guideLine2, this.guideLine3, this.ghost, this.chargeRing, this.placeArc);
+    this.guide.add(this.guideLine1, this.guideLine2, this.guideLine3, this.ghost, this.chargeRing, this.placeArc, this.reticle.group);
     this.guide.renderOrder = 5;
     this.guide.traverse((o) => (o.renderOrder = 5));
     this.scene.add(this.guide);
@@ -426,7 +430,8 @@ export class GameView {
     this.elapsed += dt;
     this.onTick?.(dt);
     this.syncMarbles(dt);
-    this.updateGuide();
+    this.syncProps();
+    this.updateGuide(dt);
     this.updateEffects(dt);
     this.updateCamera(dt);
     this.arena?.update(this.elapsed, dt);
@@ -514,6 +519,30 @@ export class GameView {
     this.updateCaustics();
   }
 
+  /** Loose props follow their bodies mid-shot and the layout between shots. */
+  private syncProps() {
+    const m = this.match;
+    const p = this.pieces;
+    if (!m || !p) return;
+    if (m.sim) {
+      for (const r of m.sim.props) {
+        if (r.broken || r.traits.density === undefined) continue;
+        const t = r.body.translation();
+        const q = r.body.rotation();
+        p.setProp(r.i, t.x, t.z, -2 * Math.atan2(q.y, q.w), false);
+      }
+    } else {
+      for (const s of m.layout.props ?? []) p.setProp(s.i, s.x, s.z, s.a, !!s.broken);
+    }
+  }
+
+  /** A breakable prop was smashed: shards, a jolt and a puff from the ground. */
+  smash(piece: number, pos: { x: number; y: number; z: number }) {
+    this.pieces?.shatter(piece);
+    this.juice.kick(0.35);
+    this.surfaceFx.impact(pos, 600);
+  }
+
   private syncLayout(layout: Layout, shooter: THREE.Group | null) {
     for (const t of layout.targets) {
       const mesh = this.targetMeshes.get(t.id);
@@ -530,7 +559,7 @@ export class GameView {
     }
   }
 
-  private updateGuide() {
+  private updateGuide(dt: number) {
     const m = this.match;
     const a = this.aim;
     const anchor = this.shooterAnchor();
@@ -544,6 +573,7 @@ export class GameView {
     for (const mesh of [this.guideLine1, this.guideLine2, this.guideLine3, this.ghost, this.placeArc]) {
       (mesh.material as THREE.MeshBasicMaterial).color.copy(c);
     }
+    this.reticle.setColor(c);
     const y = 0.015;
     const ox = anchor.x;
     const oz = anchor.z;
@@ -574,8 +604,9 @@ export class GameView {
     if (hit && best <= maxLen && showLines) {
       const gx = ox + dx * best;
       const gz = oz + dz * best;
-      this.ghost.visible = true;
-      this.ghost.position.set(gx, y, gz);
+      // The reticle takes the contact point; the thin ghost ring would only double it.
+      this.ghost.visible = false;
+      this.reticle.update(gx, y + 0.004, gz, true, dt);
       // Object ball direction: from ghost centre through target centre.
       const nAng = Math.atan2(hit.z - gz, hit.x - gx);
       this.setLine(this.guideLine2, hit.x, hit.z, nAng, Math.min(1.6, maxLen * 0.4), y, 0.03);
@@ -592,6 +623,10 @@ export class GameView {
       this.ghost.visible = false;
       this.guideLine2.visible = false;
       this.guideLine3.visible = false;
+      // Nothing in reach: the reticle floats where the line ends, or with the guide off a
+      // short way out, so the direction always reads.
+      const reach = showLines ? Math.min(len1, maxLen) : FREE_RETICLE;
+      this.reticle.update(ox + dx * reach, y + 0.004, oz + dz * reach, false, dt);
     }
 
     // Charge ring + placement arc.
