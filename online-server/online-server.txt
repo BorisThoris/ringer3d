@@ -1,4 +1,4 @@
-[server] room code GWGY
+[server] room code CTWS
 [server] room listed in browser: true
 [server] host roster: Room code | Host | Connected peer to peer
 [server] shot logs identical: true (6 shots compared)
