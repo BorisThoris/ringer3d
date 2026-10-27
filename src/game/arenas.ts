@@ -162,14 +162,15 @@ export const ARENAS: Record<ArenaId, Arena> = {
     // Nothing grips: marbles slide before they roll, glide for seconds, ride the lake's
     // slow swells, and scatter on hits. The snowbank past the ring buries runaways.
     // (Slick, not pinball: any slicker and the first break swept the ring, so a match
-    // came down to who shot first rather than who shot better.)
+    // came down to who shot first rather than who shot better. Measured: at rollDecel 4.2
+    // a skilled player beat an expert and the legend alike about one game in three.)
     surface: {
       ...DEFAULT_SURFACE,
-      rollDecel: 4.2,
+      rollDecel: 5.6,
       friction: 0.12,
-      linearDamping: 0.05,
+      linearDamping: 0.08,
       angularDamping: 0.1,
-      marbleRestitution: 0.92,
+      marbleRestitution: 0.88,
       bumps: { amp: 0.03, scale: 12, stretch: 1 },
       edge: { restitution: 0.05, friction: 1 },
     },

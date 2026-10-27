@@ -128,7 +128,8 @@ export function App() {
     });
   };
 
-  const storyMatch = (fighterId: string, stage: number) => {
+  /** `series`: games won so far by [you, them] on a best-of floor. */
+  const storyMatch = (fighterId: string, stage: number, series: [number, number] = [0, 0]) => {
     const st = buildTower(fighterId)[stage];
     const me = fighter(fighterId);
     const opp = fighter(st.opponent);
@@ -144,7 +145,21 @@ export function App() {
       players,
       localSeats: [0],
       results: (r) => {
-        const won = r.winners.length === 1 && r.winners[0] === 0;
+        const need = st.wins;
+        const tally: [number, number] = [...series];
+        if (r.winners.length === 1) tally[r.winners[0] === 0 ? 0 : 1]++;
+        const bestOf = `Best of ${need * 2 - 1}`;
+        if (need > 1 && tally[0] < need && tally[1] < need) {
+          const mine = r.winners.length === 1 && r.winners[0] === 0;
+          return {
+            title: r.winners.length > 1 ? 'Drawn game' : mine ? 'Game to you' : `Game to ${opp.name}`,
+            sub: `${bestOf} · you ${tally[0]}, ${opp.name} ${tally[1]}`,
+            scores: scoresOf(players, r),
+            primary: { label: 'Next game', action: () => storyMatch(fighterId, stage, tally) },
+            secondary: { label: 'Back to the Tower', action: () => { engine.startDemo(st.arena); setScreen({ name: 'tower', fighter: fighterId, stage }); } },
+          };
+        }
+        const won = need > 1 ? tally[0] >= need : r.winners.length === 1 && r.winners[0] === 0;
         const last = stage === 7;
         if (won) {
           const next = stage + 1;
@@ -157,7 +172,7 @@ export function App() {
           }));
           return {
             title: last ? 'The Black Taw falls' : `${opp.name} is beaten`,
-            sub: newlyUnlocked ? `${opp.name} can now be chosen in the Tower.` : undefined,
+            sub: [need > 1 ? `${bestOf} · ${tally[0]} to ${tally[1]}` : '', newlyUnlocked ? `${opp.name} can now be chosen in the Tower.` : ''].filter(Boolean).join(' · ') || undefined,
             quote: { who: opp.name, marble: opp.marble, text: opp.defeat },
             scores: scoresOf(players, r),
             primary: last
@@ -167,7 +182,8 @@ export function App() {
           };
         }
         return {
-          title: r.winners.length > 1 ? 'Draw — try again' : `${opp.name} wins`,
+          title: need > 1 ? `${opp.name} takes the series` : r.winners.length > 1 ? 'Draw — try again' : `${opp.name} wins`,
+          sub: need > 1 ? `${bestOf} · ${tally[0]} to ${tally[1]}` : undefined,
           quote: { who: opp.name, marble: opp.marble, text: opp.taunt },
           scores: scoresOf(players, r),
           primary: { label: 'Try again', action: () => storyMatch(fighterId, stage) },

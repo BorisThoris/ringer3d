@@ -77,6 +77,7 @@ export function Tower({ fighterId, stage, onBack, onFight }: { fighterId: string
                 <b>{i > stage + 1 && boss ? '???' : opp.name}</b>
                 <small>
                   {ARENAS[s.arena].name} · {BOT_PROFILES[s.bot].label} · {DIFF_WORD[s.difficulty]} map · {GUIDE_WORD[s.guide]}
+                  {s.wins > 1 ? ` · best of ${s.wins * 2 - 1}` : ''}
                 </small>
               </span>
               {i < stage && <span className="pill ok">Beaten</span>}
@@ -129,7 +130,7 @@ export function Versus({ fighterId, stage, onGo }: { fighterId: string; stage: n
       </div>
       <p className="quote">“{opp.intro}”</p>
       <p className="arena-name">
-        Stage {stage + 1} · {ARENAS[s.arena].name} · {BOT_PROFILES[s.bot].label} · {DIFF_WORD[s.difficulty]} map · {GUIDE_WORD[s.guide]} · tap to begin
+        Stage {stage + 1} · {ARENAS[s.arena].name} · {BOT_PROFILES[s.bot].label} · {DIFF_WORD[s.difficulty]} map · {GUIDE_WORD[s.guide]}{s.wins > 1 ? ` · best of ${s.wins * 2 - 1}` : ''} · tap to begin
       </p>
     </div>
   );

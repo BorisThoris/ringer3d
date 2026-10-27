@@ -21,7 +21,9 @@ describe('the tower', () => {
       }
       // The first floor is gentle, the last is the hardest there is.
       expect(stages[0]).toMatchObject({ bot: 'rookie', difficulty: 'easy', guide: 'full' });
-      expect(stages[7]).toMatchObject({ opponent: 'obsidian', bot: 'legend', difficulty: 'hard', guide: 'off' });
+      expect(stages[7]).toMatchObject({ opponent: 'obsidian', bot: 'legend', difficulty: 'hard', guide: 'off', wins: 3 });
+      // Ice is swingy: its floors are a series, never a single game.
+      for (const s of stages) if (s.arena === 'ice') expect(s.wins, `${f.id} ${s.opponent}`).toBeGreaterThan(1);
     }
   });
 

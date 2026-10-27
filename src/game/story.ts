@@ -161,9 +161,20 @@ export interface TowerStage {
   mapSeed: number;
   /** The most aim guide this floor allows: it shortens, then goes, as you climb. */
   guide: GuideMode;
+  /** Games to win to take the floor: 1, or a best-of series. */
+  wins: number;
 }
 
 const STAGE_GUIDE: GuideMode[] = ['full', 'full', 'full', 'short', 'short', 'short', 'off', 'off'];
+
+/**
+ * On ice one break can take half the ring, so a single game there is close to a coin toss
+ * whoever the opponent is (measured: a skilled player took an expert and the legend alike
+ * about one game in four). Ice floors are played as a series, which lets skill tell:
+ * best of three, and best of five against the Black Taw. Ice games are short, so a series
+ * runs about as long as one game elsewhere.
+ */
+const seriesOn = (arena: ArenaId) => (arena === 'ice' ? 2 : 1);
 
 const STAGE_DIFFICULTY: Difficulty[] = ['easy', 'easy', 'medium', 'medium', 'medium', 'hard', 'hard', 'hard'];
 
@@ -176,15 +187,19 @@ export function buildTower(playerFighter: string): TowerStage[] {
   const ladder = order.slice(0, 7);
   // One step up the ladder every floor: no floor repeats the last one's opponent strength.
   const bots = ['rookie', 'novice', 'casual', 'regular', 'skilled', 'expert', 'master'];
-  const stages: TowerStage[] = ladder.map((id, i) => ({
-    opponent: id,
-    arena: FIGHTERS.find((f) => f.id === id)!.homeArena,
-    bot: bots[i],
-    difficulty: STAGE_DIFFICULTY[i],
-    mapSeed: hashString(`tower:${id}:${i}`) % 100000,
-    guide: STAGE_GUIDE[i],
-  }));
-  stages.push({ opponent: 'obsidian', arena: 'ice', bot: 'legend', difficulty: 'hard', mapSeed: hashString('tower:obsidian') % 100000, guide: STAGE_GUIDE[7] });
+  const stages: TowerStage[] = ladder.map((id, i) => {
+    const arena = FIGHTERS.find((f) => f.id === id)!.homeArena;
+    return {
+      opponent: id,
+      arena,
+      bot: bots[i],
+      difficulty: STAGE_DIFFICULTY[i],
+      mapSeed: hashString(`tower:${id}:${i}`) % 100000,
+      guide: STAGE_GUIDE[i],
+      wins: seriesOn(arena),
+    };
+  });
+  stages.push({ opponent: 'obsidian', arena: 'ice', bot: 'legend', difficulty: 'hard', mapSeed: hashString('tower:obsidian') % 100000, guide: STAGE_GUIDE[7], wins: 3 });
   return stages;
 }
 

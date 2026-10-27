@@ -58,8 +58,8 @@ describe('surfaces', () => {
       expect(d.grass).toBeLessThan(d.culdesac);
       expect(d.culdesac).toBeLessThan(d.desk);
       expect(d.desk).toBeLessThan(d.ice);
-      // Not cosmetic: ice carries the same flick several times further than sand.
-      expect(d.ice / d.sand).toBeGreaterThan(3);
+      // Not cosmetic: ice carries the same flick well over twice as far as sand.
+      expect(d.ice / d.sand).toBeGreaterThan(2.4);
     }
   });
 
