@@ -86,7 +86,7 @@ export function MainMenu({ go }: { go: (s: 'story' | 'quick' | 'local' | 'online
   );
 }
 
-const BOT_SKILLS = ['rookie', 'casual', 'skilled', 'expert', 'master', 'legend'] as const;
+const BOT_SKILLS = ['rookie', 'novice', 'casual', 'regular', 'skilled', 'expert', 'master', 'legend'] as const;
 
 export function QuickPlay({ onBack, onStart }: { onBack: () => void; onStart: (map: MapChoice, players: PlayerInfo[]) => void }) {
   const st = settings.use((s) => s);

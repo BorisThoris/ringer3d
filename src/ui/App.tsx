@@ -4,7 +4,7 @@ import type { ArenaId } from '../game/arenas';
 import type { Difficulty, MapDef } from '../game/maps';
 import type { SessionMode, SessionResult } from '../game/session';
 import { MARBLES, uiColor } from '../game/marbles';
-import { progress, settings } from '../game/settings';
+import { progress, settings, type GuideMode } from '../game/settings';
 import { buildTower, fighter } from '../game/story';
 import type { OnlineMatchConfig } from '../net/protocol';
 import type { OnlineRoom } from '../net/room';
@@ -30,6 +30,7 @@ interface PlayArgs {
   arena: ArenaId;
   level?: { difficulty: Difficulty; seed: number };
   map?: MapDef;
+  guideCap?: GuideMode;
   players: PlayerInfo[];
   localSeats: number[];
   room?: OnlineRoom;
@@ -81,6 +82,7 @@ export function App() {
       arena: a.arena,
       level: a.level,
       map: a.map,
+      guideCap: a.guideCap,
       players: a.players,
       seed: a.seed ?? ((Math.random() * 2 ** 31) | 0),
       localSeats: a.localSeats,
@@ -138,6 +140,7 @@ export function App() {
       mode: 'story',
       arena: st.arena,
       level: { difficulty: st.difficulty, seed: st.mapSeed },
+      guideCap: st.guide,
       players,
       localSeats: [0],
       results: (r) => {

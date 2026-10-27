@@ -40,9 +40,12 @@ export async function planBotShot(ctx: BotContext, profile: BotProfile, rng: Rng
   }
 
   // Careful players also ask "what if my thumb slips a little?" on their favourite shots.
+  // How many they double-check grows with skill, one tier at a time: a hard on/off line
+  // here made the step from regular to skilled a wall.
   pool.sort((a, b) => b.value! - a.value!);
-  if (profile.positional >= 0.5) {
-    for (const c of pool.slice(0, 5)) {
+  const careful = Math.round(profile.positional * 5);
+  if (careful > 0) {
+    for (const c of pool.slice(0, careful)) {
       let sum = c.value!;
       for (let k = 0; k < 2; k++) {
         sum += imagine(ctx, jitter(c.shot, profile, rng), profile);

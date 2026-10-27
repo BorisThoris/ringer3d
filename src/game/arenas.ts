@@ -160,14 +160,16 @@ export const ARENAS: Record<ArenaId, Arena> = {
     name: 'The Frozen Lake',
     tagline: 'Black ice, a ring scratched with a skate. Nothing stops.',
     // Nothing grips: marbles slide before they roll, glide for seconds, ride the lake's
-    // slow swells, and scatter on every hit. The snowbank past the ring buries runaways.
+    // slow swells, and scatter on hits. The snowbank past the ring buries runaways.
+    // (Slick, not pinball: any slicker and the first break swept the ring, so a match
+    // came down to who shot first rather than who shot better.)
     surface: {
       ...DEFAULT_SURFACE,
-      rollDecel: 2.6,
+      rollDecel: 4.2,
       friction: 0.12,
-      linearDamping: 0.02,
+      linearDamping: 0.05,
       angularDamping: 0.1,
-      marbleRestitution: 0.96,
+      marbleRestitution: 0.92,
       bumps: { amp: 0.03, scale: 12, stretch: 1 },
       edge: { restitution: 0.05, friction: 1 },
     },

@@ -95,6 +95,13 @@ export const progress = createStore<Progress>(
 );
 progress.subscribe(() => save(PROGRESS_KEY, progress.get()));
 
+/** The weaker of two guide settings: a Tower floor can tighten the player's own choice. */
+export function capGuide(mode: GuideMode, cap: GuideMode | undefined): GuideMode {
+  if (!cap) return mode;
+  const rank: Record<GuideMode, number> = { off: 0, short: 1, full: 2 };
+  return rank[cap] < rank[mode] ? cap : mode;
+}
+
 export function guideLength(mode: GuideMode): number {
   return mode === 'full' ? 9 : mode === 'short' ? 2.2 : 0;
 }

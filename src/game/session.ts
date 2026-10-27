@@ -12,7 +12,7 @@ import type { AimView, GameView } from '../render/GameView';
 import { ARENAS, arenaId, type ArenaId } from './arenas';
 import { generateMap, type Difficulty, type MapDef } from './maps';
 import { MARBLES } from './marbles';
-import { guideLength, settings } from './settings';
+import { capGuide, guideLength, settings, type GuideMode } from './settings';
 import { hud, showBanner } from './store';
 
 export type SessionMode = 'demo' | 'bot' | 'local' | 'story' | 'online';
@@ -31,6 +31,8 @@ export interface SessionOptions {
   map?: MapDef;
   /** How hard a generated map is and which one (defaults: medium, from `seed`). */
   level?: { difficulty: Difficulty; seed?: number };
+  /** The most aim guide this match allows (a Tower floor); the player's own setting otherwise. */
+  guideCap?: GuideMode;
   players: PlayerInfo[];
   seed: number;
   /** Seats whose input comes from this device. */
@@ -97,7 +99,7 @@ export class GameSession {
       power: 0,
       spin: 0,
       firstShot: true,
-      guideLength: guideLength(settings.get().guide),
+      guideLength: guideLength(capGuide(settings.get().guide, opts.guideCap)),
       canPlace: false,
     };
   }
@@ -197,16 +199,7 @@ export class GameSession {
             sound.chime('turn');
           }
         } else {
-          // Point at the nearest marble to save the player a drag.
-          const s = m.layout.shooter!;
-          let best = Infinity;
-          for (const t of m.layout.targets) {
-            const d = Math.hypot(t.x - s.x, t.z - s.z);
-            if (d < best) {
-              best = d;
-              this.aim.aimAngle = Math.atan2(t.z - s.z, t.x - s.x);
-            }
-          }
+          // The aim stays where the last shot went: finding the next mark is the player's job.
           this.delay = demo ? 0.5 : 0.7;
           if (!demo) showBanner('Shoot again', 'Your shooter stayed in the ring', 'gold');
         }
@@ -606,7 +599,7 @@ export class GameSession {
     if (this.isDemo) return;
     const m = this.match;
     this.aim.canPlace = this.canPlace;
-    this.aim.guideLength = this.controllerFor(m.current) === 'local' ? guideLength(settings.get().guide) : 0;
+    this.aim.guideLength = this.controllerFor(m.current) === 'local' ? guideLength(capGuide(settings.get().guide, this.opts.guideCap)) : 0;
     hud.set({
       players: this.opts.players.map((p, i) => ({
         name: p.name,

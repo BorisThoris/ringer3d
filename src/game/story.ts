@@ -1,6 +1,7 @@
 import { hashString } from '../core/rng';
 import type { ArenaId } from './arenas';
 import type { Difficulty } from './maps';
+import type { GuideMode } from './settings';
 
 export interface Fighter {
   id: string;
@@ -158,7 +159,11 @@ export interface TowerStage {
   /** The stage's map: harder the higher you climb, the same course every time you retry. */
   difficulty: Difficulty;
   mapSeed: number;
+  /** The most aim guide this floor allows: it shortens, then goes, as you climb. */
+  guide: GuideMode;
 }
+
+const STAGE_GUIDE: GuideMode[] = ['full', 'full', 'full', 'short', 'short', 'short', 'off', 'off'];
 
 const STAGE_DIFFICULTY: Difficulty[] = ['easy', 'easy', 'medium', 'medium', 'medium', 'hard', 'hard', 'hard'];
 
@@ -169,15 +174,17 @@ const STAGE_DIFFICULTY: Difficulty[] = ['easy', 'easy', 'medium', 'medium', 'med
 export function buildTower(playerFighter: string): TowerStage[] {
   const order = ['pip', 'tide', 'jade', 'volt', 'ironside', 'rime', 'nova', 'ember'].filter((f) => f !== playerFighter);
   const ladder = order.slice(0, 7);
-  const bots = ['rookie', 'casual', 'casual', 'skilled', 'skilled', 'expert', 'master'];
+  // One step up the ladder every floor: no floor repeats the last one's opponent strength.
+  const bots = ['rookie', 'novice', 'casual', 'regular', 'skilled', 'expert', 'master'];
   const stages: TowerStage[] = ladder.map((id, i) => ({
     opponent: id,
     arena: FIGHTERS.find((f) => f.id === id)!.homeArena,
     bot: bots[i],
     difficulty: STAGE_DIFFICULTY[i],
     mapSeed: hashString(`tower:${id}:${i}`) % 100000,
+    guide: STAGE_GUIDE[i],
   }));
-  stages.push({ opponent: 'obsidian', arena: 'ice', bot: 'legend', difficulty: 'hard', mapSeed: hashString('tower:obsidian') % 100000 });
+  stages.push({ opponent: 'obsidian', arena: 'ice', bot: 'legend', difficulty: 'hard', mapSeed: hashString('tower:obsidian') % 100000, guide: STAGE_GUIDE[7] });
   return stages;
 }
 

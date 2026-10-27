@@ -57,6 +57,9 @@ export function StorySelect({ onBack, onChoose }: { onBack: () => void; onChoose
   );
 }
 
+const DIFF_WORD = { easy: 'easy', medium: 'medium', hard: 'hard' } as const;
+const GUIDE_WORD = { full: 'full aim guide', short: 'short aim guide', off: 'no aim guide' } as const;
+
 export function Tower({ fighterId, stage, onBack, onFight }: { fighterId: string; stage: number; onBack: () => void; onFight: () => void }) {
   const stages = buildTower(fighterId);
   const me = fighter(fighterId);
@@ -73,7 +76,7 @@ export function Tower({ fighterId, stage, onBack, onFight }: { fighterId: string
               <span className="grow">
                 <b>{i > stage + 1 && boss ? '???' : opp.name}</b>
                 <small>
-                  {ARENAS[s.arena].name} · {BOT_PROFILES[s.bot].label}
+                  {ARENAS[s.arena].name} · {BOT_PROFILES[s.bot].label} · {DIFF_WORD[s.difficulty]} map · {GUIDE_WORD[s.guide]}
                 </small>
               </span>
               {i < stage && <span className="pill ok">Beaten</span>}
@@ -126,7 +129,7 @@ export function Versus({ fighterId, stage, onGo }: { fighterId: string; stage: n
       </div>
       <p className="quote">“{opp.intro}”</p>
       <p className="arena-name">
-        Stage {stage + 1} · {ARENAS[s.arena].name} · tap to begin
+        Stage {stage + 1} · {ARENAS[s.arena].name} · {BOT_PROFILES[s.bot].label} · {DIFF_WORD[s.difficulty]} map · {GUIDE_WORD[s.guide]} · tap to begin
       </p>
     </div>
   );

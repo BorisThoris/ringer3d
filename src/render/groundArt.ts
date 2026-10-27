@@ -34,16 +34,25 @@ const mod = (a: number, n: number) => ((a % n) + n) % n;
 
 /** Value noise on a lattice that wraps every `period` cells (so the tile is seamless). */
 function vnoise(u: number, v: number, period: number, seed: number): number {
-  const x = u * period;
-  const y = v * period;
+  return vnoise2(u, v, period, period, seed);
+}
+
+/**
+ * Stretched value noise: `px` cells across, `py` cells down, each a whole number so the
+ * lattice still wraps at the tile's edges. (Scaling u or v before plain noise does not wrap,
+ * and left a seam at every tile edge.)
+ */
+function vnoise2(u: number, v: number, px: number, py: number, seed: number): number {
+  const x = u * px;
+  const y = v * py;
   const ix = Math.floor(x);
   const iy = Math.floor(y);
   const fx = fade(x - ix);
   const fy = fade(y - iy);
-  const x0 = mod(ix, period);
-  const y0 = mod(iy, period);
-  const x1 = mod(ix + 1, period);
-  const y1 = mod(iy + 1, period);
+  const x0 = mod(ix, px);
+  const y0 = mod(iy, py);
+  const x1 = mod(ix + 1, px);
+  const y1 = mod(iy + 1, py);
   const a = hash(x0, y0, seed);
   const b = hash(x1, y0, seed);
   const c = hash(x0, y1, seed);
@@ -127,7 +136,8 @@ const RECIPES: Record<ArenaId, Recipe> = {
     paint: (u, v) => {
       const warp = fbm(u, v, 2, 3, 1) * 0.08;
       const grain = Math.sin((v + warp) * Math.PI * 2 * 46 + fbm(u, v, 3, 3, 5) * 9);
-      const streak = vnoise(u * 0.25, v, 180, 9);
+      // Long streaks along the grain: few cells across, many down.
+      const streak = vnoise2(u, v, 45, 180, 9);
       const t = 0.5 + grain * 0.5;
       const c = mix(hex('#6f4c33'), hex('#86603f'), t * 0.6 + streak * 0.4);
       return { c, h: t * 0.5 + streak * 0.5 };
@@ -142,9 +152,10 @@ const RECIPES: Record<ArenaId, Recipe> = {
       const blot = fbm(u, v, 4, 4, 2);
       const grit = vnoise(u, v, 220, 3);
       const fleck = grit > 0.86 ? 0.88 : grit < 0.1 ? 1.06 : 1;
-      // Two slabs across the tile: a joint at each edge and one in the middle.
-      const ju = Math.min(mod(u, 0.5), 0.5 - mod(u, 0.5));
-      const jv = Math.min(mod(v, 0.5), 0.5 - mod(v, 0.5));
+      // Two slabs across the tile, joints a quarter in from each edge (so no joint runs
+      // along the line where one copy of the tile meets the next).
+      const ju = Math.min(mod(u - 0.25, 0.5), 0.5 - mod(u - 0.25, 0.5));
+      const jv = Math.min(mod(v - 0.25, 0.5), 0.5 - mod(v - 0.25, 0.5));
       const joint = 1 - smooth(0.002, 0.007, Math.min(ju, jv));
       let c = mix(hex('#8f8a82'), hex('#a09a91'), blot);
       c = shade(c, fleck * (1 - joint * 0.35));
@@ -158,7 +169,7 @@ const RECIPES: Record<ArenaId, Recipe> = {
     normalScale: 0.8,
     paint: (u, v) => {
       const stripe = smooth(0.42, 0.58, Math.abs(Math.sin(v * Math.PI * 2)));
-      const blades = vnoise(u, v * 0.25, 260, 4) * 0.6 + vnoise(u, v, 140, 5) * 0.4;
+      const blades = vnoise2(u, v, 260, 65, 4) * 0.6 + vnoise(u, v, 140, 5) * 0.4;
       const clover = smooth(0.62, 0.72, fbm(u, v, 5, 3, 6));
       let c = mix(hex('#4f9a37'), hex('#67b545'), stripe);
       c = mix(c, hex('#3f8a35'), clover * 0.5);
@@ -231,19 +242,18 @@ const RECIPES: Record<ArenaId, Recipe> = {
   },
 };
 
-const cache = new Map<ArenaId, GroundArt>();
-
-/** The field's ground: painted once, then shared. */
-export function groundArt(id: ArenaId): GroundArt {
-  const hit = cache.get(id);
-  if (hit) return hit;
+/**
+ * Paint a field's tile: colour (RGBA) and height. Exported so tests can check that every
+ * tile's edges meet seamlessly.
+ */
+export function paintGround(id: ArenaId, size: number): { color: Uint8ClampedArray; height: Float32Array } {
   const r = RECIPES[id];
-  const color = new Uint8ClampedArray(SIZE * SIZE * 4);
-  const height = new Float32Array(SIZE * SIZE);
-  for (let y = 0; y < SIZE; y++) {
-    for (let x = 0; x < SIZE; x++) {
-      const { c, h } = r.paint(x / SIZE, y / SIZE);
-      const i = y * SIZE + x;
+  const color = new Uint8ClampedArray(size * size * 4);
+  const height = new Float32Array(size * size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const { c, h } = r.paint(x / size, y / size);
+      const i = y * size + x;
       color[i * 4] = c[0];
       color[i * 4 + 1] = c[1];
       color[i * 4 + 2] = c[2];
@@ -251,6 +261,17 @@ export function groundArt(id: ArenaId): GroundArt {
       height[i] = h;
     }
   }
+  return { color, height };
+}
+
+const cache = new Map<ArenaId, GroundArt>();
+
+/** The field's ground: painted once, then shared. */
+export function groundArt(id: ArenaId): GroundArt {
+  const hit = cache.get(id);
+  if (hit) return hit;
+  const r = RECIPES[id];
+  const { color, height } = paintGround(id, SIZE);
   // Normals from the height field (wrapping, so the tile stays seamless).
   const normal = new Uint8ClampedArray(SIZE * SIZE * 4);
   const at = (x: number, y: number) => height[mod(y, SIZE) * SIZE + mod(x, SIZE)];
