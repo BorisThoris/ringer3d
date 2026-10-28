@@ -16,6 +16,9 @@ export interface MarbleLook {
   glow: number;
   /** A vivid colour that stands for this marble in the interface and the in-match cues. */
   ui?: string;
+  /** Generated collectibles (core/marbleGen.ts): the glass finish and glitter flecks 0..1. */
+  finish?: 'glass' | 'frosted' | 'pearl' | 'metallic' | 'glitter' | 'holo' | 'prism';
+  sparkle?: number;
 }
 
 /** The interface colour for a marble: its own, or the brighter of its feature colours. */

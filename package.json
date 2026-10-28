@@ -18,7 +18,10 @@
     "android": "npm run mobile:sync && cap open android",
     "ios": "npm run mobile:sync && cap open ios",
     "e2e:online": "node scripts/e2e-online.mjs",
-    "deploy": "npm run build && node scripts/keep-old-assets.mjs && wrangler deploy"
+    "deploy": "npm run build && node scripts/keep-old-assets.mjs && wrangler deploy",
+    "headless:build": "esbuild src/headless/cli.ts --bundle --platform=node --format=esm --target=node20 --outfile=dist-headless/ringer-headless.mjs --log-level=warning",
+    "headless": "node dist-headless/ringer-headless.mjs",
+    "export:roblox": "npm run headless:build && node roblox/scripts/export.mjs"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.3",

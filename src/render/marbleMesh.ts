@@ -318,6 +318,28 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
       break;
   }
 
+  // Glitter: generated collectibles carry flecks through the glass (galaxies have their own).
+  const sparkle = look.sparkle ?? 0;
+  if (sparkle > 0.02 && look.core !== 'galaxy') {
+    const count = Math.round((quality === 'low' ? 40 : 120) * sparkle);
+    const flake = cached(`flake-${r}`, () => new THREE.OctahedronGeometry(r * 0.018, 0));
+    const inst = new THREE.InstancedMesh(
+      flake,
+      new THREE.MeshStandardMaterial({ color: look.accent2, emissive: new THREE.Color(look.accent2), emissiveIntensity: 1.6, metalness: 0.7, roughness: 0.15 }),
+      count,
+    );
+    const m = new THREE.Matrix4();
+    const p = new THREE.Vector3();
+    for (let i = 0; i < count; i++) {
+      do p.set(rand() * 2 - 1, rand() * 2 - 1, rand() * 2 - 1);
+      while (p.lengthSq() > 1);
+      p.multiplyScalar(r * 0.85);
+      m.compose(p, new THREE.Quaternion().setFromEuler(new THREE.Euler(rand() * 6, rand() * 6, rand() * 6)), new THREE.Vector3(1, 1, 1).multiplyScalar(0.5 + rand()));
+      inst.setMatrixAt(i, m);
+    }
+    group.add(inst);
+  }
+
   // Bubbles: every glass marble has a few, clearies more.
   const bubbles = look.core === 'clearie' ? 9 : 3;
   const bubbleMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.05, metalness: 0.2 });
@@ -351,7 +373,9 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
           // toward the marble's own base, more so the less clear the glass is.
           // Tinted glass (the targets) takes its colour straight; clear glass only a touch.
           color: look.clarity < 0.5 ? tint.clone() : new THREE.Color('#ffffff').lerp(tint, 1 - look.clarity),
-          roughness: 0,
+          // Finishes of generated collectibles: frosted glass is matte, pearl and holo shimmer,
+          // prism splits the light into colours.
+          roughness: look.finish === 'frosted' ? 0.38 : 0,
           transmission: look.clarity,
           // three's transmission is screen-space: thickness sets how far the refracted image
           // shifts. A full diameter smears the interior to the rim; ~0.6r gives a real
@@ -361,10 +385,13 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
           attenuationColor: tint,
           // Tinted glass deepens its colour quickly; clear glass barely at all.
           attenuationDistance: look.core === 'clearie' ? r * 2.6 : look.clarity < 0.5 ? r * 2.2 : r * 7,
-          dispersion: quality === 'high' ? 0.35 : 0,
+          dispersion: quality === 'high' ? (look.finish === 'prism' ? 1.2 : 0.35) : 0,
           specularIntensity: 1,
           envMapIntensity: 1.15,
-          iridescence: look.core === 'opal' ? 1 : look.core === 'galaxy' ? 0.4 : 0,
+          iridescence: look.finish === 'holo' || look.finish === 'prism' || look.core === 'opal' ? 1 : look.finish === 'pearl' ? 0.6 : look.core === 'galaxy' ? 0.4 : 0,
+          sheen: look.finish === 'pearl' ? 1 : 0,
+          sheenColor: new THREE.Color(look.accent2),
+          metalness: look.finish === 'metallic' ? 0.35 : 0,
           iridescenceIOR: 1.6,
         });
   const shell = new THREE.Mesh(sphere(r, seg), glass);
