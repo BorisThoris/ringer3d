@@ -96,7 +96,8 @@ spawn.Material = Enum.Material.Neon
 spawn.Color = Color3.fromRGB(255, 120, 60)
 spawn.Duration = 0
 spawn.Parent = lobby
-Leaderboard.board(CFrame.new(0, 10, -45) * CFrame.Angles(0, 0, 0), lobby)
+-- The board's text is on its Front (-Z) face; turned round so it faces the spawn at +Z.
+Leaderboard.board(CFrame.new(0, 10, -45) * CFrame.Angles(0, math.pi, 0), lobby)
 
 -- ---- Matches ----------------------------------------------------------------------------------
 local tables: { [number]: any } = {} -- slot -> table
