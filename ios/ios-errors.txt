@@ -1,3 +1,0 @@
-2026-10-28 22:18:14.344 E  App[6716:676d] [com.apple.WebKit:ResourceLoadStatistics] Failed to request known fingerprinting scripts from WebPrivacy: Error Domain=WebPrivacyErrorDomain Code=1001 "List data not found" UserInfo={NSLocalizedDescription=List data not found}
-2026-10-28 22:18:14.831 Df App[6716:67a3] [com.apple.AppSSO:SOClient] configurationWithCompletion: success = YES, error = (null)
-2026-10-28 22:18:14.900 E  App[6716:67a3] [com.apple.TextInputUI:CandidateGeneration] Attempted to update accumulator from source type: 0, after completion has already been called for token:[5FE2322E]. This is an error and will be ignored.
