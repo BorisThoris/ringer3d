@@ -1,8 +1,0 @@
-10-28 16:17:24.796  2977  2977 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
-10-28 16:17:24.797  2977  2977 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
-10-28 16:17:24.802  2977  2977 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
-10-28 16:17:24.803  2977  2977 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
-10-28 16:17:26.974  2977  2977 W Capacitor/Console: File: https://localhost/assets/index-CYoc-6Qd.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
-10-28 16:17:41.003  2977  2977 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-10-28 16:17:45.884  2977  2977 I Capacitor/Console: File:  - Line 333 - Msg: undefined
-10-28 16:18:12.690  1052  4172 E JavaBinder: *** Uncaught remote exception! Exceptions are not yet supported across processes. Client PID 4065 UID 10118.
