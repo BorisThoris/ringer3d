@@ -80,7 +80,7 @@ for i = 0, 59 do
 	local a = i / 60 * math.pi * 2
 	lobbyPart({ Name = "Chalk", Size = Vector3.new(2.1, 0.08, 0.5), CFrame = CFrame.lookAt(Vector3.new(math.cos(a) * 20, 0.2, math.sin(a) * 20), Vector3.new(0, 0.2, 0)), Material = Enum.Material.SmoothPlastic, Color = Color3.fromRGB(245, 240, 230), CanCollide = false })
 end
-local showcase = { "obsidian", "aurora", "volt", "nova", "rime", "ember", "tide", "jade", "comet" }
+local showcase = { "obsidian", "aurora", "pumpkin", "volt", "nova", "rime", "ember", "tide", "comet" }
 for i, id in ipairs(showcase) do
 	local a = i / #showcase * math.pi * 2
 	local ball = MarbleLook.make(Config.MARBLE[id], 3)
@@ -88,6 +88,31 @@ for i, id in ipairs(showcase) do
 	ball.CFrame = CFrame.new(math.cos(a) * 11, 3, math.sin(a) * 11)
 	ball.Parent = lobby
 end
+-- Halloween: carved pumpkins glowing round the plaza's edge.
+for i = 0, 11 do
+	local a = i / 12 * math.pi * 2 + 0.26
+	local pos = Vector3.new(math.cos(a) * 62, 2.2, math.sin(a) * 62)
+	local pumpkin = lobbyPart({ Name = "Pumpkin", Shape = Enum.PartType.Ball, Size = Vector3.new(5, 4.4, 5), CFrame = CFrame.lookAt(pos, Vector3.new(0, 2.2, 0)), Material = Enum.Material.SmoothPlastic, Color = Color3.fromRGB(240, 110, 20) })
+	local glow = Instance.new("PointLight")
+	glow.Color = Color3.fromRGB(255, 170, 60)
+	glow.Range = 14
+	glow.Brightness = 1.6
+	glow.Parent = pumpkin
+	lobbyPart({ Name = "Stem", Size = Vector3.new(0.6, 1.2, 0.6), CFrame = CFrame.new(pos + Vector3.new(0, 2.6, 0)), Material = Enum.Material.Wood, Color = Color3.fromRGB(90, 70, 30) })
+	local face = Instance.new("SurfaceGui")
+	face.Face = Enum.NormalId.Front
+	face.LightInfluence = 0
+	face.Parent = pumpkin
+	local eyes = Instance.new("TextLabel")
+	eyes.Size = UDim2.fromScale(1, 1)
+	eyes.BackgroundTransparency = 1
+	eyes.Text = "▲ ▲\n◡◡◡"
+	eyes.TextScaled = true
+	eyes.Font = Enum.Font.FredokaOne
+	eyes.TextColor3 = Color3.fromRGB(255, 230, 120)
+	eyes.Parent = face
+end
+
 local spawn = Instance.new("SpawnLocation")
 spawn.Anchored = true
 spawn.Size = Vector3.new(10, 1, 10)

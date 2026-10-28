@@ -51,6 +51,10 @@ Kit.round(coinIcon, 17)
 Kit.stroke(coinIcon, Kit.INK, 2)
 local coinText = Kit.label("0", 28, { Position = UDim2.fromOffset(48, 6), Size = UDim2.new(1, -56, 0, 38), TextXAlignment = Enum.TextXAlignment.Left, Parent = coinPill })
 
+-- The live event, under the coins.
+local event = Kit.label("🎃 HALLOWEEN: the Jack-o'-Marble Limited is in Marble Bags!", 20, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 62), Size = UDim2.fromOffset(620, 28), TextColor3 = Color3.fromRGB(255, 170, 60), Parent = hud })
+event.TextWrapped = false
+
 local side = Kit.new("Frame", { Position = UDim2.new(0, 12, 0.5, -170), Size = UDim2.fromOffset(150, 340), BackgroundTransparency = 1, Parent = hud })
 Kit.new("UIListLayout", { Padding = UDim.new(0, 10), Parent = side })
 

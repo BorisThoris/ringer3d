@@ -135,6 +135,8 @@ Config.MARBLES = {
 	m("prism", "Prism", "Exclusive", rgb(240, 240, 255), rgb(255, 90, 220), Enum.Material.Glass, 0.15, 0.9, { source = "premium" }),
 	m("aurora", "Aurora", "Limited", rgb(20, 40, 60), rgb(80, 255, 170), Enum.Material.Glass, 0.2, 1, { supply = 500 }),
 	m("comet", "Comet", "Limited", rgb(250, 250, 255), rgb(90, 160, 255), Enum.Material.Glass, 0.25, 0.9, { supply = 1500 }),
+	-- Halloween 2026: a numbered pumpkin marble, only in Marble Bags while the event lasts.
+	m("pumpkin", "Jack-o'-Marble", "Limited", rgb(255, 120, 20), rgb(255, 230, 90), Enum.Material.Glass, 0.2, 1, { supply = 1000, event = "halloween" }),
 	m("ruby", "Ruby Heart", "Legendary", rgb(150, 0, 30), rgb(255, 60, 90), Enum.Material.Glass, 0.2, 0.7, {}),
 	m("moss", "Moss Agate", "Rare", rgb(80, 120, 70), rgb(200, 230, 150), Enum.Material.Glass, 0.3, 0.1, {}),
 	m("sunset", "Sunset", "Epic", rgb(255, 150, 70), rgb(255, 60, 120), Enum.Material.Glass, 0.25, 0.6, {}),
@@ -173,7 +175,7 @@ Config.BAG_ODDS = {
 	{ rarity = "Rare", weight = 27, pool = { "rime", "ironside", "moss" } },
 	{ rarity = "Epic", weight = 9, pool = { "volt", "sunset" } },
 	{ rarity = "Legendary", weight = 3, pool = { "ruby" } },
-	{ rarity = "Limited", weight = 1, pool = { "aurora", "comet" } },
+	{ rarity = "Limited", weight = 1, pool = { "aurora", "comet", "pumpkin" } },
 }
 -- A duplicate is worth this share of its rarity's value back in coins.
 Config.DUPLICATE_COINS = { Common = 40, Rare = 120, Epic = 300, Legendary = 800, Limited = 0, Exclusive = 0 }

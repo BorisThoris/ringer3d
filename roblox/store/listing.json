@@ -1,23 +1,23 @@
 {
-  "name": "Ringer 3D 🔮 Marble Duels",
-  "description": "Flick your shooter, knock marbles out of the ring, keep what you capture!\n\n🎯 Classic Ringer: 13 marbles in a cross. Knock one out and stay inside the ring to shoot again.\n⚔️ Duel players on your server, practise against 8 bot levels, or climb THE TOWER: eight floors on six fields up to the Black Taw.\n🔮 Collect marbles: Ember, Volt, Nova, Obsidian and more. LIMITED marbles carry serial numbers: only 500 Auroras will ever exist!\n🎒 Marble Bags with every drop rate shown in the shop.\n🏆 Global leaderboard, badges and a daily reward streak.\n👑 VIP: double coins, the Golden Taw and a VIP chat tag. Roblox Premium members get the Prism marble and +25% coins.\n\n🕹️ Controls: press, pull back and let go. Works on phone, tablet and PC.\n\nNew fields and marbles every update. Favourite ⭐ to get them first!",
-  "genre": "Sports",
+  "name": "[🎃] Marble DUELS 🔮",
+  "description": "Marble DUELS! Flick your marble, knock marbles out of the ring and keep every one you capture. 1v1 PvP or vs bots!\n\n🎃 HALLOWEEN EVENT: the Jack-o'-Marble LIMITED is in Marble Bags. Only 1,000 will ever exist, each one serial numbered!\n\n⚔️ 1v1 DUELS against players on your server\n🤖 Play vs bots: 8 levels from Rookie to Legend\n🏰 THE TOWER: 8 floors on 6 fields, then the Black Taw boss\n🔮 Collect marbles: Ember, Volt, Nova, Obsidian, Ruby Heart and more\n💎 LIMITED marbles with serial numbers: Aurora (500), Comet (1,500), Jack-o'-Marble (1,000)\n🎒 Marble Bags with every drop rate shown in the shop\n🏆 Global leaderboard, 5 badges, daily reward streak\n👑 VIP: 2x coins, the Golden Taw and a VIP chat tag\n⭐ Roblox Premium: free Prism marble and +25% coins\n\n🕹️ Controls: press, pull back and let go. Phone, tablet and PC.\n\n📜 Updates\n28 Oct 2026: Halloween event, Jack-o'-Marble Limited, pumpkins in the lobby.\n\nLike 👍 and favourite ⭐ for new marbles and fields every update!",
   "devices": ["Computer", "Phone", "Tablet"],
   "passes": {
-    "vip": { "name": "VIP 👑", "description": "Double coins from every game, the Golden Taw marble and a gold VIP tag in chat.", "price": 199 },
-    "trails": { "name": "Shot Trails ✨", "description": "Every shot you take leaves a glowing trail in your marble's colour.", "price": 99 }
+    "vip": { "name": "👑 VIP", "description": "2x coins from every game, the Golden Taw marble and a gold [VIP] tag in chat.", "price": 199 },
+    "trails": { "name": "✨ Shot Trails", "description": "Every shot leaves a glowing trail in your marble's colour.", "price": 99 }
   },
   "products": {
-    "coins500": { "name": "500 Coins", "description": "500 coins for marbles and Marble Bags.", "price": 49 },
-    "coins1500": { "name": "1,500 Coins", "description": "1,500 coins for marbles and Marble Bags. Best for a new collection.", "price": 129 },
-    "coins5000": { "name": "5,000 Coins", "description": "5,000 coins: the collector's stack.", "price": 349 },
-    "bag": { "name": "Marble Bag", "description": "Open one Marble Bag now. Drop rates: Common 60%, Rare 27%, Epic 9%, Legendary 3%, Limited 1%.", "price": 25 }
+    "coins500": { "name": "💰 500 Coins", "description": "500 coins for marbles and Marble Bags.", "price": 49 },
+    "coins1500": { "name": "💰 1,500 Coins", "description": "1,500 coins for marbles and Marble Bags. Popular!", "price": 129 },
+    "coins5000": { "name": "💰 5,000 Coins", "description": "5,000 coins: the collector's stack. Best value!", "price": 349 },
+    "bag": { "name": "🎒 Marble Bag", "description": "Open one Marble Bag now. Drop rates: Common 60%, Rare 27%, Epic 9%, Legendary 3%, Limited 1%.", "price": 25 }
   },
   "badges": {
-    "welcome": { "name": "Knuckle Down", "description": "Join Ringer 3D for the first time." },
+    "welcome": { "name": "Knuckle Down", "description": "Join Marble DUELS for the first time." },
     "firstWin": { "name": "First Ring", "description": "Win your first game." },
     "towerTop": { "name": "Black Taw Breaker", "description": "Beat the Black Taw at the top of the Tower." },
     "limited": { "name": "Numbered", "description": "Own a Limited marble with a serial number." },
     "sweep": { "name": "Clean Sweep", "description": "Capture all 13 marbles in one game." }
-  }
+  },
+  "thumbnails": ["thumb-1-halloween.jpg", "thumb-2-duels.jpg", "thumb-3-limited.jpg", "thumb-4-tower.jpg", "thumb-5-pvp.jpg"]
 }
