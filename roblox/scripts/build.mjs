@@ -47,9 +47,16 @@ function node(dir) {
     statSync(init);
     return item('ModuleScript', basename(dir), `<ProtectedString name="Source">${cdata(readFileSync(init, 'utf8'))}</ProtectedString>`, children(dir));
   } catch {
-    return item('Folder', basename(dir), '', children(dir));
+    // These containers are real classes, not Folders: Roblox only runs LocalScripts that sit
+    // in the actual StarterPlayerScripts / StarterCharacterScripts. As a Folder, the whole
+    // client (HUD, Play button, aiming) silently never starts.
+    const name = basename(dir);
+    const cls = CONTAINER_CLASSES.has(name) ? name : 'Folder';
+    return item(cls, name, '', children(dir));
   }
 }
+
+const CONTAINER_CLASSES = new Set(['StarterPlayerScripts', 'StarterCharacterScripts']);
 
 // The pass, product and badge ids made on the Creator Hub (store/ids.json) become a generated
 // ReplicatedStorage.Ringer.Ids module that Config reads.
