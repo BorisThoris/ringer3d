@@ -20,7 +20,13 @@ collectibles and Robux.
 | `store/listing.json` | Store page text, passes, products and badges (names, descriptions, prices) |
 | `store/ids.json` | The ids those got on the Creator Hub; the build turns them into `Ringer.Ids` |
 | `scripts/` | `build.mjs` (src to place file), `publish.mjs`, `run-luau.mjs`, `cloud.mjs` |
+| `lighting.json` | The place's Lighting (Future, bloom, colour grading), written in by `build.mjs` |
+| `scripts/creator-hub/` | Creator Hub steps run through the signed-in browser: universe, key, monetization, store page, genre, thumbnails |
+| `scripts/shots/` | Real in-game screenshots off-screen: Studio in a private window station + `CaptureService` |
 | `tests/smoke.luau` | Cloud test: everything compiles, the server boots, rules, bot, tables, bag odds |
+| `store/art/` | Icon, thumbnails (with alt text), badge/pass/product images; `ingame/` real frames |
+| `art-pipeline/` | How the store art was made: local SDXL renders + outlined text with sharp |
+| `research/` | Why the store page and the look are what they are: search and genre data, the top earners' style |
 
 ## Build, test, publish
 

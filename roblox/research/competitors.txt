@@ -1,0 +1,84 @@
+﻿
+== marble (200, 10)
+ 976568  3882344   Steal An Egg
+   1031    14746   Huge Marble Slide
+    157    52261   BE A BALL
+     38   140592   Mega Marble Run Pit [Read Desc]
+    132     3336   Marble Race Creator
+     29   171514   Marble Mania
+    147    61651   Build a Marble Slide!
+     27     4156   Marble Racing With 100 Marbles!
+      8      316   Marble Rush Mania 🔮
+     44   126051   Marble Run Tycoon 2
+
+== marbles (200, 10)
+    687     4116   Skyblock🏝️
+   1018    14746   Huge Marble Slide
+    132     3336   Marble Race Creator
+    851    20187   Fall Off A Building
+    157    52261   BE A BALL
+     38   140592   Mega Marble Run Pit [Read Desc]
+     27     4156   Marble Racing With 100 Marbles!
+    659     8753    [🎃] +1 Black Hole Mass
+     17      122   Race Marbles! 
+   1638   935145   Break your Bones ☠️
+
+== marble game (200, 10)
+   1018    14747   Huge Marble Slide
+     38   140592   Mega Marble Run Pit [Read Desc]
+    155    52261   BE A BALL
+     17      121   Race Marbles! 
+    147    61651   Build a Marble Slide!
+     86    30584   Drive the ball to the end
+    132     3336   Marble Race Creator
+      8      316   Marble Rush Mania 🔮
+     44   126051   Marble Run Tycoon 2
+     26     1049   Marble Run Machine
+
+== marble duel (200, 10)
+    895     1831   Funky Duels! [FNF]
+  15151    10759   Steel Fighters
+  12909   332766   [🎃] KNIFE DUELS
+   5497    47611   [🎃] Murder Mystery DUELS
+   3739    11954   [UPD] 8 Ball Duels
+    638     3100   RIFLE DUELS
+  11432   144725   [🎃UPD] Knife VS Gun DUELS
+   1018    14747   Huge Marble Slide
+   1510   140963   Samurai DUELS
+   3968    84999   [🎃] Traitor VS Sheriff DUELS
+
+== marble simulator (200, 10)
+     31   171514   Marble Mania
+      8    12459   Marble Run Simulator
+     44   126051   Marble Run Tycoon 2
+    132     3336   Marble Race Creator
+     27     4156   Marble Racing With 100 Marbles!
+    155    52261   BE A BALL
+     14    11502   Marble Chaos!
+     38   140592   Mega Marble Run Pit [Read Desc]
+      4      801   Marble Droppers
+      8      316   Marble Rush Mania 🔮
+
+== marble pvp (200, 10)
+     17      122   Race Marbles! 
+     26      974   🔨 MACE PVP ⚔️
+  22236    18285   RoWorld [World PvP]
+   1018    14747   Huge Marble Slide
+    863      241   Unstable PVP Simulations [NULL UPDATE]
+    303       40   [ ⚔️ ] 1.8 KIT PVP
+      4      944   Valkadia PVP 🌸
+   5919     1003   [🩸PVP🩸] Realistic Ragdoll Playground 💥
+     29   171514   Marble Mania
+  16751   342523   [🎃] Ball VS Ball
+
+== flick (200, 10)
+   2286   360135   [FPS] Flick
+      0     1131   [😂TROLL] Verity’s Troll Tower
+  18722   232929   [FPS] One Tap
+      0        7   [MASSIVE UPDATE!] Flick Ball⚽
+ 148185 10886078   [🎃] RIVALS
+    733     3487   [FPS] FLING
+  10960    90760   [🎃PASS] Deagle Arena
+    675    11661   [FPS] Aura Edit Arena
+  22830  1916794   🔥Hypershot
+    543     9472   [🎯FPS] Rocket Rumble
