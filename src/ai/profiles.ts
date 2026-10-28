@@ -31,6 +31,6 @@ export const BOT_PROFILES: Record<string, BotProfile> = {
   regular: { id: 'regular', label: 'Regular', aimErrorDeg: 3.4, powerError: 0.095, candidates: 24, usesSpin: true, positional: 0.35, blunder: 0.15, thinkMs: [750, 1500] },
   skilled: { id: 'skilled', label: 'Skilled', aimErrorDeg: 2.8, powerError: 0.08, candidates: 30, usesSpin: true, positional: 0.5, blunder: 0.1, thinkMs: [800, 1600] },
   expert: { id: 'expert', label: 'Expert', aimErrorDeg: 1.8, powerError: 0.05, candidates: 56, usesSpin: true, positional: 0.85, blunder: 0.04, thinkMs: [900, 1700] },
-  master: { id: 'master', label: 'Master', aimErrorDeg: 1.5, powerError: 0.042, candidates: 72, usesSpin: true, positional: 0.95, blunder: 0.02, thinkMs: [1000, 1900] },
+  master: { id: 'master', label: 'Master', aimErrorDeg: 1.75, powerError: 0.049, candidates: 64, usesSpin: true, positional: 0.95, blunder: 0.04, thinkMs: [1000, 1900] },
   legend: { id: 'legend', label: 'Legend', aimErrorDeg: 0.55, powerError: 0.016, candidates: 160, usesSpin: true, positional: 1.4, blunder: 0.0, thinkMs: [1100, 2000] },
 };

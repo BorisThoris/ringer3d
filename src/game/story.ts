@@ -176,7 +176,7 @@ const STAGE_GUIDE: GuideMode[] = ['full', 'full', 'full', 'short', 'short', 'sho
  */
 const seriesOn = (arena: ArenaId) => (arena === 'ice' ? 2 : 1);
 
-const STAGE_DIFFICULTY: Difficulty[] = ['easy', 'easy', 'medium', 'medium', 'medium', 'hard', 'hard', 'hard'];
+const STAGE_DIFFICULTY: Difficulty[] = ['easy', 'easy', 'medium', 'medium', 'hard', 'hard', 'hard', 'hard'];
 
 /**
  * The tower: seven challengers then the Black Taw. Opponents matching your own fighter are
