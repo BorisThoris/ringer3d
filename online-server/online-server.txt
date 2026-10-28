@@ -1,3 +1,5 @@
-[server] room code YBSX
+[server] room code TFYB
 [server] room listed in browser: true
-FAIL [server]: host never saw the guest ready
+[server] host roster: Room code | Host | Connected peer to peer
+[server] shot logs identical: true (6 shots compared)
+PASS [server]
