@@ -190,23 +190,32 @@ Config.VIP_MULTIPLIER = 2
 Config.PREMIUM_MULTIPLIER = 1.25
 
 -- ---- Ids made on the Creator Hub (0 = not made yet: the feature hides itself) ------------
+-- The build generates the Ids module from roblox/store/ids.json.
+local ids = { passes = {}, products = {}, badges = {} }
+local idsModule = script.Parent:FindFirstChild("Ids")
+if idsModule then
+	ids = require(idsModule) :: any
+end
+local function idOf(group, name)
+	return ids[group][name] or 0
+end
 Config.PASSES = {
-	vip = 0, -- 2x coins, the Golden Taw, a VIP chat tag
-	trails = 0, -- a glowing trail on every shot
+	vip = idOf("passes", "vip"), -- 2x coins, the Golden Taw, a VIP chat tag
+	trails = idOf("passes", "trails"), -- a glowing trail on every shot
 }
 Config.PRODUCTS = {
-	coins500 = 0,
-	coins1500 = 0,
-	coins5000 = 0,
-	bag = 0, -- open one Marble Bag now
+	coins500 = idOf("products", "coins500"),
+	coins1500 = idOf("products", "coins1500"),
+	coins5000 = idOf("products", "coins5000"),
+	bag = idOf("products", "bag"), -- open one Marble Bag now
 }
 Config.PRODUCT_COINS = { coins500 = 500, coins1500 = 1500, coins5000 = 5000 }
 Config.BADGES = {
-	welcome = 0,
-	firstWin = 0,
-	towerTop = 0,
-	limited = 0,
-	sweep = 0, -- win 13-0 (every marble in the ring)
+	welcome = idOf("badges", "welcome"),
+	firstWin = idOf("badges", "firstWin"),
+	towerTop = idOf("badges", "towerTop"),
+	limited = idOf("badges", "limited"),
+	sweep = idOf("badges", "sweep"), -- capture all 13 in one game
 }
 
 return Config
