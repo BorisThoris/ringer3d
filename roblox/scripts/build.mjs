@@ -79,6 +79,17 @@ let services = readdirSync(src)
   })
   .join('');
 
+// Lighting comes from lighting.json: a few properties (Technology) can only be set in the file.
+function props(o) {
+  return Object.entries(o)
+    .map(([k, [type, v]]) => (type === 'Color3' ? `<Color3 name="${k}"><R>${v[0] / 255}</R><G>${v[1] / 255}</G><B>${v[2] / 255}</B></Color3>` : `<${type} name="${k}">${v}</${type}>`))
+    .join('');
+}
+{
+  const l = JSON.parse(readFileSync(join(root, 'lighting.json'), 'utf8'));
+  services += item('Lighting', 'Lighting', props(l.Lighting), l.children.map(([cls, name, p]) => item(cls, name, props(p))).join(''));
+}
+
 // Test builds (CHECK=1) also carry every Script and LocalScript as a ModuleScript under
 // ServerStorage.SyntaxCheck, so a cloud test can compile them all (a cloud server never runs
 // LocalScripts) and report syntax errors with line numbers.

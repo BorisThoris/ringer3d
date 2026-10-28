@@ -1,7 +1,7 @@
--- Build one table's field: the ground in the field's material, the chalk ring, a kerb you can
--- see carried up as a wall you can't (so no marble ever leaves the field: the web game's
--- 2026-10-28 lesson), backstops just outside the ring that can bounce marbles back in, and a
--- stand for each player.
+-- Build one table's field: the ground with a lighter disc inside the ring, the chalk ring, a
+-- candy-striped bumper carried up as a wall you can't see (so no marble ever leaves the field:
+-- the web game's 2026-10-28 lesson), toy-block backstops just outside the ring that can bounce
+-- marbles back in, a podium for each player, and round toy trees beyond the bumper.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Ringer.Config)
@@ -37,6 +37,20 @@ function Arena.build(origin: Vector3, arena: Config.Arena, seats: number, rng: R
 		CustomPhysicalProperties = PhysicalProperties.new(2, arena.friction, 0.3, 1, 1),
 		Parent = folder,
 	})
+	-- The lighter disc inside the ring: paint only, nothing touches it.
+	part({
+		Name = "Inner",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.04, R * 2, R * 2),
+		CFrame = CFrame.new(origin + Vector3.new(0, 0.02, 0)) * CFrame.Angles(0, 0, math.pi / 2),
+		Material = Enum.Material.SmoothPlastic,
+		Color = arena.inner,
+		CanCollide = false,
+		CanQuery = false,
+		CanTouch = false,
+		CastShadow = false,
+		Parent = folder,
+	})
 
 	-- The kerb ring, and the invisible wall standing on it.
 	local segs = 64
@@ -49,8 +63,8 @@ function Arena.build(origin: Vector3, arena: Config.Arena, seats: number, rng: R
 			Name = "Kerb",
 			Size = Vector3.new(segLen, 2.4, 2),
 			CFrame = facing * CFrame.new(0, 1.2, 0),
-			Material = Enum.Material.Concrete,
-			Color = arena.kerb,
+			Material = Enum.Material.SmoothPlastic,
+			Color = arena.kerb[i % #arena.kerb + 1],
 			CustomPhysicalProperties = PhysicalProperties.new(2, 0.4, 0.35, 1, 1),
 			Parent = folder,
 		})
@@ -73,7 +87,7 @@ function Arena.build(origin: Vector3, arena: Config.Arena, seats: number, rng: R
 		local at = origin + Vector3.new(math.cos(a) * R, 0.03, math.sin(a) * R)
 		part({
 			Name = "Line",
-			Size = Vector3.new(lineLen, 0.06, 0.45),
+			Size = Vector3.new(lineLen, 0.06, 0.7),
 			CFrame = CFrame.lookAt(at, Vector3.new(origin.X, at.Y, origin.Z)),
 			Material = Enum.Material.SmoothPlastic,
 			Color = arena.line,
@@ -97,7 +111,7 @@ function Arena.build(origin: Vector3, arena: Config.Arena, seats: number, rng: R
 			Size = arena.backstop.size,
 			CFrame = CFrame.lookAt(at, Vector3.new(origin.X, at.Y, origin.Z)),
 			Material = arena.backstop.material,
-			Color = arena.backstop.color,
+			Color = arena.backstop.colors[k % #arena.backstop.colors + 1],
 			CustomPhysicalProperties = PhysicalProperties.new(3, 0.4, 0.55, 1, 1),
 			Parent = folder,
 		})
@@ -110,13 +124,38 @@ function Arena.build(origin: Vector3, arena: Config.Arena, seats: number, rng: R
 		local at = origin + Vector3.new(math.cos(a) * (B + 9), 0, math.sin(a) * (B + 9))
 		part({
 			Name = "Stand",
-			Size = Vector3.new(8, 1, 8),
-			CFrame = CFrame.new(at + Vector3.new(0, 0.5, 0)),
-			Material = Enum.Material.WoodPlanks,
-			Color = Color3.fromRGB(90, 70, 50),
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(1, 9, 9),
+			CFrame = CFrame.new(at + Vector3.new(0, 0.5, 0)) * CFrame.Angles(0, 0, math.pi / 2),
+			Material = Enum.Material.SmoothPlastic,
+			Color = s == 1 and Color3.fromRGB(60, 150, 255) or Color3.fromRGB(255, 75, 75),
 			Parent = folder,
 		})
 		table.insert(stands, CFrame.lookAt(at + Vector3.new(0, 4, 0), Vector3.new(origin.X, origin.Y + 4, origin.Z)))
+	end
+
+	-- Round toy trees beyond the bumper: a trunk and a ball, nothing a marble can reach.
+	-- Their own Random, so the decor never shifts the table's dice; none behind a podium, where
+	-- the player's camera sits.
+	local decor = Random.new(math.floor(origin.X * 7 + origin.Z))
+	for k = 0, 13 do
+		local a = (k + 0.5) / 14 * math.pi * 2
+		local clear = true
+		for s = 1, seats do
+			local sa = math.pi / 2 + (s - 1) / seats * math.pi * 2
+			if math.abs(math.atan2(math.sin(a - sa), math.cos(a - sa))) < 0.6 then
+				clear = false
+			end
+		end
+		if not clear then
+			continue
+		end
+		local d = B + 16 + decor:NextNumber() * 6
+		local at = origin + Vector3.new(math.cos(a) * d, 0, math.sin(a) * d)
+		local h = 5 + decor:NextNumber() * 3
+		part({ Name = "Trunk", Size = Vector3.new(1.4, h, 1.4), CFrame = CFrame.new(at + Vector3.new(0, h / 2, 0)), Material = Enum.Material.SmoothPlastic, Color = Color3.fromRGB(150, 95, 55), CanCollide = false, Parent = folder })
+		local c = 7 + decor:NextNumber() * 3
+		part({ Name = "Crown", Shape = Enum.PartType.Ball, Size = Vector3.new(c, c, c), CFrame = CFrame.new(at + Vector3.new(0, h + c * 0.35, 0)), Material = Enum.Material.SmoothPlastic, Color = arena.trees, CanCollide = false, Parent = folder })
 	end
 
 	folder.Parent = parent

@@ -20,7 +20,7 @@ Kit.BLUE = Color3.fromRGB(60, 150, 255)
 Kit.PURPLE = Color3.fromRGB(150, 90, 240)
 Kit.GOLD = Color3.fromRGB(255, 200, 60)
 Kit.RED = Color3.fromRGB(240, 70, 80)
-Kit.PANEL = Color3.fromRGB(40, 32, 56)
+Kit.PANEL = Color3.fromRGB(45, 95, 200)
 
 function Kit.new(class: string, props: { [string]: any }?, children: { Instance }?): any
 	local i = Instance.new(class)
@@ -113,7 +113,8 @@ function Kit.panel(screen: Instance, title: string, size: UDim2, onClose: (() ->
 	})
 	Kit.round(panel, 22)
 	Kit.stroke(panel, Kit.INK, 4)
-	Kit.new("UIGradient", { Color = ColorSequence.new(Color3.fromRGB(70, 56, 100), Color3.fromRGB(36, 28, 52)), Rotation = 90, Parent = panel })
+	-- Bright blue panels, lighter at the top, as in the top-earning games.
+	Kit.new("UIGradient", { Color = ColorSequence.new(Color3.fromRGB(120, 190, 255), Color3.fromRGB(50, 110, 225)), Rotation = 90, Parent = panel })
 	Kit.new("UISizeConstraint", { MaxSize = Vector2.new(980, 680), Parent = panel })
 	local head = Kit.label(title, 34, { Position = UDim2.fromOffset(0, 10), Size = UDim2.new(1, 0, 0, 44), Parent = panel })
 	head.ZIndex = 2
@@ -201,6 +202,36 @@ function Kit.toast(screen: Instance, text: string, kind: string?)
 		TweenService:Create(t, TweenInfo.new(0.4), { BackgroundTransparency = 1, TextTransparency = 1 }):Play()
 		task.wait(0.45)
 		t:Destroy()
+	end)
+end
+
+--- 12500 -> "12,500".
+function Kit.comma(n: number): string
+	local s = tostring(math.floor(n))
+	local out = s:reverse():gsub("(%d%d%d)", "%1,"):reverse()
+	return (out:gsub("^,", ""))
+end
+
+--- A vertical gradient over a label's text: the gold numbers of the top games.
+function Kit.gradient(label: Instance, top: Color3, bottom: Color3)
+	return Kit.new("UIGradient", { Color = ColorSequence.new(top, bottom), Rotation = 90, Parent = label })
+end
+
+--- A "+N" that pops up from a spot on screen and floats away.
+function Kit.popup(screen: Instance, text: string, at: UDim2, color: Color3?)
+	local l = Kit.label(text, 34, { AnchorPoint = Vector2.new(0.5, 0.5), Position = at, Size = UDim2.fromOffset(240, 44), ZIndex = 20, Parent = screen })
+	Kit.gradient(l, Color3.fromRGB(255, 250, 170), color or Kit.GOLD)
+	local s = Kit.new("UIScale", { Scale = 0.3, Parent = l })
+	TweenService:Create(s, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Scale = 1.15 }):Play()
+	TweenService:Create(l, TweenInfo.new(1.2, Enum.EasingStyle.Quad), { Position = at + UDim2.fromOffset(0, -70) }):Play()
+	task.delay(0.9, function()
+		TweenService:Create(l, TweenInfo.new(0.35), { TextTransparency = 1 }):Play()
+		local st = l:FindFirstChildOfClass("UIStroke")
+		if st then
+			TweenService:Create(st, TweenInfo.new(0.35), { Transparency = 1 }):Play()
+		end
+		task.wait(0.4)
+		l:Destroy()
 	end)
 end
 

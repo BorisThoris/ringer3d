@@ -3,7 +3,6 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Lighting = game:GetService("Lighting")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local Config = require(ReplicatedStorage.Ringer.Config)
@@ -42,63 +41,162 @@ Market.bagOpened = function(player, got)
 end
 
 -- ---- The world --------------------------------------------------------------------------------
-Lighting.ClockTime = 14.5
-Lighting.Brightness = 2.2
-Lighting.EnvironmentDiffuseScale = 0.6
-Lighting.EnvironmentSpecularScale = 0.7
-Lighting.OutdoorAmbient = Color3.fromRGB(150, 140, 160)
-local bloom = Instance.new("BloomEffect")
-bloom.Intensity = 0.6
-bloom.Size = 30
-bloom.Threshold = 1.4
-bloom.Parent = Lighting
-local cc = Instance.new("ColorCorrectionEffect")
-cc.Saturation = 0.12
-cc.Contrast = 0.06
-cc.Parent = Lighting
+-- Lighting (Future, bloom, saturation, a bright sky) is in the place file: see lighting.json.
+-- The lobby follows the top-earning games' look: flat saturated toy colours, a giant mascot,
+-- the collectibles on show with rarity labels, big outlined gradient text.
+local RunService = game:GetService("RunService")
+local rgb = Color3.fromRGB
 
 local lobby = Instance.new("Model")
 lobby.Name = "Lobby"
 lobby.Parent = workspace
 
-local function lobbyPart(props)
+local function lobbyPart(props, parent: Instance?)
 	local p = Instance.new("Part")
 	p.Anchored = true
 	p.TopSurface = Enum.SurfaceType.Smooth
 	p.BottomSurface = Enum.SurfaceType.Smooth
+	p.Material = Enum.Material.SmoothPlastic
 	for k, v in pairs(props) do
 		(p :: any)[k] = v
 	end
-	p.Parent = lobby
+	p.Parent = parent or lobby
 	return p
 end
 
--- A round plaza with a giant ring of giant marbles in the middle: the lobby is the game's poster.
-lobbyPart({ Name = "Plaza", Shape = Enum.PartType.Cylinder, Size = Vector3.new(2, 150, 150), CFrame = CFrame.new(0, -1, 0) * CFrame.Angles(0, 0, math.pi / 2), Material = Enum.Material.Pavement, Color = Color3.fromRGB(120, 110, 130) })
-lobbyPart({ Name = "Rug", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.2, 64, 64), CFrame = CFrame.new(0, 0.05, 0) * CFrame.Angles(0, 0, math.pi / 2), Material = Enum.Material.Fabric, Color = Color3.fromRGB(150, 60, 50) })
+local function disc(name: string, radius: number, y: number, color: Color3, thick: number?)
+	return lobbyPart({ Name = name, Shape = Enum.PartType.Cylinder, Size = Vector3.new(thick or 0.2, radius * 2, radius * 2), CFrame = CFrame.new(0, y, 0) * CFrame.Angles(0, 0, math.pi / 2), Color = color })
+end
+
+--- Big outlined text with a gradient, the way the top games letter everything.
+local function bigText(parent: Instance, text: string, colors: { Color3 }, size: Vector2, offset: Vector3?)
+	local gui = Instance.new("BillboardGui")
+	gui.Size = UDim2.fromScale(size.X, size.Y)
+	gui.StudsOffset = offset or Vector3.zero
+	gui.LightInfluence = 0
+	gui.MaxDistance = 400
+	gui.Parent = parent
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.fromScale(1, 1)
+	label.BackgroundTransparency = 1
+	label.Text = text
+	label.TextScaled = true
+	label.Font = Enum.Font.FredokaOne
+	label.TextColor3 = Color3.new(1, 1, 1)
+	label.Parent = gui
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = rgb(30, 22, 40)
+	stroke.Thickness = 4
+	stroke.Parent = label
+	local keys = {}
+	for i, c in ipairs(colors) do
+		table.insert(keys, ColorSequenceKeypoint.new((i - 1) / math.max(1, #colors - 1), c))
+	end
+	local grad = Instance.new("UIGradient")
+	grad.Color = ColorSequence.new(keys)
+	grad.Rotation = 90
+	grad.Parent = label
+	return label
+end
+
+-- Ground: a lawn, a cream plaza, and the sky-blue ring pad in the middle.
+disc("Lawn", 110, -1.1, rgb(85, 200, 75), 2)
+disc("Plaza", 46, -0.02, rgb(255, 214, 160))
+disc("PadRim", 25.2, 0, rgb(255, 255, 255))
+disc("Pad", 24, 0.02, rgb(70, 160, 255))
 for i = 0, 59 do
 	local a = i / 60 * math.pi * 2
-	lobbyPart({ Name = "Chalk", Size = Vector3.new(2.1, 0.08, 0.5), CFrame = CFrame.lookAt(Vector3.new(math.cos(a) * 20, 0.2, math.sin(a) * 20), Vector3.new(0, 0.2, 0)), Material = Enum.Material.SmoothPlastic, Color = Color3.fromRGB(245, 240, 230), CanCollide = false })
+	lobbyPart({ Name = "Chalk", Size = Vector3.new(2.3, 0.08, 0.8), CFrame = CFrame.lookAt(Vector3.new(math.cos(a) * 19, 0.15, math.sin(a) * 19), Vector3.new(0, 0.15, 0)), Color = rgb(255, 255, 255), CanCollide = false })
 end
+-- Coloured tiles round the plaza's edge.
+local tileColors = { rgb(255, 90, 90), rgb(255, 205, 50), rgb(70, 200, 120), rgb(70, 160, 255), rgb(170, 100, 255) }
+for i = 0, 39 do
+	local a = i / 40 * math.pi * 2
+	lobbyPart({ Name = "Tile", Size = Vector3.new(6.6, 0.3, 4), CFrame = CFrame.lookAt(Vector3.new(math.cos(a) * 44, 0, math.sin(a) * 44), Vector3.new(0, 0, 0)), Color = tileColors[i % #tileColors + 1] })
+end
+
+-- The collectibles on pedestals, each labelled with its rarity in the rarity's colour.
 local showcase = { "obsidian", "aurora", "pumpkin", "volt", "nova", "rime", "ember", "tide", "comet" }
 for i, id in ipairs(showcase) do
+	local look = Config.MARBLE[id]
 	local a = i / #showcase * math.pi * 2
-	local ball = MarbleLook.make(Config.MARBLE[id], 3)
+	local at = Vector3.new(math.cos(a) * 12, 0, math.sin(a) * 12)
+	local rc = Config.RARITY_COLOR[look.rarity] or rgb(255, 255, 255)
+	lobbyPart({ Name = "Pedestal", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.6, 6.4, 6.4), CFrame = CFrame.new(at + Vector3.new(0, 0.8, 0)) * CFrame.Angles(0, 0, math.pi / 2), Color = rgb(255, 255, 255) })
+	lobbyPart({ Name = "Glow", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.3, 6.9, 6.9), CFrame = CFrame.new(at + Vector3.new(0, 1.5, 0)) * CFrame.Angles(0, 0, math.pi / 2), Color = rc, CanCollide = false })
+	local ball = MarbleLook.make(look, 2.4)
 	ball.Anchored = true
-	ball.CFrame = CFrame.new(math.cos(a) * 11, 3, math.sin(a) * 11)
+	ball.CFrame = CFrame.new(at + Vector3.new(0, 4.1, 0))
 	ball.Parent = lobby
+	local holder = lobbyPart({ Name = "Label", Size = Vector3.new(1, 1, 1), CFrame = CFrame.new(at + Vector3.new(0, 7.8, 0)), Transparency = 1, CanCollide = false, CanQuery = false, CanTouch = false })
+	bigText(holder, look.name, { rgb(255, 255, 255), rgb(255, 235, 190) }, Vector2.new(6.5, 1.2)).Parent.MaxDistance = 45
+	bigText(holder, string.upper(look.rarity), { rc:Lerp(rgb(255, 255, 255), 0.35), rc }, Vector2.new(4.5, 0.9), Vector3.new(0, -1, 0)).Parent.MaxDistance = 45
 end
+
+-- The mascot: a giant Jack-o'-Marble with a face, bobbing and turning over the ring.
+local mascot = Instance.new("Model")
+mascot.Name = "Mascot"
+mascot.Parent = lobby
+local body = MarbleLook.make(Config.MARBLE.pumpkin, 7)
+body.Anchored = true
+body.CFrame = CFrame.new()
+body.Parent = mascot
+local function facePart(props)
+	return lobbyPart(props, mascot)
+end
+for _, side in ipairs({ -1, 1 }) do
+	facePart({ Name = "Eye", Shape = Enum.PartType.Ball, Size = Vector3.new(3.4, 3.8, 3.4), CFrame = CFrame.new(side * 2.4, 1.6, 6.1), Color = rgb(255, 255, 255), CanCollide = false })
+	facePart({ Name = "Pupil", Shape = Enum.PartType.Ball, Size = Vector3.new(2, 2.3, 2), CFrame = CFrame.new(side * 2.4, 1.4, 7.4), Color = rgb(25, 20, 35), CanCollide = false })
+	facePart({ Name = "Shine", Shape = Enum.PartType.Ball, Size = Vector3.new(0.7, 0.7, 0.7), CFrame = CFrame.new(side * 2.4 + 0.5, 2.1, 8.3), Material = Enum.Material.Neon, Color = rgb(255, 255, 255), CanCollide = false })
+	facePart({ Name = "Cheek", Shape = Enum.PartType.Ball, Size = Vector3.new(1.6, 1, 0.6), CFrame = CFrame.new(side * 4.3, -0.9, 5.7), Color = rgb(255, 120, 150), CanCollide = false })
+end
+facePart({ Name = "Smile", Shape = Enum.PartType.Ball, Size = Vector3.new(4.4, 1.5, 1.4), CFrame = CFrame.new(0, -1.9, 6.4), Color = rgb(60, 20, 30), CanCollide = false })
+-- The face looks at +Z (the spawn); every part keeps its offset from the body as it moves.
+local mascotHome = CFrame.new(0, 17, 0)
+local mascotParts = {}
+for _, p in ipairs(mascot:GetDescendants()) do
+	if p:IsA("BasePart") then
+		mascotParts[p] = p.CFrame
+	end
+end
+RunService.Heartbeat:Connect(function()
+	local t = os.clock()
+	local cf = mascotHome * CFrame.new(0, math.sin(t * 1.4) * 1.2, 0) * CFrame.Angles(0, math.sin(t * 0.5) * 0.7, 0)
+	for p, off in pairs(mascotParts) do
+		p.CFrame = cf * off
+	end
+end)
+local sign = lobbyPart({ Name = "Sign", Size = Vector3.new(1, 1, 1), CFrame = CFrame.new(0, 31, 0), Transparency = 1, CanCollide = false, CanQuery = false, CanTouch = false })
+bigText(sign, "MARBLE DUELS", { rgb(255, 240, 90), rgb(255, 140, 40) }, Vector2.new(46, 8))
+bigText(sign, "🎃 HALLOWEEN LIMITED 🎃", { rgb(255, 200, 120), rgb(255, 110, 30) }, Vector2.new(30, 3.4), Vector3.new(0, -5.2, 0))
+
+-- Round toy trees round the lawn.
+local treeColors = { rgb(120, 225, 90), rgb(255, 160, 205), rgb(255, 200, 80), rgb(90, 210, 150) }
+local decor = Random.new(7)
+for i = 0, 21 do
+	local a = (i + 0.3) / 22 * math.pi * 2
+	local d = 72 + decor:NextNumber() * 18
+	local at = Vector3.new(math.cos(a) * d, 0, math.sin(a) * d)
+	local h = 6 + decor:NextNumber() * 4
+	local c = 9 + decor:NextNumber() * 5
+	if math.abs(at.X) < 14 and at.Z > 0 then
+		continue -- keep the view from the spawn clear
+	end
+	lobbyPart({ Name = "Trunk", Size = Vector3.new(1.8, h, 1.8), CFrame = CFrame.new(at + Vector3.new(0, h / 2, 0)), Color = rgb(150, 95, 55) })
+	lobbyPart({ Name = "Crown", Shape = Enum.PartType.Ball, Size = Vector3.new(c, c, c), CFrame = CFrame.new(at + Vector3.new(0, h + c * 0.35, 0)), Color = treeColors[i % #treeColors + 1] })
+end
+
 -- Halloween: carved pumpkins glowing round the plaza's edge.
 for i = 0, 11 do
 	local a = i / 12 * math.pi * 2 + 0.26
-	local pos = Vector3.new(math.cos(a) * 62, 2.2, math.sin(a) * 62)
-	local pumpkin = lobbyPart({ Name = "Pumpkin", Shape = Enum.PartType.Ball, Size = Vector3.new(5, 4.4, 5), CFrame = CFrame.lookAt(pos, Vector3.new(0, 2.2, 0)), Material = Enum.Material.SmoothPlastic, Color = Color3.fromRGB(240, 110, 20) })
+	local pos = Vector3.new(math.cos(a) * 56, 2.2, math.sin(a) * 56)
+	local pumpkin = lobbyPart({ Name = "Pumpkin", Shape = Enum.PartType.Ball, Size = Vector3.new(5, 4.4, 5), CFrame = CFrame.lookAt(pos, Vector3.new(0, 2.2, 0)), Color = rgb(255, 120, 20) })
 	local glow = Instance.new("PointLight")
-	glow.Color = Color3.fromRGB(255, 170, 60)
+	glow.Color = rgb(255, 170, 60)
 	glow.Range = 14
 	glow.Brightness = 1.6
 	glow.Parent = pumpkin
-	lobbyPart({ Name = "Stem", Size = Vector3.new(0.6, 1.2, 0.6), CFrame = CFrame.new(pos + Vector3.new(0, 2.6, 0)), Material = Enum.Material.Wood, Color = Color3.fromRGB(90, 70, 30) })
+	lobbyPart({ Name = "Stem", Size = Vector3.new(0.6, 1.2, 0.6), CFrame = CFrame.new(pos + Vector3.new(0, 2.6, 0)), Color = rgb(70, 150, 50) })
 	local face = Instance.new("SurfaceGui")
 	face.Face = Enum.NormalId.Front
 	face.LightInfluence = 0
@@ -109,20 +207,20 @@ for i = 0, 11 do
 	eyes.Text = "▲ ▲\n◡◡◡"
 	eyes.TextScaled = true
 	eyes.Font = Enum.Font.FredokaOne
-	eyes.TextColor3 = Color3.fromRGB(255, 230, 120)
+	eyes.TextColor3 = rgb(255, 230, 120)
 	eyes.Parent = face
 end
 
 local spawn = Instance.new("SpawnLocation")
 spawn.Anchored = true
 spawn.Size = Vector3.new(10, 1, 10)
-spawn.CFrame = CFrame.new(0, 0.5, 42)
+spawn.CFrame = CFrame.new(0, 0.5, 38)
 spawn.Material = Enum.Material.Neon
-spawn.Color = Color3.fromRGB(255, 120, 60)
+spawn.Color = rgb(255, 205, 50)
 spawn.Duration = 0
 spawn.Parent = lobby
 -- The board's text is on its Front (-Z) face; turned round so it faces the spawn at +Z.
-Leaderboard.board(CFrame.new(0, 10, -45) * CFrame.Angles(0, math.pi, 0), lobby)
+Leaderboard.board(CFrame.new(0, 10, -40) * CFrame.Angles(0, math.pi, 0), lobby)
 
 -- ---- Matches ----------------------------------------------------------------------------------
 local tables: { [number]: any } = {} -- slot -> table

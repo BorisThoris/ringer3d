@@ -28,45 +28,58 @@ export type Arena = {
 	id: string,
 	name: string,
 	material: Enum.Material,
-	color: Color3,
+	color: Color3, -- the field outside the ring
+	inner: Color3, -- the disc inside the ring, a shade lighter
 	rollDecel: number, -- studs/s^2 of rolling resistance
 	friction: number,
 	elasticity: number,
-	kerb: Color3,
+	kerb: { Color3 }, -- the bumper's candy stripes
 	line: Color3,
-	backstop: { name: string, size: Vector3, color: Color3, material: Enum.Material },
+	backstop: { name: string, size: Vector3, colors: { Color3 }, material: Enum.Material },
+	trees: Color3, -- the round toy trees round the field
 }
 
+-- The look follows the top-earning Roblox games (Steal a Brainrot, Pet Simulator 99, Adopt Me!,
+-- Grow a Garden): flat, saturated toy colours in smooth plastic, no realistic textures. Feel
+-- (friction, bounce, rolling resistance) is set by the numbers, never by the material.
+local rgb = Color3.fromRGB
+local TOY = { rgb(255, 75, 75), rgb(255, 205, 40), rgb(60, 150, 255), rgb(150, 90, 240) }
 Config.ARENAS = {
 	desk = {
-		id = "desk", name = "The Desk", material = Enum.Material.WoodPlanks, color = Color3.fromRGB(122, 82, 52),
-		rollDecel = 28, friction = 0.5, elasticity = 0.92, kerb = Color3.fromRGB(70, 44, 28), line = Color3.fromRGB(240, 234, 220),
-		backstop = { name = "Book", size = Vector3.new(5.2, 2, 1.5), color = Color3.fromRGB(40, 110, 70), material = Enum.Material.SmoothPlastic },
+		id = "desk", name = "The Desk", material = Enum.Material.SmoothPlastic, color = rgb(235, 160, 85), inner = rgb(255, 185, 105),
+		rollDecel = 28, friction = 0.5, elasticity = 0.92, kerb = { rgb(255, 80, 70), rgb(255, 255, 255) }, line = rgb(255, 255, 255),
+		backstop = { name = "Book", size = Vector3.new(5.2, 2, 1.5), colors = TOY, material = Enum.Material.SmoothPlastic },
+		trees = rgb(120, 220, 90),
 	},
 	culdesac = {
-		id = "culdesac", name = "The Cul-de-sac", material = Enum.Material.Concrete, color = Color3.fromRGB(150, 146, 138),
-		rollDecel = 36, friction = 0.6, elasticity = 0.86, kerb = Color3.fromRGB(110, 108, 104), line = Color3.fromRGB(255, 255, 255),
-		backstop = { name = "Kerbstone", size = Vector3.new(5, 1.3, 1.2), color = Color3.fromRGB(170, 168, 160), material = Enum.Material.Slate },
+		id = "culdesac", name = "The Cul-de-sac", material = Enum.Material.SmoothPlastic, color = rgb(110, 125, 175), inner = rgb(135, 155, 210),
+		rollDecel = 36, friction = 0.6, elasticity = 0.86, kerb = { rgb(255, 210, 40), rgb(255, 255, 255) }, line = rgb(255, 255, 255),
+		backstop = { name = "Kerbstone", size = Vector3.new(5, 1.3, 1.2), colors = TOY, material = Enum.Material.SmoothPlastic },
+		trees = rgb(90, 210, 120),
 	},
 	grass = {
-		id = "grass", name = "The Back Lawn", material = Enum.Material.Grass, color = Color3.fromRGB(80, 160, 60),
-		rollDecel = 56, friction = 0.85, elasticity = 0.78, kerb = Color3.fromRGB(50, 110, 40), line = Color3.fromRGB(235, 235, 225),
-		backstop = { name = "Log", size = Vector3.new(6.4, 1.2, 1.2), color = Color3.fromRGB(105, 70, 40), material = Enum.Material.Wood },
+		id = "grass", name = "The Back Lawn", material = Enum.Material.SmoothPlastic, color = rgb(70, 190, 70), inner = rgb(105, 215, 85),
+		rollDecel = 56, friction = 0.85, elasticity = 0.78, kerb = { rgb(255, 255, 255), rgb(255, 90, 90) }, line = rgb(255, 255, 255),
+		backstop = { name = "Log", size = Vector3.new(6.4, 1.2, 1.2), colors = TOY, material = Enum.Material.SmoothPlastic },
+		trees = rgb(255, 150, 200),
 	},
 	sand = {
-		id = "sand", name = "The Beach", material = Enum.Material.Sand, color = Color3.fromRGB(222, 190, 130),
-		rollDecel = 52, friction = 0.7, elasticity = 0.72, kerb = Color3.fromRGB(190, 160, 110), line = Color3.fromRGB(120, 90, 60),
-		backstop = { name = "Driftwood", size = Vector3.new(7, 1, 1), color = Color3.fromRGB(190, 180, 160), material = Enum.Material.Wood },
+		id = "sand", name = "The Beach", material = Enum.Material.SmoothPlastic, color = rgb(255, 205, 105), inner = rgb(255, 220, 130),
+		rollDecel = 52, friction = 0.7, elasticity = 0.72, kerb = { rgb(255, 110, 120), rgb(255, 255, 255) }, line = rgb(255, 255, 255),
+		backstop = { name = "Driftwood", size = Vector3.new(7, 1, 1), colors = TOY, material = Enum.Material.SmoothPlastic },
+		trees = rgb(60, 200, 110),
 	},
 	ice = {
-		id = "ice", name = "The Frozen Lake", material = Enum.Material.Ice, color = Color3.fromRGB(70, 120, 160),
-		rollDecel = 22, friction = 0.12, elasticity = 0.88, kerb = Color3.fromRGB(220, 235, 245), line = Color3.fromRGB(235, 245, 255),
-		backstop = { name = "Ice block", size = Vector3.new(4.6, 1.6, 1.4), color = Color3.fromRGB(190, 225, 245), material = Enum.Material.Glacier },
+		id = "ice", name = "The Frozen Lake", material = Enum.Material.SmoothPlastic, color = rgb(95, 185, 255), inner = rgb(140, 210, 255),
+		rollDecel = 22, friction = 0.12, elasticity = 0.88, kerb = { rgb(255, 255, 255), rgb(120, 170, 255) }, line = rgb(255, 255, 255),
+		backstop = { name = "Ice block", size = Vector3.new(4.6, 1.6, 1.4), colors = { rgb(200, 240, 255), rgb(150, 210, 255) }, material = Enum.Material.Glass },
+		trees = rgb(235, 250, 255),
 	},
 	gravel = {
-		id = "gravel", name = "The Gravel Pit", material = Enum.Material.Pebble, color = Color3.fromRGB(140, 130, 118),
-		rollDecel = 48, friction = 0.8, elasticity = 0.8, kerb = Color3.fromRGB(100, 94, 86), line = Color3.fromRGB(245, 240, 230),
-		backstop = { name = "Slab", size = Vector3.new(4.8, 1, 1.2), color = Color3.fromRGB(120, 116, 110), material = Enum.Material.Slate },
+		id = "gravel", name = "The Gravel Pit", material = Enum.Material.SmoothPlastic, color = rgb(80, 185, 170), inner = rgb(110, 210, 195),
+		rollDecel = 48, friction = 0.8, elasticity = 0.8, kerb = { rgb(255, 140, 40), rgb(255, 255, 255) }, line = rgb(255, 255, 255),
+		backstop = { name = "Slab", size = Vector3.new(4.8, 1, 1.2), colors = TOY, material = Enum.Material.SmoothPlastic },
+		trees = rgb(255, 190, 70),
 	},
 } :: { [string]: Arena }
 Config.ARENA_ORDER = { "desk", "culdesac", "grass", "sand", "ice", "gravel" }
@@ -120,7 +133,6 @@ local function m(id, name, rarity, shell, core, material, transparency, glow, ex
 	return t
 end
 
-local rgb = Color3.fromRGB
 Config.MARBLES = {
 	m("ember", "Ember", "Common", rgb(255, 227, 207), rgb(255, 77, 31), Enum.Material.Glass, 0.35, 0.25),
 	m("tide", "Tide", "Common", rgb(207, 239, 255), rgb(26, 124, 255), Enum.Material.Glass, 0.35, 0.1, { price = 150 }),

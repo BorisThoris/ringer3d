@@ -49,7 +49,29 @@ Kit.stroke(coinPill, Kit.INK, 3)
 local coinIcon = Kit.new("Frame", { Position = UDim2.fromOffset(8, 8), Size = UDim2.fromOffset(34, 34), BackgroundColor3 = Kit.GOLD, Parent = coinPill })
 Kit.round(coinIcon, 17)
 Kit.stroke(coinIcon, Kit.INK, 2)
-local coinText = Kit.label("0", 28, { Position = UDim2.fromOffset(48, 6), Size = UDim2.new(1, -56, 0, 38), TextXAlignment = Enum.TextXAlignment.Left, Parent = coinPill })
+local coinText = Kit.label("0", 30, { Position = UDim2.fromOffset(48, 5), Size = UDim2.new(1, -56, 0, 40), TextXAlignment = Enum.TextXAlignment.Left, Parent = coinPill })
+Kit.gradient(coinText, Color3.fromRGB(255, 250, 170), Kit.GOLD)
+local shownCoins: number? = nil
+-- Coins count up to the new total, with a "+N" when they grow.
+local function setCoins(n: number)
+	local from = shownCoins
+	shownCoins = n
+	if from == nil or n <= from then
+		coinText.Text = Kit.comma(n)
+		return
+	end
+	Kit.popup(screen, "+" .. Kit.comma(n - from), UDim2.new(0.5, 40, 0, 90))
+	local v = Instance.new("NumberValue")
+	v.Value = from
+	v.Changed:Connect(function(x)
+		coinText.Text = Kit.comma(x)
+	end)
+	local tw = TweenService:Create(v, TweenInfo.new(0.8, Enum.EasingStyle.Quad), { Value = n })
+	tw.Completed:Connect(function()
+		v:Destroy()
+	end)
+	tw:Play()
+end
 
 -- The live event, under the coins.
 local event = Kit.label("🎃 HALLOWEEN: the Jack-o'-Marble Limited is in Marble Bags!", 20, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 62), Size = UDim2.fromOffset(620, 28), TextColor3 = Color3.fromRGB(255, 170, 60), Parent = hud })
@@ -319,15 +341,15 @@ end
 -- =============================================================================================
 -- Side buttons
 -- =============================================================================================
-Kit.button("Shop", Kit.GOLD, function()
+Kit.button("🛒 Shop", Kit.GOLD, function()
 	refreshShop()
 	show("shop")
 end, { Size = UDim2.fromOffset(150, 58), Parent = side })
-Kit.button("Marbles", Kit.PURPLE, function()
+Kit.button("🔮 Marbles", Kit.PURPLE, function()
 	refreshCollection()
 	show("marbles")
 end, { Size = UDim2.fromOffset(150, 58), Parent = side })
-local dailyButton = Kit.button("Daily", Kit.GREEN, function()
+local dailyButton = Kit.button("🎁 Daily", Kit.GREEN, function()
 	local ok, got = ask("daily")
 	if ok then
 		toast(string.format("Day %d streak: +%d coins!", got.streak, got.coins), "good")
@@ -335,7 +357,11 @@ local dailyButton = Kit.button("Daily", Kit.GREEN, function()
 		toast(typeof(got) == "string" and got or "Come back tomorrow!", "info")
 	end
 end, { Size = UDim2.fromOffset(150, 58), Parent = side })
-Kit.button("Invite", Kit.BLUE, function()
+-- A red "!" on Daily while a reward is waiting.
+local dailyBadge = Kit.label("!", 24, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(1, -4, 0, 4), Size = UDim2.fromOffset(30, 30), BackgroundTransparency = 0, BackgroundColor3 = Kit.RED, Visible = false, ZIndex = 5, Parent = dailyButton })
+Kit.round(dailyBadge, 15)
+Kit.stroke(dailyBadge, Kit.INK, 2)
+Kit.button("👋 Invite", Kit.BLUE, function()
 	local ok, can = pcall(SocialService.CanSendGameInviteAsync, SocialService, player)
 	if ok and can then
 		SocialService:PromptGameInvite(player)
@@ -508,9 +534,10 @@ Remotes:WaitForChild("ProfileSync").OnClientEvent:Connect(function(p)
 		return
 	end
 	profile = p
-	coinText.Text = tostring(p.coins)
+	setCoins(p.coins)
 	towerLabel.Text = p.tower > #Config.TOWER and "Conquered!" or string.format("Floor %d of %d: %s", p.tower, #Config.TOWER, Config.TOWER[p.tower].name)
-	dailyButton.Text = p.dailyReady and "Daily!" or "Daily"
+	dailyButton.Text = "🎁 Daily"
+	dailyBadge.Visible = p.dailyReady == true
 	if panels.shop.Visible then
 		refreshShop()
 	end
@@ -567,7 +594,7 @@ task.spawn(function()
 		shopInfo = info
 		if info.profile then
 			profile = info.profile
-			coinText.Text = tostring(profile.coins)
+			setCoins(profile.coins)
 		end
 	end
 end)

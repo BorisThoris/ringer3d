@@ -1,0 +1,147 @@
+{
+  "_comment": "Written into the place's Lighting by scripts/build.mjs (Technology can't be set from a script). Bright, saturated midday like the top-earning games.",
+  "Lighting": {
+    "Technology": [
+      "token",
+      4
+    ],
+    "ClockTime": [
+      "float",
+      13.2
+    ],
+    "Brightness": [
+      "float",
+      2.1
+    ],
+    "Ambient": [
+      "Color3",
+      [
+        80,
+        80,
+        95
+      ]
+    ],
+    "OutdoorAmbient": [
+      "Color3",
+      [
+        150,
+        150,
+        165
+      ]
+    ],
+    "EnvironmentDiffuseScale": [
+      "float",
+      0.8
+    ],
+    "EnvironmentSpecularScale": [
+      "float",
+      0.8
+    ],
+    "ShadowSoftness": [
+      "float",
+      0.35
+    ],
+    "GlobalShadows": [
+      "bool",
+      true
+    ]
+  },
+  "children": [
+    [
+      "Atmosphere",
+      "Atmosphere",
+      {
+        "Density": [
+          "float",
+          0.16
+        ],
+        "Offset": [
+          "float",
+          0.1
+        ],
+        "Color": [
+          "Color3",
+          [
+            205,
+            236,
+            255
+          ]
+        ],
+        "Decay": [
+          "Color3",
+          [
+            120,
+            190,
+            255
+          ]
+        ],
+        "Glare": [
+          "float",
+          0
+        ],
+        "Haze": [
+          "float",
+          0.15
+        ]
+      }
+    ],
+    [
+      "BloomEffect",
+      "Bloom",
+      {
+        "Intensity": [
+          "float",
+          0.35
+        ],
+        "Size": [
+          "float",
+          28
+        ],
+        "Threshold": [
+          "float",
+          2.4
+        ]
+      }
+    ],
+    [
+      "ColorCorrectionEffect",
+      "Pop",
+      {
+        "Saturation": [
+          "float",
+          0.32
+        ],
+        "Contrast": [
+          "float",
+          0.16
+        ],
+        "Brightness": [
+          "float",
+          -0.02
+        ],
+        "TintColor": [
+          "Color3",
+          [
+            255,
+            252,
+            245
+          ]
+        ]
+      }
+    ],
+    [
+      "SunRaysEffect",
+      "SunRays",
+      {
+        "Intensity": [
+          "float",
+          0.06
+        ],
+        "Spread": [
+          "float",
+          0.6
+        ]
+      }
+    ]
+  ]
+}
