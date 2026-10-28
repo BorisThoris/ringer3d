@@ -160,7 +160,8 @@ export class ShotSim {
     );
     this.colliderKind.set(gc.handle, 'ground');
 
-    // Kerb ring so nothing escapes the arena.
+    // The edge of play: the kerb you see, carried on up as a wall you don't, far above the
+    // highest hop (about 7 units), so a marble thrown up over the kerb comes back down inside.
     const segs = 48;
     const kerb = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
     const segLen = ((2 * Math.PI * WORLD.boundaryRadius) / segs) * 0.55;
@@ -168,8 +169,8 @@ export class ShotSim {
       const a = (i / segs) * Math.PI * 2;
       const r = WORLD.boundaryRadius + 0.25;
       const c = this.world.createCollider(
-        RAPIER.ColliderDesc.cuboid(0.25, 0.6, segLen)
-          .setTranslation(Math.cos(a) * r, 0.6, Math.sin(a) * r)
+        RAPIER.ColliderDesc.cuboid(0.25, EDGE_H / 2, segLen)
+          .setTranslation(Math.cos(a) * r, EDGE_H / 2, Math.sin(a) * r)
           .setRotation(yawQuat(-a))
           .setRestitution(surface.edge.restitution)
           .setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Min)
@@ -373,6 +374,20 @@ export class ShotSim {
     }
     this.struck.clear();
 
+    // Safety net: anything that still gets past the edge or under the ground is set down
+    // at rest just inside the kerb (out of the ring), instead of falling for the rest of
+    // the shot's time.
+    for (const b of this.bodies) {
+      if (this.holed.has(b.id)) continue;
+      const t = b.body.translation();
+      const r = Math.hypot(t.x, t.z);
+      if (t.y > -0.5 && r < WORLD.boundaryRadius + 0.6) continue;
+      const k = r > 1e-6 ? (WORLD.boundaryRadius - 1) / r : 0;
+      b.body.setTranslation({ x: r > 1e-6 ? t.x * k : WORLD.boundaryRadius - 1, y: b.radius, z: t.z * k }, true);
+      b.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      b.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    }
+
     // The ground underfoot: slopes steer, bumps throw fast marbles up, and rolling
     // resistance brings everything to rest (it outweighs every slope, so nothing creeps).
     const S = this.surface;
@@ -523,6 +538,8 @@ const STICKY = 2.2;
 const SLICK = 0.2;
 /** Speed-pad push (units/s²). */
 const BOOST = 22;
+/** Height of the wall around the edge of play (the visible kerb is its bottom 1.2). */
+const EDGE_H = 14;
 /** Where holed marbles are reported: well outside the ring. */
 const POCKET = { x: WORLD.boundaryRadius + 4, y: WORLD.targetRadius, z: 0 };
 

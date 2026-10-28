@@ -50,12 +50,25 @@ interface Budget {
   bumpers: [number, number];
   cups: [number, number];
   pads: [number, number];
+  /** Backstops outside the ring that can bounce marbles back in. */
+  backstops: [number, number];
 }
 
 const BUDGET: Record<Difficulty, Budget> = {
-  easy: { fold: [2], objects: [0, 2], hazard: 0.45, bumpers: [0, 2], cups: [2, 2], pads: [0, 0] },
-  medium: { fold: [2, 4], objects: [2, 4], hazard: 0.75, bumpers: [4, 6], cups: [2, 4], pads: [0, 2] },
-  hard: { fold: [4], objects: [4, 8], hazard: 1, bumpers: [4, 8], cups: [4, 4], pads: [4, 4] },
+  easy: { fold: [2], objects: [0, 2], hazard: 0.45, bumpers: [0, 2], cups: [2, 2], pads: [0, 0], backstops: [2, 2] },
+  medium: { fold: [2, 4], objects: [2, 4], hazard: 0.75, bumpers: [4, 6], cups: [2, 4], pads: [0, 2], backstops: [2, 4] },
+  hard: { fold: [4], objects: [4, 8], hazard: 1, bumpers: [4, 8], cups: [4, 4], pads: [4, 4], backstops: [4, 4] },
+};
+
+/** Each field's backstop: what lies outside its ring (skin, length range, thickness, height). */
+const BACKSTOP: Record<ArenaId, [string, [number, number], number, number]> = {
+  desk: ['book', [1.1, 1.5], 0.38, 0.5],
+  culdesac: ['kerbstone', [1.1, 1.5], 0.3, 0.32],
+  grass: ['log', [1.3, 1.8], 0.3, 0.3],
+  sand: ['driftwood', [1.4, 2], 0.24, 0.24],
+  ice: ['iceblock', [1, 1.4], 0.32, 0.38],
+  gravel: ['slab', [1, 1.4], 0.28, 0.25],
+  minigolf: ['rail', [1.2, 1.8], 0.16, 0.36],
 };
 
 /** Footprint (radius, units) a solid piece keeps clear around itself. */
@@ -221,6 +234,17 @@ class Builder {
   post(skin: string, r: [number, number], h: number) {
     return this.place(() => ({ kind: 'post', ...this.inRing(), r: q(this.rng.range(r[0], r[1])), h, skin }));
   }
+  /**
+   * A backstop just outside the ring, lying across the way out: a marble knocked out hard
+   * enough to reach it can bounce back in (no point), and a shooter that sails out can come
+   * back to stay in and shoot again.
+   */
+  backstop(skin: string, len: [number, number], thick: number, h: number) {
+    return this.place(() => {
+      const p = this.at(this.rng.range(R + 1.4, R + 3), this.rng.range(0, Math.PI * 2));
+      return { kind: 'wall', ...p, len: q(this.rng.range(len[0], len[1])), thick, h, a: q(Math.atan2(p.z, p.x) + Math.PI / 2), skin };
+    });
+  }
   block(skin: string, len: [number, number], thick: number, h: number) {
     return this.place(() => {
       const p = this.inRing();
@@ -244,6 +268,8 @@ export function generateMap(spec: MapSpec): MapDef {
   FIELD[spec.arena].ground(b, budget.hazard);
   for (let i = b.per(count(budget.objects)); i > 0; i--) FIELD[spec.arena].object(b);
   if (spec.arena === 'minigolf') course(b, budget, count);
+  const [skin, len, thick, h] = BACKSTOP[spec.arena];
+  for (let i = b.per(count(budget.backstops)); i > 0; i--) b.backstop(skin, len, thick, h);
   return { ...spec, name: mapName(spec, rng), pieces: b.pieces };
 }
 
