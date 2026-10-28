@@ -1,5 +1,5 @@
-10-27 19:55:10.759  2368  2368 W Capacitor/Console: File: https://localhost/assets/index-qF5a6-cK.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
-10-27 19:55:20.376  2368  2368 W Capacitor/Console: File: https://localhost/assets/index-qF5a6-cK.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
-10-27 19:55:45.524  2368  2368 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-10-27 19:55:45.542  2368  2368 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-10-27 19:55:51.444  2368  2368 I Capacitor/Console: File:  - Line 333 - Msg: undefined
+10-28 14:06:07.814  2461  2461 W Capacitor/Console: File: https://localhost/assets/index-PPgBLKbA.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+10-28 14:06:20.675  2461  2461 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+10-28 14:06:24.498  2461  2461 I Capacitor/Console: File:  - Line 333 - Msg: undefined
+10-28 14:06:55.278  1037  4866 E JavaBinder: *** Uncaught remote exception! Exceptions are not yet supported across processes. Client PID 3945 UID 10118.
+10-28 14:06:56.726  1037  4014 E JavaBinder: *** Uncaught remote exception! Exceptions are not yet supported across processes. Client PID 3945 UID 10118.
