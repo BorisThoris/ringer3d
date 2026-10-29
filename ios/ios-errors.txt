@@ -1,10 +1,3 @@
-2026-10-29 14:17:03.085 E  App[28542:13dd6] [com.apple.WebKit:ResourceLoadStatistics] Failed to request known fingerprinting scripts from WebPrivacy: Error Domain=WebPrivacyErrorDomain Code=1001 "List data not found" UserInfo={NSLocalizedDescription=List data not found}
-2026-10-29 14:17:03.458 E  App[28542:13de8] [com.apple.TextInputUI:CandidateGeneration] Attempted to update accumulator from source type: 0, after completion has already been called for token:[144DBDD2]. This is an error and will be ignored.
-2026-10-29 14:17:05.800 Df App[28542:13de7] [com.apple.xpc:connection] [0x105107bb0] Re-initialization successful; calling out to event handler with XPC_ERROR_CONNECTION_INTERRUPTED
-2026-10-29 14:17:08.496 Df App[28542:13de3] [com.apple.AppSSO:SOClient] configurationWithCompletion: success = YES, error = (null)
-2026-10-29 14:17:20.172 E  App[28542:13de2] [com.apple.WebPrivacy:XPC] Updated list with error: DownloadFailed
-2026-10-29 14:17:20.177 E  App[28542:13de2] [com.apple.WebPrivacy:XPC] Updated list with error: DownloadFailed
-2026-10-29 14:17:20.181 E  App[28542:13de2] [com.apple.WebPrivacy:XPC] Updated list with error: DownloadFailed
-2026-10-29 14:17:23.108 E  App[28542:13de8] [com.apple.WebPrivacy:XPC] Updated list with error: DownloadFailed
-2026-10-29 14:17:36.421 E  App[28542:13de2] [com.apple.WebPrivacy:XPC] Updated list with error: DownloadFailed
-2026-10-29 14:17:41.558 E  App[28542:13de8] [com.apple.WebPrivacy:XPC] Updated list with error: DownloadFailed
+2026-10-29 15:21:15.956 Df App[3904:4877] [com.apple.AppSSO:SOClient] configurationWithCompletion: success = YES, error = (null)
+2026-10-29 15:21:16.850 E  App[3904:4867] [com.apple.WebKit:ResourceLoadStatistics] Failed to request known fingerprinting scripts from WebPrivacy: Error Domain=WebPrivacyErrorDomain Code=1001 "List data not found" UserInfo={NSLocalizedDescription=List data not found}
+2026-10-29 15:21:17.755 E  App[3904:487b] [com.apple.TextInputUI:CandidateGeneration] Attempted to update accumulator from source type: 0, after completion has already been called for token:[E2A4B6C9]. This is an error and will be ignored.
