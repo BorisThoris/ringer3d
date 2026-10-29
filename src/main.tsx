@@ -5,6 +5,8 @@ import { engine } from './ui/engine';
 import { sound } from './render/audio';
 import { initPlatform } from './platform';
 import { initSteam } from './steamFeatures';
+import { store } from './platformStore';
+import { credit } from './game/wallet';
 import './ui/styles.css';
 
 // Tells the boot rescue in index.html that the app's script really loaded.
@@ -18,6 +20,8 @@ function Root() {
     const stage = document.getElementById('stage')!;
     void initPlatform();
     void initSteam();
+    // Coin packs paid for while the app was closing: credited once (receipts are idempotent).
+    void store.restore?.().then((rs) => rs.forEach((r) => credit(r.receipt, r.product)));
     engine
       .init(stage)
       .then(() => {

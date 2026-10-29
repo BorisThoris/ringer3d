@@ -1,3 +1,4 @@
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { PRODUCTS, type ProductId } from './core/economy';
 import { isDesktopShell, platform } from './platform';
 import { steam, type SteamBridge } from './steam';
@@ -12,8 +13,9 @@ import { steam, type SteamBridge } from './steam';
  *           HTTPS at VITE_STEAM_STORE_URL with the player's Steam id. Unset: no store.
  *  itch     itch.io has no in-app purchase API: the game is sold (or pay-what-you-want) on
  *           its page, and coins are earned by playing. No store in the game.
- *  play     Google Play Billing would be its own adapter here (a Capacitor billing plugin plus
- *           products in the Play Console). Not built yet.
+ *  play     Google Play Billing through our native PlayBilling plugin (android/app, Play
+ *           Billing Library). Our server checks each purchase token with Google and consumes it
+ *           (server/playStore.mjs) at VITE_PLAY_STORE_URL. Unset: no store.
  *  none     Development and the plain web build.
  */
 
@@ -28,6 +30,8 @@ export interface StoreAdapter {
   /** Why there is no store, for the shop's footnote; null when purchases work. */
   readonly unavailable: string | null;
   purchase(product: ProductId): Promise<PurchaseResult>;
+  /** Purchases paid for but never credited (the app closed mid-purchase): credit these at boot. */
+  restore?(): Promise<{ receipt: string; product: ProductId }[]>;
 }
 
 const none = (id: StoreAdapter['id'], why: string): StoreAdapter => ({
@@ -80,6 +84,61 @@ function steamStore(base: string, bridge: SteamBridge): StoreAdapter {
   };
 }
 
+/** The native side: android/app/.../PlayBillingPlugin.java. */
+export interface PlayBillingPlugin {
+  /** Shows Google's purchase sheet. Rejects with code 'cancelled' when the player backs out. */
+  purchase(o: { productId: string }): Promise<{ purchaseToken: string; state: 'purchased' | 'pending' }>;
+  /** Paid purchases Google holds for us that aren't consumed yet. */
+  unconsumed(): Promise<{ purchases: { productId: string; purchaseToken: string }[] }>;
+}
+
+/**
+ * Google Play Billing. The phone buys; our server asks Google whether the token is paid and
+ * consumes it (so the pack can be bought again), then hands back the receipt. A purchase whose
+ * app died before the server answered stays unconsumed in Play and is picked up by restore().
+ */
+export function playStore(base: string, plugin: PlayBillingPlugin, fetchFn: typeof fetch = fetch): StoreAdapter {
+  const verify = async (product: string, token: string) => {
+    const r = await fetchFn(`${base}/play/verify`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ product, token }) });
+    if (!r.ok) return null;
+    return (await r.json()) as { receipt: string; product: ProductId };
+  };
+  return {
+    id: 'play',
+    unavailable: null,
+    async purchase(product) {
+      let bought: { purchaseToken: string; state: string };
+      try {
+        bought = await plugin.purchase({ productId: product });
+      } catch (e) {
+        return { ok: false, error: (e as { code?: string }).code === 'cancelled' ? 'The purchase was cancelled.' : "Google Play couldn't start the purchase." };
+      }
+      if (bought.state === 'pending') return { ok: false, error: 'Your payment is pending. The coins arrive once it clears.' };
+      try {
+        const v = await verify(product, bought.purchaseToken);
+        return v ? { ok: true, receipt: v.receipt } : { ok: false, error: "The purchase didn't check out." };
+      } catch {
+        return { ok: false, error: "Couldn't reach the store. Your coins arrive next time you open the game." };
+      }
+    },
+    async restore() {
+      const known = new Set<string>(PRODUCTS.map((p) => p.id));
+      const out: { receipt: string; product: ProductId }[] = [];
+      try {
+        const { purchases } = await plugin.unconsumed();
+        for (const p of purchases) {
+          if (!known.has(p.productId)) continue;
+          const v = await verify(p.productId, p.purchaseToken).catch(() => null);
+          if (v) out.push(v);
+        }
+      } catch {
+        /* offline: try again next launch */
+      }
+      return out;
+    },
+  };
+}
+
 function pick(): StoreAdapter {
   const target = (import.meta.env.VITE_STORE as string | undefined) ?? (steam ? 'steam' : isDesktopShell ? 'none' : platform === 'android' ? 'play' : 'none');
   if (target === 'steam') {
@@ -88,7 +147,11 @@ function pick(): StoreAdapter {
     return url ? steamStore(url.replace(/\/$/, ''), steam) : none('steam', 'The Steam store opens with the Steam release.');
   }
   if (target === 'itch') return none('itch', 'On itch.io, coins are earned by playing.');
-  if (target === 'play') return none('play', 'Google Play purchases are coming with the Play Store release.');
+  if (target === 'play') {
+    const url = import.meta.env.VITE_PLAY_STORE_URL as string | undefined;
+    if (!Capacitor.isPluginAvailable('PlayBilling')) return none('play', 'Google Play purchases need the Play Store app.');
+    return url ? playStore(url.replace(/\/$/, ''), registerPlugin<PlayBillingPlugin>('PlayBilling')) : none('play', 'Google Play purchases open with the Play Store release.');
+  }
   return none('none', 'Coins are earned by playing in this version.');
 }
 

@@ -11,7 +11,8 @@
  *
  * Env: PORT (default 8787), STATIC_DIR (default ../dist), ICE_SERVERS (JSON array, optional;
  * e.g. to hand clients a TURN server). STEAM_PUBLISHER_KEY + STEAM_APP_ID (+ STEAM_SANDBOX=1)
- * turn on the Steam coin-pack store (steamStore.mjs).
+ * turn on the Steam coin-pack store (steamStore.mjs); PLAY_SERVICE_ACCOUNT (+ PLAY_PACKAGE) the
+ * Google Play purchase check (playStore.mjs).
  */
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
@@ -20,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { WebSocketServer } from 'ws';
 import { createSteamStore } from './steamStore.mjs';
+import { createPlayStore, loadServiceAccount } from './playStore.mjs';
 
 const PORT = Number(process.env.PORT ?? 8787);
 const here = dirname(fileURLToPath(import.meta.url));
@@ -172,10 +174,12 @@ const MIME = {
 };
 
 const steamStore = createSteamStore({ key: process.env.STEAM_PUBLISHER_KEY, appId: process.env.STEAM_APP_ID, sandbox: process.env.STEAM_SANDBOX === '1' });
+const playStore = createPlayStore({ account: loadServiceAccount(process.env.PLAY_SERVICE_ACCOUNT), packageName: process.env.PLAY_PACKAGE ?? 'com.boristhoris.ringer3d' });
 
 const http = createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', 'http://x');
-  if (url.pathname.startsWith('/steam/')) {
+  if (url.pathname.startsWith('/steam/') || url.pathname.startsWith('/play/')) {
+    const shop = url.pathname.startsWith('/play/') ? playStore : steamStore;
     let body = null;
     if (req.method === 'POST') {
       let text = '';
@@ -189,7 +193,7 @@ const http = createServer(async (req, res) => {
         body = null;
       }
     }
-    const [status, out] = (await steamStore(req.method ?? 'GET', url.pathname, body).catch(() => [500, { error: 'store error' }])) ?? [404, { error: 'not found' }];
+    const [status, out] = (await shop(req.method ?? 'GET', url.pathname, body).catch(() => [500, { error: 'store error' }])) ?? [404, { error: 'not found' }];
     res.writeHead(status, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'access-control-allow-headers': 'content-type' });
     res.end(out ? JSON.stringify(out) : '');
     return;
