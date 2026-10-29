@@ -108,7 +108,7 @@ Real-money coin packs go through one adapter per store (`src/platformStore.ts`),
 
 | Store | Status |
 | --- | --- |
-| Steam | Microtransactions through our server (it holds the publisher key); set `VITE_STEAM_STORE_URL`. Needs the Steamworks app, its SDK and the server. |
+| Steam | Microtransactions through our server (it holds the publisher key), confirmed by Steam's authorization callback; set `VITE_STEAM_STORE_URL`. Needs the Steamworks app and the server. |
 | itch.io | No in-app purchases: the game is sold on its page; coins are earned by playing. |
 | Google Play | A billing adapter goes here (a Capacitor billing plugin and products in the Play Console). Not built yet. |
 | Web | Coins are earned by playing. |
@@ -135,6 +135,15 @@ npm run ios          # opens Xcode (macOS)
 ```
 
 Online uses peer-to-peer mode by default, so mobile builds need no extra configuration. Only if you use the optional lobby server: set `VITE_LOBBY_URL` to its `wss://` address (Android blocks plain `ws://` from the app's secure origin), or enter it in Settings. Haptics and fullscreen status bar handling use Capacitor plugins on device.
+
+## Steam
+
+The Steam build is the same game in an Electron shell with Steamworks: Steam lobbies and P2P for online play, invites, achievements, stats, Steam Cloud saves, rich presence, the overlay and Steam Deck defaults. See [steam/README.md](steam/README.md).
+
+```bash
+npm run steam:start     # play in the Steam shell
+npm run steam:pack      # depot-ready folder: steam/dist/win-unpacked
+```
 
 ## Desktop (Tauri)
 

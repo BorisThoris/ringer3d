@@ -70,21 +70,16 @@ export function MainMenu({ go }: { go: (s: 'story' | 'quick' | 'local' | 'online
           <span className="chev">›</span>
         </button>
       ))}
-      <button
-        className="menu-card collection-card"
-        onClick={() => {
-          tap();
-          go('collection');
-        }}
-      >
-        <span className="bag small" aria-hidden />
-        <span>
-          <h3>Collection</h3>
-          <p>Marble Bags, your marbles, daily reward</p>
-        </span>
-        <CoinPill />
-      </button>
       <div className="menu-foot">
+        <button
+          className="btn small collection-btn"
+          onClick={() => {
+            tap();
+            go('collection');
+          }}
+        >
+          Collection <CoinPill />
+        </button>
         <button
           className="btn small ghost"
           onClick={() => {
@@ -288,17 +283,20 @@ export function SettingsScreen({ onBack }: { onBack: () => void }) {
         </button>
       </div>
       <div className="section-title">Online connection</div>
-      <Chips<'p2p' | 'server'>
+      <Chips<'p2p' | 'server' | 'steam'>
         label="Online connection"
         value={s.netMode}
         options={[
+          ...(window.steam ? [{ id: 'steam' as const, label: 'Steam' }] : []),
           { id: 'p2p', label: 'Peer to peer' },
           { id: 'server', label: 'Lobby server' },
         ]}
         onChange={(m) => settings.set({ netMode: m })}
       />
       <p className="lede" style={{ margin: 0 }}>
-        {s.netMode === 'p2p'
+        {s.netMode === 'steam'
+          ? 'Steam lobbies and Steam networking: invite friends from Steam, play through Valve\'s relays. Steam players meet Steam players.'
+          : s.netMode === 'p2p'
           ? 'No server needed: games are found through public relays and matches run directly between devices.'
           : 'Uses your own Ringer lobby server, which can also relay games for players on very strict networks.'}
       </p>

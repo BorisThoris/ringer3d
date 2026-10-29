@@ -1,0 +1,51 @@
+{
+  "name": "ringer3d-steam",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Ringer 3D for Steam: the web build in Electron with Steamworks (steamworks.js).",
+  "main": "main.cjs",
+  "scripts": {
+    "prepare-app": "node -e \"const fs=require('fs');fs.rmSync('app',{recursive:true,force:true});fs.cpSync('../dist','app',{recursive:true})\"",
+    "start": "electron .",
+    "probe": "electron probe.cjs",
+    "pack": "npm run prepare-app && electron-builder --dir"
+  },
+  "dependencies": {
+    "steamworks.js": "0.4.0"
+  },
+  "devDependencies": {
+    "electron": "38.2.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.boristhoris.ringer3d",
+    "productName": "Ringer 3D",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "app/**",
+      "package.json",
+      "node_modules/steamworks.js/**"
+    ],
+    "extraFiles": [
+      {
+        "from": "node_modules/steamworks.js/dist/win64/steam_api64.dll",
+        "to": "steam_api64.dll"
+      }
+    ],
+    "asarUnpack": [
+      "node_modules/steamworks.js/**"
+    ],
+    "win": {
+      "target": "dir",
+      "signAndEditExecutable": false,
+      "icon": "../src-tauri/icons/icon.ico"
+    },
+    "linux": {
+      "target": "dir"
+    }
+  }
+}

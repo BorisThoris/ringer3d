@@ -34,7 +34,7 @@ export interface CreateRoomOptions {
  *  - ServerMatchmaker: our optional lobby server (adds a relay for very strict networks).
  */
 export interface Matchmaker {
-  readonly kind: 'p2p' | 'server';
+  readonly kind: 'p2p' | 'server' | 'steam';
   readonly myId: string;
   connect(): Promise<void>;
   listRooms(): Promise<RoomInfo[]>;

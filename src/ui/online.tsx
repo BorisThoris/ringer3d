@@ -7,19 +7,41 @@ import { P2PMatchmaker } from '../net/p2pMatchmaker';
 import type { RoomInfo } from '../net/protocol';
 import { OnlineRoom } from '../net/room';
 import { ServerMatchmaker } from '../net/serverMatchmaker';
+import { SteamMatchmaker } from '../net/steamMatchmaker';
+import { steam } from '../steam';
 import type { Matchmaker } from '../net/transport';
 import { ArenaPicker, Chips, MapPicker, MapPreview, MarbleChip, Screen, tap } from './components';
 import { generateMap, type Difficulty } from '../game/maps';
 
 let shared: { key: string; mm: Matchmaker } | null = null;
 /** One matchmaker per connection mode; switching mode in Settings swaps it. */
-function matchmakerFor(mode: 'p2p' | 'server', url: string): Matchmaker {
-  const key = mode === 'p2p' ? 'p2p' : `server:${url}`;
+function matchmakerFor(mode: 'p2p' | 'server' | 'steam', url: string): Matchmaker {
+  // Steam mode outside the Steam build falls back to peer to peer.
+  const m = mode === 'steam' && !steam ? 'p2p' : mode;
+  const key = m === 'server' ? `server:${url}` : m;
   if (!shared || shared.key !== key) {
     shared?.mm.close();
-    shared = { key, mm: mode === 'p2p' ? new P2PMatchmaker() : new ServerMatchmaker(url) };
+    shared = { key, mm: m === 'steam' ? new SteamMatchmaker(steam!) : m === 'p2p' ? new P2PMatchmaker() : new ServerMatchmaker(url) };
   }
   return shared.mm;
+}
+
+/** Steam: a friend's invite (or "Join game" in the Steam friends list) opens their room. */
+export function listenForSteamInvites(onRoom: (r: OnlineRoom) => void) {
+  if (!steam) return () => {};
+  return steam.onJoinRequested(async (lobby) => {
+    const st = settings.get();
+    try {
+      onRoom(await OnlineRoom.join(matchmakerFor('steam', st.lobbyUrl), { roomId: lobby, name: st.playerName, marble: st.marble }));
+    } catch {
+      /* the room closed before we got there */
+    }
+  });
+}
+
+/** Steam's invite dialog for the room you're in (private Steam rooms are joined this way). */
+export function inviteSteamFriends() {
+  if (shared?.mm instanceof SteamMatchmaker) shared.mm.invite();
 }
 
 export function OnlineHub({ onBack, onRoom }: { onBack: () => void; onRoom: (r: OnlineRoom) => void }) {
@@ -43,7 +65,9 @@ export function OnlineHub({ onBack, onRoom }: { onBack: () => void; onRoom: (r: 
     } catch (e) {
       setRooms(null);
       setError(
-        st.netMode === 'p2p'
+        st.netMode === 'steam'
+          ? `Couldn't reach Steam (${(e as Error).message}). Is Steam running?`
+          : st.netMode === 'p2p'
           ? `Couldn't reach the public relays used to find games (${(e as Error).message}). Check your connection; joining by code may still work.`
           : `${(e as Error).message} Check the lobby server address in Settings, or switch the connection to peer to peer.`,
       );
@@ -254,6 +278,17 @@ export function RoomLobby({ room, onLeave }: { room: OnlineRoom; onLeave: () => 
           >
             Copy
           </button>
+          {room.mm.kind === 'steam' && (
+            <button
+              className="btn small primary"
+              onClick={() => {
+                tap();
+                inviteSteamFriends();
+              }}
+            >
+              Invite Steam friends
+            </button>
+          )}
         </div>
       )}
       {s.error && <div className="notice">{s.error}</div>}

@@ -21,7 +21,9 @@
     "deploy": "npm run build && node scripts/keep-old-assets.mjs && wrangler deploy",
     "headless:build": "esbuild src/headless/cli.ts --bundle --platform=node --format=esm --target=node20 --outfile=dist-headless/ringer-headless.mjs --log-level=warning",
     "headless": "node dist-headless/ringer-headless.mjs",
-    "export:roblox": "npm run headless:build && node roblox/scripts/export.mjs"
+    "export:roblox": "npm run headless:build && node roblox/scripts/export.mjs",
+    "steam:start": "npm run build && npm --prefix steam start",
+    "steam:pack": "npm run build && npm --prefix steam run pack"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.3",

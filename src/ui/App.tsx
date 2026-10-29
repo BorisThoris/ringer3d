@@ -5,6 +5,7 @@ import type { Difficulty, MapDef } from '../game/maps';
 import type { SessionMode, SessionResult } from '../game/session';
 import { lookFor, uiColor } from '../game/marbles';
 import { rewardMatch } from '../game/wallet';
+import { steamMatchEnd, steamPresence } from '../steamFeatures';
 import { Collection } from './collection';
 import { progress, settings, type GuideMode } from '../game/settings';
 import { buildTower, fighter } from '../game/story';
@@ -13,7 +14,7 @@ import type { OnlineRoom } from '../net/room';
 import { sound } from '../render/audio';
 import { engine } from './engine';
 import { Hud } from './Hud';
-import { OnlineHub, RoomLobby } from './online';
+import { listenForSteamInvites, OnlineHub, RoomLobby } from './online';
 import type { MapChoice } from './components';
 import { HowTo, LocalPlay, MainMenu, QuickPlay, Results, SettingsScreen, type ResultsInfo } from './screens';
 import { Ending, StorySelect, Tower, Versus } from './story';
@@ -50,6 +51,31 @@ export function App() {
     if (engine.view) engine.view.frameShift = screen.name === 'menu' ? 0.2 : 0;
   }, [screen.name]);
 
+  // Steam rich presence: what friends see next to your name.
+  useEffect(() => {
+    const status: Partial<Record<ScreenState['name'], string>> = {
+      menu: 'In the menu',
+      collection: 'Opening Marble Bags',
+      tower: 'Climbing the Tower',
+      versus: 'Climbing the Tower',
+      online: 'Looking for a game',
+      room: 'In a lobby',
+      game: screen.name === 'game' && screen.online ? 'Playing online' : 'Playing a match',
+    };
+    steamPresence(status[screen.name] ?? 'In the menu', screen.name === 'room' ? screen.room.state.get().room?.id : undefined);
+  }, [screen]);
+
+  // Steam: accepting a friend's invite (or "Join game") drops you into their room.
+  useEffect(
+    () =>
+      listenForSteamInvites((room) => {
+        roomRef.current?.leave();
+        roomRef.current = room;
+        setScreen({ name: 'room', room });
+      }),
+    [],
+  );
+
   // Every panel is tinted with the player's own marble.
   useEffect(() => {
     document.documentElement.style.setProperty('--accent', uiColor(lookFor(myMarble)));
@@ -70,6 +96,12 @@ export function App() {
     const me = r.localSeats[0];
     // Every finished match pays coins toward Marble Bags (core/economy.ts).
     rewardMatch(r.winners.length === 1 && r.winners[0] === me, r.scores[me] ?? 0);
+    steamMatchEnd({
+      won: r.winners.length === 1 && r.winners[0] === me,
+      myScore: r.scores[me] ?? 0,
+      otherScores: r.scores.filter((_, i) => i !== me),
+      online: !!roomRef.current,
+    });
     progress.set((p) => ({
       stats: {
         played: p.stats.played + 1,

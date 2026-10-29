@@ -14,7 +14,8 @@ export interface Settings {
   aimSensitivity: number;
   lobbyUrl: string;
   /** 'p2p' needs no server (public relays for matchmaking); 'server' uses our lobby server. */
-  netMode: 'p2p' | 'server';
+  /** 'steam': Steam lobbies and P2P, only in the Steam build. */
+  netMode: 'p2p' | 'server' | 'steam';
 }
 
 export interface Progress {
@@ -79,7 +80,7 @@ export const settings = createStore<Settings>(
     haptics: true,
     aimSensitivity: 1,
     lobbyUrl: defaultLobby(),
-    netMode: 'p2p',
+    netMode: typeof window !== 'undefined' && window.steam ? 'steam' : 'p2p',
   }),
 );
 settings.subscribe(() => save(SETTINGS_KEY, settings.get()));

@@ -4,6 +4,7 @@ import { App } from './ui/App';
 import { engine } from './ui/engine';
 import { sound } from './render/audio';
 import { initPlatform } from './platform';
+import { initSteam } from './steamFeatures';
 import './ui/styles.css';
 
 // Tells the boot rescue in index.html that the app's script really loaded.
@@ -16,6 +17,7 @@ function Root() {
   useEffect(() => {
     const stage = document.getElementById('stage')!;
     void initPlatform();
+    void initSteam();
     engine
       .init(stage)
       .then(() => {
