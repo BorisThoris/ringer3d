@@ -31,7 +31,8 @@ try {
   await page.screenshot({ path: `${OUT}/1-menu.png` });
   const click = async (text) => {
     const ok = await page.evaluate((t) => {
-      const b = [...document.querySelectorAll('button')].find((x) => x.textContent?.includes(t) && !x.disabled);
+      const all = [...document.querySelectorAll('button')].filter((x) => !x.disabled);
+      const b = all.find((x) => x.getAttribute('aria-label') === t) ?? all.find((x) => x.textContent?.includes(t));
       b?.click();
       return !!b;
     }, text);
