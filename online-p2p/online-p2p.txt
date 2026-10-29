@@ -1,4 +1,5 @@
-[p2p] room code ZBCH
+[p2p] room code QMEP
 [p2p] room listed in browser: true
 [p2p] host roster: Room code | Host | Connected peer to peer
-FAIL [p2p]: match did not start on guest
+[p2p] shot logs identical: true (6 shots compared)
+PASS [p2p]
