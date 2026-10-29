@@ -1,10 +1,10 @@
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
+import { ECONOMY, playerLevel } from '../core/economy';
 import type { PlayerInfo } from '../core/types';
 import { BOT_PROFILES } from '../ai/profiles';
 import { randomSeed } from '../game/maps';
 import { lookFor, MARBLES, uiColor } from '../game/marbles';
 import { wallet } from '../game/wallet';
-import { CoinPill } from './collection';
 import { progress, settings, type GuideMode } from '../game/settings';
 import { fighter, FIGHTERS } from '../game/story';
 import type { Quality } from '../render/marbleMesh';
@@ -72,15 +72,6 @@ export function MainMenu({ go }: { go: (s: 'story' | 'quick' | 'local' | 'online
       ))}
       <div className="menu-foot">
         <button
-          className="btn small collection-btn"
-          onClick={() => {
-            tap();
-            go('collection');
-          }}
-        >
-          Collection <CoinPill />
-        </button>
-        <button
           className="btn small ghost"
           onClick={() => {
             tap();
@@ -88,15 +79,6 @@ export function MainMenu({ go }: { go: (s: 'story' | 'quick' | 'local' | 'online
           }}
         >
           How to play
-        </button>
-        <button
-          className="btn small ghost"
-          onClick={() => {
-            tap();
-            go('settings');
-          }}
-        >
-          Settings
         </button>
       </div>
     </div>
@@ -357,15 +339,69 @@ export interface ResultsInfo {
   scores: { name: string; marble: string; score: number; winner: boolean }[];
   primary: { label: string; action: () => void };
   secondary?: { label: string; action: () => void };
+  /** What this match paid the player (single-player and online matches). */
+  reward?: { coins: number; won: boolean };
 }
 
-export function Results({ info }: { info: ResultsInfo }) {
+/** Counts up to `to` over ~0.9 s, so a reward lands rather than just appears. */
+function useCountUp(to: number, delay = 450): number {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    let raf = 0;
+    const t0 = performance.now() + delay;
+    const step = (t: number) => {
+      const k = Math.min(1, Math.max(0, (t - t0) / 900));
+      setN(Math.round(to * (1 - (1 - k) ** 3)));
+      if (k < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [to, delay]);
+  return n;
+}
+
+export function Results({ info, onCollection }: { info: ResultsInfo; onCollection?: () => void }) {
+  const coins = wallet.use((w) => w.coins);
+  const stats = progress.use((p) => p.stats);
+  const shown = useCountUp(info.reward?.coins ?? 0);
+  const lv = playerLevel(stats);
+  const outcome = info.reward ? (info.reward.won ? 'win' : 'loss') : info.scores.some((s) => s.winner) ? 'win' : 'draw';
   return (
-    <div className="sheet screen" style={{ marginTop: 'auto', marginBottom: 'auto' }}>
-      <div className="screen-head">
+    <div className={`sheet screen results ${outcome}`} style={{ marginTop: 'auto', marginBottom: 'auto' }}>
+      <div className="result-banner">
         <h2>{info.title}</h2>
       </div>
       {info.sub && <p className="lede">{info.sub}</p>}
+      {info.reward && (
+        <div className="reward" aria-label={`You earned ${info.reward.coins} coins`}>
+          <span className="coin big" aria-hidden />
+          <b className="gain">+{shown}</b>
+          <span className="reward-meta">
+            <small>coins earned</small>
+            <span className="xp" style={{ '--p': lv.into / lv.need } as CSSProperties} aria-label={`Level ${lv.level}: ${lv.into} of ${lv.need} XP`}>
+              <i />
+            </span>
+            <small>
+              Level {lv.level} · {lv.into}/{lv.need} XP
+            </small>
+          </span>
+        </div>
+      )}
+      {info.reward && onCollection && coins >= ECONOMY.bagPrice && (
+        <button
+          className="btn bag-nudge"
+          onClick={() => {
+            tap();
+            onCollection();
+          }}
+        >
+          <span className="bag small" aria-hidden />
+          <span>
+            <b>Open a Marble Bag</b>
+            <small>{coins.toLocaleString()} coins: enough for {Math.floor(coins / ECONOMY.bagPrice)}</small>
+          </span>
+        </button>
+      )}
       {info.quote && (
         <div className="list-item">
           <MarbleChip id={info.quote.marble} size={44} />

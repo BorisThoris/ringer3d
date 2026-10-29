@@ -1,4 +1,4 @@
-import { claimDaily, earn, freshWallet, grantPurchase, matchReward, melt, openBag, type ProductId, type Wallet } from '../core/economy';
+import { claimDaily, earn, freshWallet, grantPurchase, matchReward, melt, nextDaily, openBag, type ProductId, type Wallet } from '../core/economy';
 import type { GeneratedMarble } from '../core/marbleGen';
 import { createStore } from './store';
 
@@ -68,6 +68,11 @@ export function claimToday(): { ok: true; coins: number; streak: number } | { ok
 
 export function dailyReady(w: Wallet): boolean {
   return w.lastDaily < today();
+}
+
+/** Today's place in the daily-reward strip, by the same rule a claim uses. */
+export function dailyPreview(w: Wallet) {
+  return nextDaily(w, today());
 }
 
 export function credit(receipt: string, product: ProductId) {

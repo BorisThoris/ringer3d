@@ -95,6 +95,28 @@ export function claimDaily(w: Wallet, day: number): { ok: true; wallet: Wallet; 
   return { ok: true, coins, streak, wallet: { ...w, coins: w.coins + coins, lastDaily: day, streak } };
 }
 
+/** What the next daily claim would be: its day in the streak and its coins (the reward strip). */
+export function nextDaily(w: Wallet, day: number): { streak: number; coins: number; ready: boolean } {
+  const ready = w.lastDaily < day;
+  const streak = !ready ? w.streak : w.lastDaily === day - 1 ? w.streak + 1 : 1;
+  return { streak, coins: ECONOMY.daily[Math.min(streak, ECONOMY.daily.length) - 1], ready };
+}
+
+/**
+ * The player's level, from match stats alone (no state of its own): XP for playing, winning and
+ * every capture; level L needs 100 × L more XP to reach L + 1.
+ */
+export function playerLevel(stats: { played: number; won: number; captured: number }): { level: number; xp: number; into: number; need: number } {
+  const xp = stats.played * 20 + stats.won * 40 + stats.captured * 4;
+  let level = 1;
+  let left = xp;
+  while (left >= level * 100) {
+    left -= level * 100;
+    level++;
+  }
+  return { level, xp, into: left, need: level * 100 };
+}
+
 /** Credit a store purchase once per receipt. */
 export function grantPurchase(w: Wallet, receipt: string, product: ProductId): Wallet {
   const p = PRODUCTS.find((x) => x.id === product);

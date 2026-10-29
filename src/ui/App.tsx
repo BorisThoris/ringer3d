@@ -18,6 +18,10 @@ import { listenForSteamInvites, OnlineHub, RoomLobby } from './online';
 import type { MapChoice } from './components';
 import { HowTo, LocalPlay, MainMenu, QuickPlay, Results, SettingsScreen, type ResultsInfo } from './screens';
 import { Ending, StorySelect, Tower, Versus } from './story';
+import { TopBar } from './topbar';
+
+/** Screens that sit under the top bar (everything but the match and the Tower's cut-scenes). */
+const BAR_SCREENS = new Set<ScreenState['name']>(['menu', 'quick', 'local', 'settings', 'howto', 'story-select', 'online', 'collection', 'tower', 'results']);
 
 type ScreenState =
   | { name: 'menu' | 'quick' | 'local' | 'settings' | 'howto' | 'story-select' | 'online' | 'collection' }
@@ -88,14 +92,21 @@ export function App() {
     setScreen({ name: 'menu' });
   };
 
+  /** Leave a finished match (and its room) for a menu screen. */
+  const leaveTo = (name: 'collection' | 'settings') => {
+    toMenu();
+    setScreen({ name });
+  };
+
   const scoresOf = (players: PlayerInfo[], r: SessionResult) =>
     players.map((p, i) => ({ name: p.name, marble: p.marble, score: r.scores[i] ?? 0, winner: r.winners.includes(i) }));
 
-  const recordStats = (r: SessionResult) => {
-    if (r.aborted || r.localSeats.length !== 1) return;
+  /** Records a finished match; returns the coins it paid, if any. */
+  const recordStats = (r: SessionResult): number | undefined => {
+    if (r.aborted || r.localSeats.length !== 1) return undefined;
     const me = r.localSeats[0];
     // Every finished match pays coins toward Marble Bags (core/economy.ts).
-    rewardMatch(r.winners.length === 1 && r.winners[0] === me, r.scores[me] ?? 0);
+    const coins = rewardMatch(r.winners.length === 1 && r.winners[0] === me, r.scores[me] ?? 0);
     steamMatchEnd({
       won: r.winners.length === 1 && r.winners[0] === me,
       myScore: r.scores[me] ?? 0,
@@ -109,6 +120,7 @@ export function App() {
         captured: p.stats.captured + (r.scores[me] ?? 0),
       },
     }));
+    return coins;
   };
 
   const play = (a: PlayArgs) => {
@@ -124,8 +136,10 @@ export function App() {
       localSeats: a.localSeats,
       net: a.room,
       onEnd: (r) => {
-        recordStats(r);
-        setScreen({ name: 'results', info: a.results(r) });
+        const coins = recordStats(r);
+        const me = r.localSeats.length === 1 ? r.localSeats[0] : -1;
+        const info = a.results(r);
+        setScreen({ name: 'results', info: coins === undefined ? info : { ...info, reward: { coins, won: r.winners.length === 1 && r.winners[0] === me } } });
       },
     });
     setScreen({ name: 'game', online: !!a.room });
@@ -329,7 +343,7 @@ export function App() {
       body = <RoomLobby room={screen.room} onLeave={toMenu} />;
       break;
     case 'results':
-      body = <Results info={screen.info} />;
+      body = <Results info={screen.info} onCollection={() => leaveTo('collection')} />;
       break;
     case 'game':
       body = null;
@@ -339,7 +353,12 @@ export function App() {
   return (
     <>
       {screen.name === 'game' && <Hud online={screen.online} onQuit={toMenu} />}
-      {body && <div className="overlay">{body}</div>}
+      {body && (
+        <div className={BAR_SCREENS.has(screen.name) ? 'overlay has-bar' : 'overlay'}>
+          {BAR_SCREENS.has(screen.name) && <TopBar on={screen.name} go={(t) => (screen.name === 'results' ? leaveTo(t) : setScreen({ name: t }))} />}
+          {body}
+        </div>
+      )}
     </>
   );
 }

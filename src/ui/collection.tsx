@@ -3,7 +3,7 @@ import { bagOdds, ECONOMY, PRODUCTS } from '../core/economy';
 import { generateMarble, type Tier } from '../core/marbleGen';
 import { lookFor, uiColor } from '../game/marbles';
 import { settings } from '../game/settings';
-import { buyBag, claimToday, credit, dailyReady, meltMarble, wallet } from '../game/wallet';
+import { buyBag, claimToday, credit, dailyPreview, meltMarble, wallet } from '../game/wallet';
 import { store } from '../platformStore';
 import { Marble3D, MarbleChip, Screen, tap } from './components';
 
@@ -15,17 +15,6 @@ export const TIER_COLOR: Record<Tier, string> = {
   Mythic: '#ff46be',
 };
 
-/** Coins, as the menu shows them. */
-export function CoinPill() {
-  const coins = wallet.use((w) => w.coins);
-  return (
-    <span className="coin-pill" aria-label={`${coins} coins`}>
-      <span className="coin" aria-hidden />
-      {coins.toLocaleString()}
-    </span>
-  );
-}
-
 /** The collection: Marble Bags, the marbles you've minted, the daily reward and the store. */
 export function Collection({ onBack }: { onBack: () => void }) {
   const w = wallet.use((x) => x);
@@ -34,6 +23,11 @@ export function Collection({ onBack }: { onBack: () => void }) {
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const owned = [...w.owned].reverse();
+  const daily = dailyPreview(w);
+  // "Best value" is the pack with the most coins per dollar; the bonus is measured against the smallest.
+  const perDollar = (p: (typeof PRODUCTS)[number]) => p.coins / p.usd;
+  const best = PRODUCTS.reduce((a, b) => (perDollar(b) > perDollar(a) ? b : a));
+  const bonus = Math.round((perDollar(best) / perDollar(PRODUCTS[0]) - 1) * 100);
   const revealed = reveal ? generateMarble(Number(reveal.slice(1))) : null;
 
   const say = (s: string) => {
@@ -42,7 +36,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <Screen title="Collection" onBack={onBack} wide actions={<CoinPill />}>
+    <Screen title="Collection" onBack={onBack} wide>
       <div className="collection">
         <section className="bag-card">
           <div className="bag" aria-hidden />
@@ -99,18 +93,40 @@ export function Collection({ onBack }: { onBack: () => void }) {
         )}
 
         <section className="daily">
-          <h3>Daily reward</h3>
-          <p>Day {w.streak || 0} streak: come back every day for more.</p>
+          <div className="daily-head">
+            <h3>Daily reward</h3>
+            <small>{daily.ready ? `Day ${daily.streak} is ready` : 'Come back tomorrow to keep your streak'}</small>
+          </div>
+          <ol className="daily-strip">
+            {ECONOMY.daily.map((c, i) => {
+              const d = i + 1;
+              const last = ECONOMY.daily.length;
+              const at = Math.min(daily.streak, last);
+              const state = daily.ready && d === at ? 'today' : d <= Math.min(daily.ready ? daily.streak - 1 : daily.streak, last) ? 'done' : 'later';
+              return (
+                <li key={d} className={`day ${state}${d === last ? ' big' : ''}`} aria-label={`Day ${d}: ${c} coins${state === 'done' ? ', claimed' : state === 'today' ? ', ready' : ''}`}>
+                  <small>Day {d}</small>
+                  <span className="coin" aria-hidden />
+                  <b>{c}</b>
+                  {state === 'done' && (
+                    <span className="tick" aria-hidden>
+                      ✓
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
           <button
-            className="btn"
-            disabled={!dailyReady(w)}
+            className={daily.ready ? 'btn primary' : 'btn'}
+            disabled={!daily.ready}
             onClick={() => {
               tap();
               const r = claimToday();
               say(r.ok ? `+${r.coins} coins (day ${r.streak})` : r.why);
             }}
           >
-            {dailyReady(w) ? 'Claim' : 'Claimed today'}
+            {daily.ready ? `Claim ${daily.coins} coins` : 'Claimed today'}
           </button>
         </section>
 
@@ -157,11 +173,12 @@ export function Collection({ onBack }: { onBack: () => void }) {
 
         <section>
           <h3>Coins</h3>
-          <div className="row wrap">
-            {PRODUCTS.map((p) => (
+          <div className="packs">
+            {PRODUCTS.map((p, i) => (
               <button
                 key={p.id}
-                className="btn"
+                className={`pack${p.id === best.id ? ' best' : ''}`}
+                style={{ '--stack': i + 1 } as CSSProperties}
                 disabled={!!store.unavailable || busy}
                 onClick={async () => {
                   tap();
@@ -174,7 +191,15 @@ export function Collection({ onBack }: { onBack: () => void }) {
                   } else say(r.error ?? 'The purchase did not go through.');
                 }}
               >
-                {p.label}
+                {p.id === best.id && bonus > 0 && <span className="ribbon">Best value</span>}
+                <span className="pile" aria-hidden>
+                  {Array.from({ length: i + 2 }, (_, k) => (
+                    <span key={k} className="coin" />
+                  ))}
+                </span>
+                <b>{p.coins.toLocaleString()}</b>
+                <small>{p.id === best.id && bonus > 0 ? `coins · +${bonus}%` : 'coins'}</small>
+                <span className="price">US${p.usd.toFixed(2)}</span>
               </button>
             ))}
           </div>

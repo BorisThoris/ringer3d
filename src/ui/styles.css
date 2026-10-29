@@ -463,7 +463,7 @@ button {
 .menu-foot {
   display: flex;
   gap: 10px;
-  justify-content: space-between;
+  justify-content: center;
 }
 
 /* ---------- Marble swatch -------------------------------------------------------------- */
@@ -1475,32 +1475,12 @@ button {
 }
 
 /* ---- Collection: coins, Marble Bags, generated marbles -------------------------------- */
-.coin-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 12px 4px 6px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.35);
-  border: 1.5px solid rgba(255, 210, 63, 0.6);
-  font: 800 var(--t-md) / 1 var(--display);
-  color: var(--sun);
-  white-space: nowrap;
-}
 .coin {
   width: 18px;
   height: 18px;
   border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, #fff6c2, var(--sun) 45%, #c98a00);
   box-shadow: inset 0 0 0 2px rgba(120, 70, 0, 0.45);
-}
-.collection-btn {
-  gap: 8px;
-  border-color: rgba(255, 210, 63, 0.7);
-}
-.collection-btn .coin-pill {
-  padding: 2px 8px 2px 4px;
-  font-size: var(--t-sm);
 }
 .collection {
   display: flex;
@@ -1570,13 +1550,87 @@ button {
 }
 .daily {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 16px;
+  flex-direction: column;
+  gap: 10px;
 }
-.daily p {
+.daily-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.daily-head h3 {
   margin: 0;
-  flex: 1;
+}
+.daily-head small {
+  color: var(--chalk-dim);
+  font-weight: 700;
+}
+/* Seven days, the last one a big payout: the streak you don't want to break. */
+.daily-strip {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr) 1.5fr;
+  gap: 6px;
+}
+.day {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 2px 7px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1.5px solid var(--glass-line);
+  font-family: var(--display);
+}
+.day small {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: var(--chalk-dim);
+  white-space: nowrap;
+}
+.day b {
+  font-size: var(--t-sm);
+  font-weight: 800;
+  color: var(--sun);
+}
+.day.big {
+  background: linear-gradient(160deg, rgba(255, 210, 63, 0.3), rgba(255, 70, 190, 0.18));
+  border-color: rgba(255, 210, 63, 0.6);
+}
+.day.big .coin {
+  width: 26px;
+  height: 26px;
+}
+.day.done {
+  opacity: 0.55;
+}
+.day.today {
+  background: linear-gradient(180deg, rgba(255, 224, 102, 0.4), rgba(255, 184, 31, 0.18));
+  border-color: var(--sun);
+  box-shadow: 0 0 0 3px rgba(255, 210, 63, 0.25), 0 8px 22px rgba(255, 196, 0, 0.28);
+  animation: today-glow 1.6s ease-in-out infinite;
+}
+@keyframes today-glow {
+  50% {
+    transform: translateY(-3px);
+    box-shadow: 0 0 0 5px rgba(255, 210, 63, 0.18), 0 12px 26px rgba(255, 196, 0, 0.36);
+  }
+}
+.day .tick {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: var(--mint);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
 }
 .gen-grid {
   display: grid;
@@ -1618,4 +1672,395 @@ button {
   background: rgba(0, 0, 0, 0.6);
   font-weight: 800;
   text-align: center;
+}
+
+/* ---- Top bar: profile and level on the left, coins and the shop on the right ---------- */
+.overlay.has-bar {
+  gap: 12px;
+}
+.overlay.has-bar > .screen {
+  max-height: calc(100% - 68px);
+}
+.topbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  animation: bar-in 420ms var(--spring) both;
+}
+@keyframes bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+}
+.profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 5px 16px 5px 5px;
+  border-radius: var(--r-pill);
+  background: rgba(12, 8, 28, 0.62);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1.5px solid var(--glass-line);
+}
+.avatar {
+  position: relative;
+  flex: none;
+  display: grid;
+}
+.avatar .lv {
+  position: absolute;
+  right: -6px;
+  bottom: -5px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #7ad8ff, var(--tide));
+  border: 2px solid var(--ink);
+  font: 900 0.72rem/1 var(--display);
+  color: white;
+}
+.who {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.who b {
+  font: 800 var(--t-md) / 1 var(--display);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
+}
+.who small {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--chalk-dim);
+  white-space: nowrap;
+}
+.xp {
+  --p: 0;
+  display: block;
+  width: 110px;
+  height: 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+.xp i {
+  display: block;
+  height: 100%;
+  width: calc(var(--p) * 100%);
+  border-radius: inherit;
+  background: linear-gradient(90deg, #7ad8ff, var(--tide));
+  transition: width 900ms var(--out);
+}
+.wallet {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.coin-bank {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 44px;
+  padding: 0 5px 0 8px;
+  border-radius: var(--r-pill);
+  border: 1.5px solid rgba(255, 210, 63, 0.65);
+  background: rgba(12, 8, 28, 0.66);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  cursor: pointer;
+  font: 800 var(--t-lg) / 1 var(--display);
+  color: var(--sun);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
+}
+.coin-bank .coin {
+  width: 24px;
+  height: 24px;
+}
+.coin-bank .num {
+  display: inline-block;
+  min-width: 2ch;
+  animation: score-pop 420ms var(--spring);
+}
+.coin-bank .plus {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #5ef0a8, var(--jade));
+  box-shadow: 0 3px 0 #0a7a43;
+  color: white;
+  font-size: 1.3rem;
+  text-shadow: none;
+}
+.bar-btn {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  border: 1.5px solid var(--glass-line);
+  background: rgba(12, 8, 28, 0.66);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.32);
+  cursor: pointer;
+  transition: transform 140ms var(--spring);
+}
+.bar-btn:hover,
+.coin-bank:hover {
+  transform: translateY(-2px);
+}
+.bar-btn:active,
+.coin-bank:active {
+  transform: translateY(2px) scale(0.96);
+}
+.bar-btn.shop {
+  color: var(--sun);
+  background: linear-gradient(180deg, rgba(255, 210, 63, 0.3), rgba(12, 8, 28, 0.66));
+  border-color: rgba(255, 210, 63, 0.6);
+}
+.bar-btn[aria-current='true'] {
+  border-color: var(--chalk);
+}
+.badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #ff2f4f;
+  border: 2px solid var(--ink);
+  color: white;
+  font: 900 0.75rem/1 var(--display);
+  animation: badge-bob 1.4s ease-in-out infinite;
+}
+@keyframes badge-bob {
+  50% {
+    transform: scale(1.18);
+  }
+}
+@media (max-width: 480px) {
+  .who small,
+  .profile .xp,
+  .logo small {
+    display: none;
+  }
+  .who b {
+    max-width: 92px;
+  }
+  .profile {
+    padding-right: 12px;
+  }
+}
+
+/* ---- Coin packs: offer cards, the best-value one called out -------------------------- */
+.packs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.pack {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 22px 8px 0;
+  border-radius: var(--r-card);
+  border: 1.5px solid rgba(255, 210, 63, 0.45);
+  background: linear-gradient(170deg, rgba(255, 210, 63, 0.22), rgba(20, 12, 40, 0.5));
+  overflow: hidden;
+  cursor: pointer;
+  font-family: var(--display);
+  transition: transform 140ms var(--spring);
+}
+.pack:hover:not(:disabled) {
+  transform: translateY(-3px);
+}
+.pack:disabled {
+  cursor: not-allowed;
+  filter: saturate(0.55);
+  opacity: 0.75;
+}
+.pack.best {
+  border: 2px solid var(--sun);
+  background: linear-gradient(170deg, rgba(255, 210, 63, 0.42), rgba(255, 70, 190, 0.2) 60%, rgba(20, 12, 40, 0.5));
+  box-shadow: 0 10px 28px rgba(255, 196, 0, 0.22);
+}
+.pile {
+  position: relative;
+  height: 40px;
+  width: 64px;
+  margin-bottom: 4px;
+}
+.pile .coin {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+}
+.pile .coin:nth-child(1) {
+  left: 19px;
+  bottom: 0;
+}
+.pile .coin:nth-child(2) {
+  left: 4px;
+  bottom: 5px;
+}
+.pile .coin:nth-child(3) {
+  left: 34px;
+  bottom: 5px;
+}
+.pile .coin:nth-child(4) {
+  left: 19px;
+  bottom: 14px;
+}
+.pack b {
+  font-size: var(--t-xl);
+  font-weight: 800;
+  color: var(--sun);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
+}
+.pack small {
+  font-weight: 700;
+  color: var(--chalk-dim);
+}
+.pack .price {
+  align-self: stretch;
+  margin-top: 10px;
+  padding: 9px 0;
+  background: linear-gradient(180deg, #5ef0a8, var(--jade));
+  color: #052c18;
+  font-weight: 800;
+}
+.ribbon {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 4px 0;
+  background: #ff2f4f;
+  color: white;
+  font: 800 0.66rem/1.2 var(--display);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ---- Results: a banner, the coins you earned, and what they buy ---------------------- */
+.results {
+  text-align: center;
+}
+.result-banner {
+  --band: linear-gradient(180deg, #ffe066, var(--sun) 55%, #ffb81f);
+  margin: 4px auto 0;
+  padding: 10px 34px 12px;
+  border-radius: 18px;
+  background: var(--band);
+  box-shadow: 0 6px 0 #b97a00, 0 16px 40px rgba(255, 196, 0, 0.35);
+  animation: banner-slam 560ms var(--spring) both;
+}
+.results.loss .result-banner {
+  --band: linear-gradient(180deg, #8fb3ff, #4a6fd8 60%, #3553b0);
+  box-shadow: 0 6px 0 #22397d, 0 16px 40px rgba(60, 100, 220, 0.35);
+}
+.results.draw .result-banner {
+  --band: linear-gradient(180deg, #d8d2ff, #a59bdc 60%, #7a6fb8);
+  box-shadow: 0 6px 0 #4d4485, 0 16px 40px rgba(120, 100, 220, 0.3);
+}
+.result-banner h2 {
+  margin: 0;
+  font: 800 var(--t-2xl) / 1.05 var(--display);
+  letter-spacing: -0.02em;
+  color: white;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.28);
+}
+.results.win .result-banner h2 {
+  color: var(--accent-ink);
+  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.5);
+}
+@keyframes banner-slam {
+  from {
+    opacity: 0;
+    transform: scale(1.6) rotate(-4deg);
+  }
+}
+.results .list-item {
+  text-align: left;
+}
+.reward {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--r-card);
+  background: radial-gradient(circle at 30% 50%, rgba(255, 210, 63, 0.3), rgba(20, 12, 40, 0.4) 70%);
+  border: 1.5px solid rgba(255, 210, 63, 0.5);
+  animation: pop 420ms 300ms var(--spring) both;
+}
+.coin.big {
+  width: 46px;
+  height: 46px;
+  animation: coin-spin 1.2s 450ms ease-out both;
+}
+@keyframes coin-spin {
+  from {
+    transform: rotateY(0) scale(0.4);
+  }
+  60% {
+    transform: rotateY(720deg) scale(1.15);
+  }
+  to {
+    transform: rotateY(720deg) scale(1);
+  }
+}
+.reward .gain {
+  font: 800 var(--t-3xl) / 1 var(--display);
+  color: var(--sun);
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.4);
+  min-width: 3ch;
+  text-align: left;
+}
+.reward-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.reward-meta small {
+  font-weight: 800;
+  color: var(--chalk-dim);
+}
+.bag-nudge {
+  justify-content: flex-start;
+  text-align: left;
+  border-color: rgba(255, 210, 63, 0.7);
+  background: linear-gradient(115deg, rgba(255, 210, 63, 0.3), rgba(20, 12, 40, 0.4));
+}
+.bag-nudge > span:not(.bag) {
+  display: flex;
+  flex-direction: column;
+}
+.bag-nudge small {
+  font-weight: 700;
+  color: var(--chalk-dim);
+}
+.bag-nudge .bag.small {
+  flex: none;
 }
