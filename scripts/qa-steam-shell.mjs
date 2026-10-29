@@ -51,7 +51,42 @@ try {
       canvas: !!document.querySelector('canvas'),
     })),
   );
-  if (report.steamBridge) report.me = await page.evaluate(() => window.steam.me());
+  if (report.steamBridge) {
+    report.me = await page.evaluate(() => window.steam.me());
+    // The live Steam calls the game makes, through the bridge, one account.
+    report.live = await page.evaluate(async () => {
+      const s = window.steam;
+      const me = (await s.me()).steamId;
+      const got = [];
+      const off = s.onP2P((from, text) => got.push({ from, text }));
+      const lobby = await s.createLobby('public', 2);
+      await s.setLobbyData(lobby, { game: 'ringer3d', code: 'QA', name: 'qa' });
+      await new Promise((r) => setTimeout(r, 1500));
+      const listed = (await s.listLobbies()).some((l) => l.id === lobby);
+      const owner = (await s.lobbyOwner(lobby)) === me;
+      const members = await s.lobbyMembers(lobby);
+      const data = (await s.lobbyData(lobby)).game ?? null;
+      const sent = await s.sendP2P(me, JSON.stringify({ t: 'qa' }));
+      await new Promise((r) => setTimeout(r, 1500));
+      off();
+      await s.leaveLobby(lobby);
+      const ticket = await s.webApiTicket('ringer3d-store');
+      return {
+        lobby: { listed, owner, members: members.length, data },
+        p2p: { sent, received: got.some((m) => m.from === me && m.text.includes('qa')) },
+        // syncCloud writes these on launch
+        cloud: {
+          settings: !!(await s.cloudRead('settings.json')),
+          wallet: !!(await s.cloudRead('wallet.json')),
+          roundTrip: (await s.cloudWrite('qa.json', 'qa')) && (await s.cloudRead('qa.json')) === 'qa',
+          savedAt: localStorage.getItem('ringer3d.savedAt.v1'),
+        },
+        stats: { set: await s.statSet('NumGames', (await s.statGet('NumGames')) ?? 0), store: await s.statsStore() },
+        achievementsCall: Array.isArray(await s.achievements(['FIRST_WIN'])),
+        ticket: typeof ticket === 'string' && ticket.length > 20,
+      };
+    });
+  }
   await page.screenshot({ path: `${OUT}/steam-shell.png` });
   browser.disconnect();
 } catch (e) {

@@ -77,7 +77,7 @@ class FakeSteam {
       onLobbyChange: listen(this.lobby),
       onJoinRequested: listen(this.join),
       unlock: async () => true,
-      achievements: async () => [],
+      achievements: async (_names: string[]) => [],
       statGet: async () => 0,
       statSet: async () => true,
       statsStore: async () => true,

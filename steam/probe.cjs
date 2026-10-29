@@ -31,7 +31,12 @@ app.whenReady().then(async () => {
       return { enabled: c.cloud.isEnabledForApp(), wrote: ok, readBack: ok ? c.cloud.readFile('probe.txt') : null };
     });
     await step('stats', () => ({ get: c.stats.getInt('games_played') }));
-    await step('achievements', () => c.achievement.names().slice(0, 10));
+    // App 480 (Spacewar) has its own achievements; ours exist only once the real app is set up.
+    await step('achievements', () => Object.fromEntries(['ACH_WIN_ONE_GAME', 'FIRST_WIN'].map((n) => [n, c.achievement.isActivated(n)])));
+    await step('statsRoundTrip', () => {
+      const before = c.stats.getInt('NumGames');
+      return { spacewarNumGames: before, set: before !== null && c.stats.setInt('NumGames', before), stored: c.stats.store() };
+    });
     await step('lobby', async () => {
       const lobby = await c.matchmaking.createLobby(2, 2);
       lobby.mergeFullData({ game: 'ringer3d-probe', version: '0' });

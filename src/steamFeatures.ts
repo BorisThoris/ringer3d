@@ -75,16 +75,22 @@ async function syncCloud() {
   const at = savedAt();
   for (const c of CLOUD) {
     const text = await s.cloudRead(c.file);
-    if (!text) continue;
+    let remoteAt = -1;
     try {
-      const remote = JSON.parse(text) as { at: number; data: object };
-      if (remote.at > (at[c.file] ?? 0)) {
+      if (text) remoteAt = (JSON.parse(text) as { at: number }).at;
+      if (text && remoteAt > (at[c.file] ?? 0)) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (c.store as any).set(remote.data);
-        at[c.file] = remote.at;
+        (c.store as any).set((JSON.parse(text) as { data: object }).data);
+        at[c.file] = remoteAt;
+        continue;
       }
     } catch {
       /* a damaged cloud file loses to the local copy */
+    }
+    // The local copy wins (or the cloud has none yet): upload it now, not on the next change.
+    if (remoteAt < (at[c.file] ?? 0) || !text || remoteAt < 0) {
+      at[c.file] = at[c.file] ?? Date.now();
+      void s.cloudWrite(c.file, JSON.stringify({ at: at[c.file], data: c.store.get() }));
     }
   }
   localStorage.setItem(AT_KEY, JSON.stringify(at));

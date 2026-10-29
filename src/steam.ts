@@ -39,7 +39,8 @@ export interface SteamBridge {
 
   // Achievements, stats, cloud, presence, overlay
   unlock(achievement: string): Promise<boolean>;
-  achievements(): Promise<string[]>;
+  /** Which of these achievements the player has unlocked. */
+  achievements(names: string[]): Promise<string[]>;
   statGet(name: string): Promise<number | null>;
   statSet(name: string, value: number): Promise<boolean>;
   statsStore(): Promise<boolean>;

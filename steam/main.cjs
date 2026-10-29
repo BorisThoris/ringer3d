@@ -11,7 +11,8 @@ const steamworks = require('steamworks.js');
 // else steam_appid.txt next to this file (480 = Valve's test app, for development).
 const APP_ID = Number(process.env.STEAM_APP_ID || process.env.SteamAppId || readText(path.join(__dirname, 'steam_appid.txt')) || 480);
 // The game: a packaged copy in ./app, or the repo's web build while developing.
-const DIST = fs.existsSync(path.join(__dirname, 'app', 'index.html')) ? path.join(__dirname, 'app') : path.join(__dirname, '..', 'dist');
+// Packaged: the copy `npm run pack` made. Development: the fresh build (app/ may be a stale pack copy).
+const DIST = app.isPackaged ? path.join(__dirname, 'app') : path.join(__dirname, '..', 'dist');
 
 function readText(p) {
   try {
@@ -68,7 +69,8 @@ const api = {
   inviteFriends: (id) => client.overlay.activateInviteDialog(BigInt(id)),
   sendP2P: (steamId, text) => client.networking.sendP2PPacket(BigInt(steamId), RELIABLE, Buffer.from(text, 'utf8')),
   unlock: (name) => client.achievement.activate(name),
-  achievements: () => client.achievement.names(),
+  // steamworks.js can't list an app's achievements; the game names them, Steam says which are unlocked.
+  achievements: (names) => (Array.isArray(names) ? names : []).filter((n) => client.achievement.isActivated(String(n))),
   statGet: (name) => client.stats.getInt(name),
   statSet: (name, v) => client.stats.setInt(name, v),
   statsStore: () => client.stats.store(),
