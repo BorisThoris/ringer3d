@@ -1,6 +1,8 @@
-10-29 12:45:07.371  3056  3056 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
-10-29 12:45:07.440  3056  3056 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
-10-29 12:45:07.452  3056  3056 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
-10-29 12:45:09.662  3056  3056 W Capacitor/Console: File: https://localhost/assets/index-CKfiQKX2.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
-10-29 12:45:26.520  3056  3056 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-10-29 12:45:26.795  3056  3056 I Capacitor/Console: File:  - Line 333 - Msg: undefined
+10-29 12:54:25.749  2915  2915 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
+10-29 12:54:25.763  2915  2915 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
+10-29 12:54:25.765  2915  2915 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
+10-29 12:54:25.767  2915  2915 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
+10-29 12:54:26.908  2915  2915 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+10-29 12:54:26.968  2915  2915 W Capacitor/Console: File: https://localhost/assets/index-Dq4uDmC0.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+10-29 12:54:37.360  2915  2915 I Capacitor/Console: File:  - Line 333 - Msg: undefined
+10-29 12:55:07.235  1039  1084 E JavaBinder: *** Uncaught remote exception! Exceptions are not yet supported across processes. Client PID 3976 UID 10118.
