@@ -1,3 +1,4 @@
+import { generateMarble, marbleLook } from '../core/marbleGen';
 /** Visual identity of a marble. Purely cosmetic: every marble plays identically (fairness). */
 export type MarbleCore = 'catseye' | 'swirl' | 'solid' | 'galaxy' | 'steelie' | 'onyx' | 'opal' | 'neon' | 'onionskin' | 'clearie';
 
@@ -56,3 +57,22 @@ export const MIB_LOOKS: MarbleLook[] = [
   { id: 'mib-g', name: 'Mib', core: 'swirl', base: '#e0215f', accent: '#ffffff', accent2: '#ffe14d', clarity: 0.34, glow: 0.25 },
   { id: 'mib-h', name: 'Mib', core: 'onionskin', base: '#f06a00', accent: '#1f5fbf', accent2: '#ffffff', clarity: 0.3, glow: 0.2 },
 ];
+
+const generatedLooks = new Map<string, MarbleLook>();
+
+/**
+ * Any marble by id: the named ones above, or a generated collectible ("g" + seed, see
+ * core/marbleGen.ts), rebuilt from its seed. Peers and replays only ever send the id.
+ */
+export function lookFor(id: string | undefined | null): MarbleLook {
+  if (id && MARBLES[id]) return MARBLES[id];
+  if (id && /^g\d+$/.test(id)) {
+    let look = generatedLooks.get(id);
+    if (!look) {
+      look = marbleLook(generateMarble(Number(id.slice(1))));
+      generatedLooks.set(id, look);
+    }
+    return look;
+  }
+  return MARBLES.ember;
+}

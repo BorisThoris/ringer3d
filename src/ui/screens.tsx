@@ -2,13 +2,21 @@ import { useState, type CSSProperties } from 'react';
 import type { PlayerInfo } from '../core/types';
 import { BOT_PROFILES } from '../ai/profiles';
 import { randomSeed } from '../game/maps';
-import { MARBLES, uiColor } from '../game/marbles';
+import { lookFor, MARBLES, uiColor } from '../game/marbles';
+import { wallet } from '../game/wallet';
+import { CoinPill } from './collection';
 import { progress, settings, type GuideMode } from '../game/settings';
 import { fighter, FIGHTERS } from '../game/story';
 import type { Quality } from '../render/marbleMesh';
 import { Chips, MapPicker, Marble3D, MarbleChip, MarblePicker, Screen, tap, type MapChoice } from './components';
 
 export const PLAYABLE_MARBLES = Object.keys(MARBLES).filter((m) => m !== 'mib' && m !== 'obsidian');
+
+/** The named marbles plus every generated one you own, newest first. */
+function usePlayable(): string[] {
+  const owned = wallet.use((w) => w.owned);
+  return [...owned.map((o) => o.id).reverse(), ...PLAYABLE_MARBLES];
+}
 
 /** The title, one marble colour per letter (Ember, sunshine, Jade, Tide, Nova, Volt). */
 const LOGO: [string, string][] = [
@@ -20,7 +28,7 @@ const LOGO: [string, string][] = [
   ['r', '#00d8ff'],
 ];
 
-export function MainMenu({ go }: { go: (s: 'story' | 'quick' | 'local' | 'online' | 'settings' | 'howto') => void }) {
+export function MainMenu({ go }: { go: (s: 'story' | 'quick' | 'local' | 'online' | 'settings' | 'howto' | 'collection') => void }) {
   const run = progress.use((p) => p.run);
   const items: { id: 'story' | 'quick' | 'local' | 'online'; title: string; sub: string; marble: string; hero?: boolean }[] = [
     { id: 'story', title: 'Tower', sub: run ? `Continue as ${fighter(run.fighter).name}, stage ${run.stage + 1} of 8` : 'Eight rings. One Black Taw.', marble: 'obsidian', hero: true },
@@ -44,7 +52,7 @@ export function MainMenu({ go }: { go: (s: 'story' | 'quick' | 'local' | 'online
           className={`menu-card${it.hero ? ' hero' : ''}`}
           style={
             {
-              '--c': uiColor(MARBLES[it.marble]),
+              '--c': uiColor(lookFor(it.marble)),
               '--sheen': `${1.2 + i * 1.4}s`,
               animation: `sheet-in 520ms ${260 + i * 90}ms both cubic-bezier(0.34, 1.56, 0.64, 1)`,
             } as CSSProperties
@@ -62,6 +70,20 @@ export function MainMenu({ go }: { go: (s: 'story' | 'quick' | 'local' | 'online
           <span className="chev">›</span>
         </button>
       ))}
+      <button
+        className="menu-card collection-card"
+        onClick={() => {
+          tap();
+          go('collection');
+        }}
+      >
+        <span className="bag small" aria-hidden />
+        <span>
+          <h3>Collection</h3>
+          <p>Marble Bags, your marbles, daily reward</p>
+        </span>
+        <CoinPill />
+      </button>
       <div className="menu-foot">
         <button
           className="btn small ghost"
@@ -90,6 +112,7 @@ const BOT_SKILLS = ['rookie', 'novice', 'casual', 'regular', 'skilled', 'expert'
 
 export function QuickPlay({ onBack, onStart }: { onBack: () => void; onStart: (map: MapChoice, players: PlayerInfo[]) => void }) {
   const st = settings.use((s) => s);
+  const playable = usePlayable();
   const [map, setMap] = useState<MapChoice>(() => ({ arena: 'culdesac', difficulty: 'medium', seed: randomSeed() }));
   const [diff, setDiff] = useState<(typeof BOT_SKILLS)[number]>('casual');
   const [opp, setOpp] = useState('tide');
@@ -127,7 +150,7 @@ export function QuickPlay({ onBack, onStart }: { onBack: () => void; onStart: (m
       <div className="taw-preview">
         <Marble3D id={st.marble} size={150} />
       </div>
-      <MarblePicker value={st.marble} onChange={(m) => settings.set({ marble: m })} options={PLAYABLE_MARBLES} />
+      <MarblePicker value={st.marble} onChange={(m) => settings.set({ marble: m })} options={playable} />
       <button
         className="btn primary"
         onClick={() => {
@@ -173,7 +196,7 @@ export function LocalPlay({ onBack, onStart }: { onBack: () => void; onStart: (m
             <div style={{ width: '100%' }}>
               <div className="chips">
                 {PLAYABLE_MARBLES.map((m) => (
-                  <button key={m} className="chip" aria-pressed={p.marble === m} aria-label={MARBLES[m].name} onClick={() => update(i, { marble: m })} style={{ padding: 6, minHeight: 40 }}>
+                  <button key={m} className="chip" aria-pressed={p.marble === m} aria-label={lookFor(m).name} onClick={() => update(i, { marble: m })} style={{ padding: 6, minHeight: 40 }}>
                     <MarbleChip id={m} size={26} />
                   </button>
                 ))}
@@ -213,6 +236,7 @@ export function LocalPlay({ onBack, onStart }: { onBack: () => void; onStart: (m
 
 export function SettingsScreen({ onBack }: { onBack: () => void }) {
   const s = settings.use((x) => x);
+  const playable = usePlayable();
   return (
     <Screen title="Settings" onBack={onBack}>
       <label className="field">
@@ -223,7 +247,7 @@ export function SettingsScreen({ onBack }: { onBack: () => void }) {
       <div className="taw-preview">
         <Marble3D id={s.marble} size={150} />
       </div>
-      <MarblePicker value={s.marble} onChange={(m) => settings.set({ marble: m })} options={PLAYABLE_MARBLES} />
+      <MarblePicker value={s.marble} onChange={(m) => settings.set({ marble: m })} options={playable} />
       <div className="section-title">Aim guide</div>
       <Chips<GuideMode>
         label="Aim guide"

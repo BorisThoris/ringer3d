@@ -3,6 +3,7 @@ import { BOT_PROFILES } from '../ai/profiles';
 import type { Shot } from '../core/types';
 import { ARENA_LIST, type ArenaId } from '../game/arenas';
 import { generateMap, type Difficulty } from '../game/maps';
+import { PROP_TRAITS } from '../core/props';
 import { generateMarble, HUE_NAMES, MARBLE_WORDS, marbleFixtures, RARITY } from '../core/marbleGen';
 import { botAgent, playMatch, randomAgent, type Agent } from './agents';
 import { HeadlessGame, type GameSpec } from './game';
@@ -145,7 +146,7 @@ function exportBundle(perLevel: number) {
   for (const arena of ['desk', 'culdesac', 'grass', 'sand', 'ice', 'gravel'] as ArenaId[])
     for (const difficulty of ['easy', 'medium', 'hard'] as Difficulty[])
       for (let i = 0; i < perLevel; i++) maps.push(generateMap({ arena, difficulty, seed: 1000 + i * 37 }));
-  return { maps, rarity: RARITY, hueNames: HUE_NAMES, words: MARBLE_WORDS, fixtures: marbleFixtures() };
+  return { maps, props: PROP_TRAITS, rarity: RARITY, hueNames: HUE_NAMES, words: MARBLE_WORDS, fixtures: marbleFixtures() };
 }
 
 async function main() {

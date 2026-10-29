@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { TARGET_COUNT } from '../core/constants';
-import { MARBLES, MIB_LOOKS, uiColor } from '../game/marbles';
+import { lookFor, MIB_LOOKS, uiColor } from '../game/marbles';
 import { hud } from '../game/store';
 import { engine } from './engine';
 import { MarbleChip, tap } from './components';
@@ -26,7 +26,7 @@ export function Hud({ onQuit, online }: { onQuit: () => void; online: boolean })
   if (!s.active) return null;
   const session = engine.session;
   // The player who is up colours the controls.
-  const upColour = uiColor(MARBLES[s.players[s.current]?.marble]);
+  const upColour = uiColor(lookFor(s.players[s.current]?.marble));
 
   return (
     <div className="hud" style={{ '--c': upColour } as CSSProperties}>
@@ -36,7 +36,7 @@ export function Hud({ onQuit, online }: { onQuit: () => void; online: boolean })
             <div
               key={i}
               className={`score-pill${i === s.current ? ' active' : ''}${p.connected ? '' : ' off'}`}
-              style={{ '--c': uiColor(MARBLES[p.marble]) } as CSSProperties}
+              style={{ '--c': uiColor(lookFor(p.marble)) } as CSSProperties}
             >
               <MarbleChip id={p.marble} size={32} />
               <span className="name">

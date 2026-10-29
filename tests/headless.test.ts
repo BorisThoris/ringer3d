@@ -87,3 +87,44 @@ describe('generated marbles', () => {
     expect(marbleFixtures().length).toBe(45);
   });
 });
+
+import { claimDaily, ECONOMY, freshWallet, grantPurchase, matchReward, melt, openBag } from '../src/core/economy';
+
+describe('economy', () => {
+  it('a bag costs its price and mints the seed\'s marble', () => {
+    const w = { ...freshWallet(), coins: 1000 };
+    const r = openBag(w, 777, 5);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.wallet.coins).toBe(1000 - ECONOMY.bagPrice);
+    expect(r.wallet.owned).toEqual([{ id: 'g777', tier: r.marble.tier, at: 5 }]);
+    expect(openBag({ ...freshWallet(), coins: 10 }, 1).ok).toBe(false);
+  });
+
+  it('melting pays the tier and removes the marble', () => {
+    const r = openBag({ ...freshWallet(), coins: 300 }, 42);
+    if (!r.ok) throw new Error('bag');
+    const m = melt(r.wallet, 'g42');
+    expect(m.ok && m.wallet.owned.length === 0 && m.coins === ECONOMY.melt[r.marble.tier]).toBe(true);
+    expect(melt(r.wallet, 'g43').ok).toBe(false);
+  });
+
+  it('daily streaks grow, reset after a gap, and pay once a day', () => {
+    let w = freshWallet();
+    const a = claimDaily(w, 100);
+    if (!a.ok) throw new Error();
+    w = a.wallet;
+    expect(claimDaily(w, 100).ok).toBe(false);
+    const b = claimDaily(w, 101);
+    expect(b.ok && b.streak === 2).toBe(true);
+    const c = claimDaily(w, 105);
+    expect(c.ok && c.streak === 1).toBe(true);
+  });
+
+  it('a store receipt is credited once', () => {
+    const w = grantPurchase(freshWallet(), 'r1', 'coins_small');
+    expect(w.coins).toBe(ECONOMY.startCoins + 500);
+    expect(grantPurchase(w, 'r1', 'coins_small')).toBe(w);
+    expect(matchReward({ won: true, captured: 7 })).toBe(95);
+  });
+});

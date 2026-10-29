@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from '
 import { WORLD } from '../core/constants';
 import { ARENA_LIST, ARENAS, type ArenaId } from '../game/arenas';
 import { DIFFICULTIES, generateMap, randomSeed, type Difficulty, type MapDef } from '../game/maps';
-import { MARBLES, type MarbleLook } from '../game/marbles';
+import { lookFor, type MarbleLook } from '../game/marbles';
 import { sound } from '../render/audio';
 import { groundSwatch } from '../render/groundArt';
 import { MarblePreview } from '../render/preview';
@@ -32,7 +32,7 @@ export function marbleGradient(look: MarbleLook): string {
 }
 
 export function MarbleChip({ id, size = 36, style }: { id: string; size?: number; style?: CSSProperties }) {
-  const look = MARBLES[id] ?? MARBLES.ember;
+  const look = lookFor(id);
   return <span className="marble" aria-hidden style={{ width: size, height: size, background: marbleGradient(look), ...style }} />;
 }
 
@@ -253,7 +253,7 @@ export function MarblePicker({ value, onChange, options, locked = [] }: { value:
           }}
         >
           <MarbleChip id={id} size={44} />
-          {MARBLES[id]?.name ?? id}
+          {lookFor(id).name}
         </button>
       ))}
     </div>
@@ -288,7 +288,7 @@ export function Marble3D({ id, size = 120, accent, style }: { id: string; size?:
   const ref = useRef<HTMLCanvasElement>(null);
   const preview = useRef<MarblePreview | null>(null);
   const quality = settings.use((s) => s.quality);
-  const look = MARBLES[id] ?? MARBLES.ember;
+  const look = lookFor(id);
 
   useEffect(() => {
     if (quality === 'low' || !ref.current) return;

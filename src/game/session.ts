@@ -11,7 +11,7 @@ import { haptic, sound } from '../render/audio';
 import type { AimView, GameView } from '../render/GameView';
 import { ARENAS, arenaId, type ArenaId } from './arenas';
 import { generateMap, type Difficulty, type MapDef } from './maps';
-import { MARBLES } from './marbles';
+import { lookFor } from './marbles';
 import { capGuide, guideLength, settings, type GuideMode } from './settings';
 import { hud, showBanner } from './store';
 
@@ -112,7 +112,7 @@ export class GameSession {
     const v = this.view;
     v.loadArena(this.opts.arena);
     v.setMap(this.map.pieces);
-    v.bindMatch(this.match, this.opts.players.map((p) => MARBLES[p.marble] ?? MARBLES.ember));
+    v.bindMatch(this.match, this.opts.players.map((p) => lookFor(p.marble)));
     v.aim = this.aim;
     if (this.isDemo) this.aim.guideLength = 0;
     v.camMode = this.isDemo ? 'attract' : 'overview';
@@ -235,7 +235,7 @@ export class GameSession {
         }
         break;
       case 'capture': {
-        const look = MARBLES[this.opts.players[e.player].marble];
+        const look = lookFor(this.opts.players[e.player].marble);
         this.view.burst(e.pos, look?.accent ?? '#ffffff');
         if (!demo) {
           sound.chime('capture');
@@ -341,7 +341,7 @@ export class GameSession {
     this.incoming.forEach((_, n) => {
       if (n < this.match.shotsTaken) this.incoming.delete(n);
     });
-    this.view.bindMatch(this.match, this.opts.players.map((p) => MARBLES[p.marble] ?? MARBLES.ember));
+    this.view.bindMatch(this.match, this.opts.players.map((p) => lookFor(p.marble)));
     this.view.aim = this.aim;
     this.aim.firstShot = this.match.firstShotOfTurn;
     this.aim.placeAngle = this.match.seatAngle(this.match.current);
@@ -430,7 +430,7 @@ export class GameSession {
       const t = b.body.translation();
       if (!isOutsideRing(t.x, t.z)) continue;
       this.crossed.add(b.id);
-      const look = MARBLES[this.opts.players[this.match.current].marble];
+      const look = lookFor(this.opts.players[this.match.current].marble);
       this.view.captureFeedback(t, look?.accent ?? '#ffffff');
       if (this.crossed.size === 1) this.slowmo = SLOWMO_SECONDS;
     }

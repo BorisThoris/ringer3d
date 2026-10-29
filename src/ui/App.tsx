@@ -3,7 +3,9 @@ import type { PlayerInfo } from '../core/types';
 import type { ArenaId } from '../game/arenas';
 import type { Difficulty, MapDef } from '../game/maps';
 import type { SessionMode, SessionResult } from '../game/session';
-import { MARBLES, uiColor } from '../game/marbles';
+import { lookFor, uiColor } from '../game/marbles';
+import { rewardMatch } from '../game/wallet';
+import { Collection } from './collection';
 import { progress, settings, type GuideMode } from '../game/settings';
 import { buildTower, fighter } from '../game/story';
 import type { OnlineMatchConfig } from '../net/protocol';
@@ -17,7 +19,7 @@ import { HowTo, LocalPlay, MainMenu, QuickPlay, Results, SettingsScreen, type Re
 import { Ending, StorySelect, Tower, Versus } from './story';
 
 type ScreenState =
-  | { name: 'menu' | 'quick' | 'local' | 'settings' | 'howto' | 'story-select' | 'online' }
+  | { name: 'menu' | 'quick' | 'local' | 'settings' | 'howto' | 'story-select' | 'online' | 'collection' }
   | { name: 'tower'; fighter: string; stage: number }
   | { name: 'versus'; fighter: string; stage: number }
   | { name: 'ending'; fighter: string; unlocked: string | null }
@@ -50,7 +52,7 @@ export function App() {
 
   // Every panel is tinted with the player's own marble.
   useEffect(() => {
-    document.documentElement.style.setProperty('--accent', uiColor(MARBLES[myMarble]));
+    document.documentElement.style.setProperty('--accent', uiColor(lookFor(myMarble)));
   }, [myMarble]);
 
   const toMenu = () => {
@@ -66,6 +68,8 @@ export function App() {
   const recordStats = (r: SessionResult) => {
     if (r.aborted || r.localSeats.length !== 1) return;
     const me = r.localSeats[0];
+    // Every finished match pays coins toward Marble Bags (core/economy.ts).
+    rewardMatch(r.winners.length === 1 && r.winners[0] === me, r.scores[me] ?? 0);
     progress.set((p) => ({
       stats: {
         played: p.stats.played + 1,
@@ -263,6 +267,9 @@ export function App() {
       break;
     case 'howto':
       body = <HowTo onBack={toMenu} />;
+      break;
+    case 'collection':
+      body = <Collection onBack={toMenu} />;
       break;
     case 'story-select':
       body = <StorySelect onBack={toMenu} onChoose={continueStory} />;

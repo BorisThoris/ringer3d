@@ -84,6 +84,35 @@ Two connection modes, chosen in Settings → Online connection. Both run the mat
 - If a guest drops mid-match, a bot takes over their seat on the host. If the host leaves, the match ends for everyone.
 - `npm run e2e:online` (with the app served on :8787) plays a match between two browser profiles; CI runs it in both modes.
 
+## Headless core and agents
+
+The rules, physics, maps, bots, marbles and economy run with no screen (`src/core`, `src/game/maps.ts`, `src/headless`). Every front end shares them: the web build, the Steam build (the same bundle in Tauri), the Play Store build (the same bundle in Capacitor), and AI agents.
+
+```bash
+npm run headless:build
+node dist-headless/ringer-headless.mjs play bot:master bot:casual --arena sand --difficulty hard --games 10
+node dist-headless/ringer-headless.mjs play stdio:"python examples/agents/nearest.py" bot:casual
+python examples/agents/env.py      # a gym-style reset/step loop over `serve`
+node dist-headless/ringer-headless.mjs marble 1 2 3
+```
+
+- In process: `HeadlessGame` (observe → JSON, act(shot) → events) and `playMatch(spec, agents)`.
+- Any language: an agent reads `{"type":"observe","obs":…}` lines on stdin and answers one JSON shot per line (`src/headless/node.ts`).
+- Training: `serve` takes `reset`/`step` lines and answers with the observation, a reward and `done`.
+
+## Collectible marbles and stores
+
+A marble is a seed (`src/core/marbleGen.ts`): its tier is rolled with the odds shown on the bag (Common 55%, Rare 28%, Epic 12%, Legendary 4.5%, Mythic 0.5%), then its pattern, glass finish, colour harmony, glow, glitter and name. The economy (`src/core/economy.ts`) is the same everywhere: coins for every match and a daily reward, Marble Bags bought with coins that mint a brand-new marble, melting marbles back into coins. Every marble plays the same.
+
+Real-money coin packs go through one adapter per store (`src/platformStore.ts`), chosen by `VITE_STORE` or the shell:
+
+| Store | Status |
+| --- | --- |
+| Steam | Microtransactions through our server (it holds the publisher key); set `VITE_STEAM_STORE_URL`. Needs the Steamworks app, its SDK and the server. |
+| itch.io | No in-app purchases: the game is sold on its page; coins are earned by playing. |
+| Google Play | A billing adapter goes here (a Capacitor billing plugin and products in the Play Console). Not built yet. |
+| Web | Coins are earned by playing. |
+
 ## Deploying
 
 Online play works without deploying anything. To host the web build, push to `main` and the Pages workflow publishes it. To run your own lobby server as well:
