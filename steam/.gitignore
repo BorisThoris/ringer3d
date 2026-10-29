@@ -1,3 +1,5 @@
 node_modules
 app
 dist
+probe.json
+probe-inventory.json
