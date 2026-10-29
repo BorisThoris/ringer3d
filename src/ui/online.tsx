@@ -11,6 +11,7 @@ import { SteamMatchmaker } from '../net/steamMatchmaker';
 import { steam } from '../steam';
 import type { Matchmaker } from '../net/transport';
 import { ArenaPicker, Chips, MapPicker, MapPreview, MarbleChip, Screen, tap } from './components';
+import { FriendsPanel } from './social';
 import { generateMap, type Difficulty } from '../game/maps';
 
 let shared: { key: string; mm: Matchmaker } | null = null;
@@ -128,6 +129,20 @@ export function OnlineHub({ onBack, onRoom }: { onBack: () => void; onRoom: (r: 
         onChange={setTab}
       />
       {error && <div className="notice">{error}</div>}
+      {/* A friend in a Steam lobby: join it straight away. */}
+      <FriendsPanel
+        onJoin={async (lobby) => {
+          setBusy(true);
+          setError(null);
+          try {
+            onRoom(await OnlineRoom.join(matchmakerFor('steam', st.lobbyUrl), { roomId: lobby, name: st.playerName, marble: st.marble }));
+          } catch (e) {
+            setError((e as Error).message);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      />
 
       {tab === 'browse' ? (
         <>

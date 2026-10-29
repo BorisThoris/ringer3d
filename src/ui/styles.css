@@ -2416,3 +2416,80 @@ button.gen-card[aria-pressed='true'] {
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
+
+/* ---- Leaderboards and friends ---------------------------------------------------------- */
+.board-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.board-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--r-card);
+  background: rgba(255, 255, 255, 0.07);
+}
+.board-list li.me {
+  background: linear-gradient(90deg, rgba(255, 210, 63, 0.28), rgba(255, 255, 255, 0.06));
+  border: 1.5px solid rgba(255, 210, 63, 0.6);
+}
+.board-list b {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.board-list .score {
+  font: 800 var(--t-lg) / 1 var(--display);
+  color: var(--sun);
+  font-variant-numeric: tabular-nums;
+}
+.rank {
+  min-width: 34px;
+  height: 34px;
+  padding: 0 6px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  font: 900 var(--t-sm) / 1 var(--display);
+  background: rgba(255, 255, 255, 0.12);
+}
+.rank.r1 {
+  background: linear-gradient(180deg, #ffe066, #ffb81f);
+  color: var(--accent-ink);
+}
+.rank.r2 {
+  background: linear-gradient(180deg, #eef2f8, #aab4c4);
+  color: var(--accent-ink);
+}
+.rank.r3 {
+  background: linear-gradient(180deg, #f0b27a, #b86b2b);
+  color: var(--accent-ink);
+}
+.friends .list-item small {
+  display: block;
+  color: var(--chalk-dim);
+  font-size: var(--t-xs);
+}
+.friend .dot {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+}
+.dot.on {
+  background: #57cbde;
+}
+.dot.game {
+  background: #90ba3c;
+  box-shadow: 0 0 0 3px rgba(144, 186, 60, 0.3);
+}
+.friend.in-game {
+  border-color: rgba(144, 186, 60, 0.6);
+}

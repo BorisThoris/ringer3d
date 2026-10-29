@@ -94,6 +94,13 @@ class FakeSteam {
       invBuy: async () => '0',
       invDefs: async () => [],
       invSetProps: async () => [],
+      submitScore: async () => ({ ok: true, score: 0, changed: false, rank: 0, previousRank: 0 }),
+      scores: async () => [],
+      friends: async () => [],
+      showUser: async () => {},
+      timelineEvent: async () => true,
+      timelineState: async () => true,
+      timelineMode: async () => true,
     };
   }
 }

@@ -85,6 +85,27 @@ try {
   await sleep(4000);
   report.toast = await page.evaluate(() => document.querySelector('.toast')?.textContent ?? null);
   await page.screenshot({ path: `${OUT}/5-after-drop.png` });
+  // Platform services beyond items: the leaderboards and friends, from the menu.
+  const toMenu = () => page.evaluate(() => (document.querySelector('.back, [aria-label=Back]') ?? [...document.querySelectorAll('button')].find((b) => /back|‹/i.test(b.textContent ?? '')))?.click());
+  await toMenu();
+  await sleep(2000);
+  report.leaderboardsButton = await click('Leaderboards');
+  await sleep(4000);
+  report.leaderboards = await page.evaluate(() => ({
+    rows: document.querySelectorAll('.board-list li').length,
+    notice: document.querySelector('.notice')?.textContent ?? document.querySelector('.screen .fine')?.textContent ?? null,
+  }));
+  await page.screenshot({ path: `${OUT}/6-leaderboards.png` });
+  await toMenu();
+  await sleep(2000);
+  await click('Online');
+  await sleep(5000);
+  report.friends = await page.evaluate(() => ({
+    shown: document.querySelectorAll('.friend').length,
+    inGame: document.querySelectorAll('.friend.in-game').length,
+  }));
+  await page.screenshot({ path: `${OUT}/7-online-friends.png` });
+  report.platform = await page.evaluate(() => !!window.steam);
   browser.disconnect();
 } catch (e) {
   report.failure = String(e.message ?? e);

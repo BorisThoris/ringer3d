@@ -5,7 +5,7 @@ import { BOT_PROFILES } from '../ai/profiles';
 import { randomSeed } from '../game/maps';
 import { lookFor, MARBLES, uiColor } from '../game/marbles';
 import { wallet } from '../game/wallet';
-import { steamHeld } from '../steamItems';
+import { useItems } from './useItems';
 import { progress, settings, type GuideMode } from '../game/settings';
 import { fighter, FIGHTERS } from '../game/story';
 import type { Quality } from '../render/marbleMesh';
@@ -16,7 +16,7 @@ export const PLAYABLE_MARBLES = Object.keys(MARBLES).filter((m) => m !== 'mib' &
 /** The named marbles plus every generated one you own, newest first. */
 function usePlayable(): string[] {
   const owned = wallet.use((w) => w.owned);
-  const onSteam = steamHeld.use((s) => s.marbles);
+  const onSteam = useItems().marbles;
   return [...onSteam.map((m) => m.id), ...owned.map((o) => o.id).reverse(), ...PLAYABLE_MARBLES];
 }
 
@@ -30,7 +30,7 @@ const LOGO: [string, string][] = [
   ['r', '#00d8ff'],
 ];
 
-export function MainMenu({ go }: { go: (s: 'story' | 'quick' | 'local' | 'online' | 'settings' | 'howto' | 'collection') => void }) {
+export function MainMenu({ go }: { go: (s: 'story' | 'quick' | 'local' | 'online' | 'settings' | 'howto' | 'collection' | 'leaderboards') => void }) {
   const run = progress.use((p) => p.run);
   const items: { id: 'story' | 'quick' | 'local' | 'online'; title: string; sub: string; marble: string; hero?: boolean }[] = [
     { id: 'story', title: 'Tower', sub: run ? `Continue as ${fighter(run.fighter).name}, stage ${run.stage + 1} of 8` : 'Eight rings. One Black Taw.', marble: 'obsidian', hero: true },
@@ -81,6 +81,15 @@ export function MainMenu({ go }: { go: (s: 'story' | 'quick' | 'local' | 'online
           }}
         >
           How to play
+        </button>
+        <button
+          className="btn small ghost"
+          onClick={() => {
+            tap();
+            go('leaderboards');
+          }}
+        >
+          Leaderboards
         </button>
       </div>
     </div>

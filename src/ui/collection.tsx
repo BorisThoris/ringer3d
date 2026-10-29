@@ -6,8 +6,9 @@ import { lookFor, uiColor } from '../game/marbles';
 import { settings } from '../game/settings';
 import { buyBag, claimBookSet, claimToday, credit, dailyPreview, meltMarble, tradeUpMarbles, wallet } from '../game/wallet';
 import { store } from '../platformStore';
-import { steam } from '../steam';
-import { itemConfig, steamBuyBag, steamDrop, steamHeld, steamOpenBag, steamTradeUp } from '../steamItems';
+import { tradedUp } from '../platformFeatures';
+import { services } from '../services';
+import { useItems } from './useItems';
 import { Marble3D, MarbleChip, Screen, tap } from './components';
 
 export const TIER_COLOR: Record<Tier, string> = {
@@ -24,7 +25,7 @@ type Sort = 'new' | 'rarity' | 'float';
 
 function useHeld(): Held[] {
   const owned = wallet.use((w) => w.owned);
-  const onSteam = steamHeld.use((s) => s.marbles);
+  const onSteam = useItems().marbles;
   const local = owned.flatMap((o) => {
     const c = collectibleFromId(o.id);
     return c ? [{ ...c, source: 'local' as const, tally: o.tally ?? 0, at: o.at }] : [];
@@ -121,7 +122,8 @@ export function Collection({ onBack }: { onBack: () => void }) {
   const w = wallet.use((x) => x);
   const equipped = settings.use((s) => s.marble);
   const held = useHeld();
-  const steamState = steamHeld.use((s) => s);
+  const steamState = useItems();
+  const items = services.items;
   const [open, setOpen] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -133,7 +135,6 @@ export function Collection({ onBack }: { onBack: () => void }) {
   const perDollar = (p: (typeof PRODUCTS)[number]) => p.coins / p.usd;
   const best = PRODUCTS.reduce((a, b) => (perDollar(b) > perDollar(a) ? b : a));
   const bonus = Math.round((perDollar(best) / perDollar(PRODUCTS[0]) - 1) * 100);
-  const steamCfg = itemConfig(steam?.appId);
 
   const sorted = [...held].sort((a, b) =>
     sort === 'rarity' ? TIERS.indexOf(b.tier) - TIERS.indexOf(a.tier) || a.float - b.float : sort === 'float' ? a.float - b.float : b.at - a.at,
@@ -157,9 +158,10 @@ export function Collection({ onBack }: { onBack: () => void }) {
   const doTradeUp = async () => {
     tap();
     setBusy(true);
-    const r = pickSource === 'steam' ? await steamTradeUp(pickedHeld.map((h) => h.itemId!)) : tradeUpMarbles(picked);
+    const r = pickSource === 'steam' && items ? await items.tradeUp(pickedHeld.map((h) => h.itemId!)) : tradeUpMarbles(picked);
     setBusy(false);
     if (r.ok) {
+      tradedUp();
       setPicking(false);
       setPicked([]);
       show(r.marble.id);
@@ -217,7 +219,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
           />
         )}
 
-        {steam && (
+        {items && (
           <section className="steam-inv">
             <div className="daily-head">
               <h3>Steam inventory</h3>
@@ -231,7 +233,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
                   onClick={async () => {
                     tap();
                     setBusy(true);
-                    const r = await steamOpenBag(steamState.bags[0].itemId);
+                    const r = await items.openBag(steamState.bags[0]);
                     setBusy(false);
                     if (r.ok) show(r.marble.id);
                     else say(r.why);
@@ -240,12 +242,12 @@ export function Collection({ onBack }: { onBack: () => void }) {
                   Open a Steam bag ({steamState.bags.length})
                 </button>
               )}
-              {steamCfg.bag && (
+              {items.canBuyBags && (
                 <button
                   className="btn"
                   onClick={async () => {
                     tap();
-                    await steamBuyBag();
+                    await items.buyBag();
                   }}
                 >
                   Buy a bag on Steam
@@ -257,7 +259,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
                 onClick={async () => {
                   tap();
                   setBusy(true);
-                  const got = await steamDrop();
+                  const got = await items.drop();
                   setBusy(false);
                   if (got[0]) show(got[0].id);
                   say(got.length ? `Steam drop: ${got.map((g) => g.marble.name).join(', ')}` : 'No drop yet: drops come with playtime.');

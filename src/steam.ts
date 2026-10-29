@@ -1,9 +1,29 @@
 /**
  * Steam, seen from the game. In the Steam build (steam/, Electron + steamworks.js) the preload
- * script puts a `SteamBridge` on `window.steam`; everywhere else it is absent and every Steam
- * feature quietly does nothing. Steam ids cross this boundary as decimal strings (64-bit ids
- * don't fit a JS number and BigInt doesn't survive JSON).
+ * script puts a `SteamBridge` on `window.steam`; headless Node code gets the same object from
+ * steam/node-bridge.cjs (`connectSteam`). Everywhere else it is absent and every Steam feature
+ * quietly does nothing. The game reaches it through src/services (the platform-neutral layer),
+ * not directly. Steam ids cross this boundary as decimal strings (64-bit ids don't fit a JS
+ * number and BigInt doesn't survive JSON).
  */
+
+export interface SteamLeaderboardEntry {
+  steamId: string;
+  name: string;
+  rank: number;
+  score: number;
+}
+
+export interface SteamFriend {
+  steamId: string;
+  name: string;
+  state: 'offline' | 'online' | 'busy' | 'away' | 'snooze' | 'trade' | 'play';
+  /** The app they're playing (0: none) and its lobby ("0": none). */
+  appId: number;
+  lobby: string;
+  /** Their rich presence status text. */
+  status: string;
+}
 
 export type LobbyKind = 'public' | 'friends' | 'private';
 
@@ -25,7 +45,7 @@ export interface SteamItem {
 
 export interface SteamBridge {
   readonly appId: number;
-  me(): Promise<{ steamId: string; name: string; deck: boolean; language: string }>;
+  me(): Promise<{ steamId: string; name: string; deck: boolean; language: string; level?: number; country?: string }>;
 
   // Lobbies (ISteamMatchmaking)
   createLobby(kind: LobbyKind, max: number): Promise<string>;
@@ -68,6 +88,16 @@ export interface SteamBridge {
   invBuy(defs: number[]): Promise<string>;
   invDefs(): Promise<{ def: number; name: string; type: string }[]>;
   invSetProps(sets: { itemId: string; name: string; value: number }[]): Promise<SteamItem[]>;
+  // Leaderboards, friends, game recording (steam/social.cjs)
+  /** Submit a score (created as a descending numeric board if missing); keepBest keeps a better old score. */
+  submitScore(board: string, score: number, keepBest?: boolean): Promise<{ ok: boolean; score: number; changed: boolean; rank: number; previousRank: number }>;
+  scores(board: string, scope?: 'global' | 'around' | 'friends', start?: number, end?: number): Promise<SteamLeaderboardEntry[]>;
+  friends(): Promise<SteamFriend[]>;
+  showUser(steamId: string, dialog?: 'steamid' | 'chat' | 'friendadd'): Promise<void>;
+  /** Steam Timeline (game recording): a marker, the state line, the mode (1 playing, 2 lobby, 3 menus, 4 loading). */
+  timelineEvent(title: string, desc?: string, icon?: string, priority?: number): Promise<boolean>;
+  timelineState(desc: string): Promise<boolean>;
+  timelineMode(mode: 1 | 2 | 3 | 4): Promise<boolean>;
   /** A session ticket for our server to check with ISteamUserAuth (store purchases). */
   webApiTicket(identity: string): Promise<string | null>;
   onMicroTxn(cb: (orderId: string, authorized: boolean) => void): () => void;

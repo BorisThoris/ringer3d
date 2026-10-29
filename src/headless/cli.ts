@@ -10,6 +10,7 @@ import type { Tier } from '../core/marbleGen';
 import { botAgent, playMatch, randomAgent, type Agent } from './agents';
 import { HeadlessGame, type GameSpec } from './game';
 import { stdioAgent } from './node';
+import { steamCommand } from './steamCli';
 
 /**
  * ringer-headless: Ringer 3D with no screen.
@@ -20,6 +21,7 @@ import { stdioAgent } from './node';
  *   marble <seed> [...]                     print generated marbles (by look seed) as JSON
  *   collectible <uid> [...] [--tier Rare]   print collectible marbles (float, wear, pattern, Shiny) by instance id
  *   export [--maps N]                       maps, marble rules and fixtures for other ports (Roblox)
+ *   steam <command> [...]                   platform services on a live Steam session (see steamCli.ts)
  *
  * Agents: bot:<rookie|novice|casual|regular|skilled|expert|master|legend>, random,
  *         stdio:<command> (any program speaking the protocol in node.ts).
@@ -160,9 +162,10 @@ async function main() {
   else if (cmd === 'map') out(generateMap(specFrom(opts) as { arena: ArenaId; difficulty: Difficulty; seed: number }));
   else if (cmd === 'marble') for (const s of rest) out(generateMarble(Number(s)));
   else if (cmd === 'collectible') for (const u of rest) out(mintCollectible(u, opts.tier as Tier | undefined));
+  else if (cmd === 'steam') process.exitCode = await steamCommand(rest, opts, out);
   else if (cmd === 'export') out(exportBundle(Number(opts.maps ?? 12)));
   else {
-    process.stderr.write(`usage: ringer-headless play|serve|map|marble|collectible  (bots: ${Object.keys(BOT_PROFILES).join(', ')})\n`);
+    process.stderr.write(`usage: ringer-headless play|serve|map|marble|collectible|steam  (bots: ${Object.keys(BOT_PROFILES).join(', ')})\n`);
     process.exitCode = 2;
   }
 }

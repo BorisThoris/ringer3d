@@ -5,26 +5,13 @@
 // Every operation here is generic (list, drop, exchange, consume, buy, set a property); what
 // the item definitions mean (which itemdef is which marble tier, bags, trade-ups) is the game's
 // business (src/steamItems.ts). Results come back as plain JSON: item ids as decimal strings.
-const fs = require('node:fs');
-const path = require('node:path');
+const { flat, readString } = require('./flatlib.cjs');
 
 const OK = 1;
 const PENDING = 22;
 
-function findDll() {
-  const candidates = [
-    path.join(path.dirname(require.resolve('steamworks.js')), 'dist', 'win64', 'steam_api64.dll'),
-    path.join(path.dirname(process.execPath), 'steam_api64.dll'),
-  ];
-  return candidates.find((p) => fs.existsSync(p));
-}
-
 function createInventory() {
-  const koffi = require('koffi');
-  const dll = findDll();
-  if (!dll) throw new Error('steam_api64.dll not found');
-  const lib = koffi.load(dll);
-  const f = (sig) => lib.func(sig);
+  const { f } = flat();
   const Self = f('void* SteamAPI_SteamInventory_v003()');
   const GetResultStatus = f('int SteamAPI_ISteamInventory_GetResultStatus(void* self, int32 h)');
   const GetResultItems = f('bool SteamAPI_ISteamInventory_GetResultItems(void* self, int32 h, void* out, _Inout_ uint32* n)');
@@ -47,12 +34,7 @@ function createInventory() {
   const self = Self();
   if (!self) throw new Error('ISteamInventory unavailable (is Steam initialised?)');
 
-  const str = (read) => {
-    const n = [0];
-    if (!read(null, n) || !n[0]) return '';
-    const buf = Buffer.alloc(n[0]);
-    return read(buf, n) ? buf.toString('utf8').replace(/\0.*$/s, '') : '';
-  };
+  const str = readString;
 
   /** Wait for a result handle, read its items (with their dynamic properties), free it. */
   async function settle(h, what) {

@@ -5,8 +5,8 @@ import type { Difficulty, MapDef } from '../game/maps';
 import type { SessionMode, SessionResult } from '../game/session';
 import { lookFor, uiColor } from '../game/marbles';
 import { rewardMatch } from '../game/wallet';
-import { steamAddTally, steamDrop } from '../steamItems';
-import { steamMatchEnd, steamPresence } from '../steamFeatures';
+import { matchEnded, presence } from '../platformFeatures';
+import { services } from '../services';
 import { Collection } from './collection';
 import { progress, settings, type GuideMode } from '../game/settings';
 import { buildTower, fighter } from '../game/story';
@@ -19,13 +19,14 @@ import { listenForSteamInvites, OnlineHub, RoomLobby } from './online';
 import type { MapChoice } from './components';
 import { HowTo, LocalPlay, MainMenu, QuickPlay, Results, SettingsScreen, type ResultsInfo } from './screens';
 import { Ending, StorySelect, Tower, Versus } from './story';
+import { Leaderboards } from './social';
 import { TopBar } from './topbar';
 
 /** Screens that sit under the top bar (everything but the match and the Tower's cut-scenes). */
-const BAR_SCREENS = new Set<ScreenState['name']>(['menu', 'quick', 'local', 'settings', 'howto', 'story-select', 'online', 'collection', 'tower', 'results']);
+const BAR_SCREENS = new Set<ScreenState['name']>(['menu', 'quick', 'local', 'settings', 'howto', 'story-select', 'online', 'collection', 'leaderboards', 'tower', 'results']);
 
 type ScreenState =
-  | { name: 'menu' | 'quick' | 'local' | 'settings' | 'howto' | 'story-select' | 'online' | 'collection' }
+  | { name: 'menu' | 'quick' | 'local' | 'settings' | 'howto' | 'story-select' | 'online' | 'collection' | 'leaderboards' }
   | { name: 'tower'; fighter: string; stage: number }
   | { name: 'versus'; fighter: string; stage: number }
   | { name: 'ending'; fighter: string; unlocked: string | null }
@@ -56,7 +57,7 @@ export function App() {
     if (engine.view) engine.view.frameShift = screen.name === 'menu' ? 0.2 : 0;
   }, [screen.name]);
 
-  // Steam rich presence: what friends see next to your name.
+  // Presence (what friends see next to your name) and the game-recording mode.
   useEffect(() => {
     const status: Partial<Record<ScreenState['name'], string>> = {
       menu: 'In the menu',
@@ -67,7 +68,10 @@ export function App() {
       room: 'In a lobby',
       game: screen.name === 'game' && screen.online ? 'Playing online' : 'Playing a match',
     };
-    steamPresence(status[screen.name] ?? 'In the menu', screen.name === 'room' ? screen.room.state.get().room?.id : undefined);
+    presence(status[screen.name] ?? 'In the menu', {
+      group: screen.name === 'room' ? screen.room.state.get().room?.id : undefined,
+      mode: screen.name === 'game' ? 'playing' : screen.name === 'room' ? 'lobby' : 'menus',
+    });
   }, [screen]);
 
   // Steam: accepting a friend's invite (or "Join game") drops you into their room.
@@ -109,8 +113,8 @@ export function App() {
     // Every finished match pays coins toward Marble Bags (core/economy.ts); the captures go on
     // the tally of the marble you played (a Steam marble keeps its tally on the Steam item).
     const coins = rewardMatch(r.winners.length === 1 && r.winners[0] === me, r.scores[me] ?? 0, marble);
-    if (marble) void steamAddTally(marble, r.scores[me] ?? 0);
-    steamMatchEnd({
+    if (marble) void services.items?.addTally(marble, r.scores[me] ?? 0);
+    matchEnded({
       won: r.winners.length === 1 && r.winners[0] === me,
       myScore: r.scores[me] ?? 0,
       otherScores: r.scores.filter((_, i) => i !== me),
@@ -144,8 +148,8 @@ export function App() {
         const info = a.results(r);
         setScreen({ name: 'results', info: coins === undefined ? info : { ...info, reward: { coins, won: r.winners.length === 1 && r.winners[0] === me } } });
         // Playtime drops: Steam decides whether one is due; if one comes, it lands on the results.
-        if (coins !== undefined)
-          void steamDrop().then((drops) => {
+        if (coins !== undefined && services.items)
+          void services.items?.drop().then((drops) => {
             if (drops.length) setScreen((s) => (s.name === 'results' ? { ...s, info: { ...s.info, drops: drops.map((d) => d.id) } } : s));
           });
       },
@@ -324,6 +328,9 @@ export function App() {
       break;
     case 'collection':
       body = <Collection onBack={toMenu} />;
+      break;
+    case 'leaderboards':
+      body = <Leaderboards onBack={toMenu} />;
       break;
     case 'story-select':
       body = <StorySelect onBack={toMenu} onChoose={continueStory} />;

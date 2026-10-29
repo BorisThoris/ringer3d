@@ -1,7 +1,7 @@
-import { mintCollectible, nextTier, TIERS, TRADE_UP_COUNT, type Collectible } from './core/collectible';
+import { mintCollectible, nextTier, TIERS, TRADE_UP_COUNT } from './core/collectible';
 import { RARITY, type Tier } from './core/marbleGen';
-import { createStore } from './game/store';
-import { steam, type SteamItem } from './steam';
+import type { HeldItem, ItemResult, ItemsService } from './services/types';
+import type { SteamBridge, SteamItem } from './steam';
 
 /**
  * Marbles in the player's Steam inventory. Each Steam item is one collectible marble: its
@@ -46,14 +46,8 @@ export function itemConfig(appId: number | undefined): SteamItemConfig {
   return appId === 480 ? SPACEWAR_ITEMS : RINGER_ITEMS;
 }
 
-export interface SteamMarble extends Collectible {
-  itemId: string;
+export interface SteamMarble extends HeldItem {
   def: number;
-  tally: number;
-}
-
-export interface SteamBag {
-  itemId: string;
 }
 
 /** A Steam item as a marble, or null if the item isn't one. */
@@ -64,93 +58,96 @@ export function marbleFromItem(item: SteamItem, cfg: SteamItemConfig): SteamMarb
   return { ...mintCollectible(`s${item.itemId}`, tier), itemId: item.itemId, def: item.def, tally: Number.isFinite(tally) ? tally : 0 };
 }
 
-const cfg = () => itemConfig(steam?.appId);
-
-/** What the player holds on Steam: marbles and unopened bags. Empty off Steam. */
-export const steamHeld = createStore<{ marbles: SteamMarble[]; bags: SteamBag[]; loaded: boolean; error: string | null }>({ marbles: [], bags: [], loaded: false, error: null });
-
-function absorb(items: SteamItem[]) {
-  const c = cfg();
-  return {
-    marbles: items.map((i) => marbleFromItem(i, c)).filter((m): m is SteamMarble => !!m),
-    bags: items.filter((i) => i.def === c.bag && !i.removed).map((i) => ({ itemId: i.itemId })),
+/**
+ * The Steam inventory as the game's ItemsService (services/types.ts), for any SteamBridge: the
+ * shell's window.steam or a headless one from steam/node-bridge.cjs.
+ */
+export function createSteamItems(bridge: SteamBridge): ItemsService {
+  const cfg = itemConfig(bridge.appId);
+  // A tiny store (no React here: this runs headless too).
+  let snap: { marbles: SteamMarble[]; bags: string[]; error: string | null } = { marbles: [], bags: [], error: null };
+  const subs = new Set<() => void>();
+  const state = {
+    get: () => snap,
+    set(p: Partial<typeof snap>) {
+      snap = { ...snap, ...p };
+      subs.forEach((f) => f());
+    },
+    subscribe(f: () => void) {
+      subs.add(f);
+      return () => void subs.delete(f);
+    },
   };
-}
 
-export async function syncSteamItems(): Promise<void> {
-  if (!steam) return;
-  try {
-    const { marbles, bags } = absorb(await steam.invAll());
-    steamHeld.set({ marbles, bags, loaded: true, error: null });
-  } catch (e) {
-    steamHeld.set({ loaded: true, error: (e as Error).message });
+  const absorb = (items: SteamItem[]) => ({
+    marbles: items.map((i) => marbleFromItem(i, cfg)).filter((m): m is SteamMarble => !!m),
+    bags: items.filter((i) => i.def === cfg.bag && !i.removed).map((i) => i.itemId),
+  });
+
+  async function sync() {
+    try {
+      const { marbles, bags } = absorb(await bridge.invAll());
+      state.set({ marbles, bags, error: null });
+    } catch (e) {
+      state.set({ error: (e as Error).message });
+    }
   }
-}
 
-/** Ask Steam for a playtime drop; returns what dropped (often nothing: Steam paces drops). */
-export async function steamDrop(): Promise<SteamMarble[]> {
-  if (!steam) return [];
-  try {
-    const got = absorb(await steam.invDrop(cfg().dropList));
-    if (got.marbles.length || got.bags.length) await syncSteamItems();
-    return got.marbles;
-  } catch {
-    return [];
+  /** An exchange (bag opening, trade-up): Steam checks the itemdef recipe and mints. */
+  async function exchange(gen: number, destroy: string[]): Promise<ItemResult> {
+    try {
+      const got = absorb(await bridge.invExchange([gen], destroy));
+      await sync();
+      return got.marbles[0] ? { ok: true, marble: got.marbles[0] } : { ok: false, why: 'Steam made nothing.' };
+    } catch (e) {
+      return { ok: false, why: (e as Error).message };
+    }
   }
-}
 
-export type SteamResult = { ok: true; marble: SteamMarble } | { ok: false; why: string };
-
-/** Five Steam marbles of one tier into one of the next: Steam checks the recipe and mints it. */
-export async function steamTradeUp(itemIds: string[]): Promise<SteamResult> {
-  const c = cfg();
-  const picked = itemIds.map((id) => steamHeld.get().marbles.find((m) => m.itemId === id));
-  if (picked.length !== TRADE_UP_COUNT || picked.some((m) => !m)) return { ok: false, why: `Pick ${TRADE_UP_COUNT} Steam marbles.` };
-  const tier = picked[0]!.tier;
-  if (picked.some((m) => m!.tier !== tier)) return { ok: false, why: 'They all need to be the same rarity.' };
-  const up = nextTier(tier);
-  const target = up && c.mint?.[up];
-  if (!target) return { ok: false, why: up ? 'Trade-ups open with the Steam release.' : 'Mythic is the top.' };
-  try {
-    const got = absorb(await steam!.invExchange([target], itemIds));
-    await syncSteamItems();
-    return got.marbles[0] ? { ok: true, marble: got.marbles[0] } : { ok: false, why: 'Steam made nothing.' };
-  } catch (e) {
-    return { ok: false, why: (e as Error).message };
-  }
-}
-
-/** Open a Marble Bag held on Steam: Steam's generator picks the tier with the published odds. */
-export async function steamOpenBag(bagItemId: string): Promise<SteamResult> {
-  const c = cfg();
-  if (!steam || !c.bagOpen) return { ok: false, why: 'Steam bags open with the Steam release.' };
-  try {
-    const got = absorb(await steam.invExchange([c.bagOpen], [bagItemId]));
-    await syncSteamItems();
-    return got.marbles[0] ? { ok: true, marble: got.marbles[0] } : { ok: false, why: 'Steam made nothing.' };
-  } catch (e) {
-    return { ok: false, why: (e as Error).message };
-  }
-}
-
-/** Steam's checkout overlay for a Marble Bag from the item store. */
-export async function steamBuyBag(): Promise<boolean> {
-  const c = cfg();
-  if (!steam || !c.bag) return false;
-  await steam.invBuy([c.bag]);
-  return true;
-}
-
-/** Add a match's captures to a Steam marble's tally (a dynamic property on the item). */
-export async function steamAddTally(marbleId: string, captures: number): Promise<void> {
-  const m = steamHeld.get().marbles.find((x) => x.id === marbleId);
-  if (!steam || !m || captures <= 0) return;
-  try {
-    await steam.invSetProps([{ itemId: m.itemId, name: 'tally', value: m.tally + captures }]);
-    await syncSteamItems();
-  } catch {
-    /* tallies are a nicety; never fail a match over one */
-  }
+  return {
+    held: () => state.get(),
+    subscribe: (cb) => state.subscribe(cb),
+    sync,
+    async drop() {
+      try {
+        const got = absorb(await bridge.invDrop(cfg.dropList));
+        if (got.marbles.length || got.bags.length) await sync();
+        return got.marbles;
+      } catch {
+        return [];
+      }
+    },
+    async tradeUp(itemIds) {
+      const picked = itemIds.map((id) => state.get().marbles.find((m) => m.itemId === id));
+      if (picked.length !== TRADE_UP_COUNT || picked.some((m) => !m)) return { ok: false, why: `Pick ${TRADE_UP_COUNT} Steam marbles.` };
+      const tier = picked[0]!.tier;
+      if (picked.some((m) => m!.tier !== tier)) return { ok: false, why: 'They all need to be the same rarity.' };
+      const up = nextTier(tier);
+      const target = up && cfg.mint?.[up];
+      if (!target) return { ok: false, why: up ? 'Trade-ups open with the Steam release.' : 'Mythic is the top.' };
+      return exchange(target, itemIds);
+    },
+    async openBag(bagItemId) {
+      if (!cfg.bagOpen) return { ok: false, why: 'Steam bags open with the Steam release.' };
+      return exchange(cfg.bagOpen, [bagItemId]);
+    },
+    canBuyBags: !!cfg.bag,
+    async buyBag() {
+      if (!cfg.bag) return false;
+      await bridge.invBuy([cfg.bag]);
+      return true;
+    },
+    async addTally(marbleId, captures) {
+      const m = state.get().marbles.find((x) => x.id === marbleId);
+      if (!m || captures <= 0) return;
+      try {
+        await bridge.invSetProps([{ itemId: m.itemId, name: 'tally', value: m.tally + captures }]);
+        await sync();
+      } catch {
+        /* tallies are a nicety; never fail a match over one */
+      }
+    },
+  };
 }
 
 // ---- Item definitions for the partner site ----------------------------------------------
