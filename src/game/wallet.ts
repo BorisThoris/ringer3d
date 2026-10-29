@@ -1,5 +1,5 @@
-import { claimDaily, earn, freshWallet, grantPurchase, matchReward, melt, nextDaily, openBag, type ProductId, type Wallet } from '../core/economy';
-import type { GeneratedMarble } from '../core/marbleGen';
+import { localUid, type Collectible } from '../core/collectible';
+import { addTally, claimDaily, claimSet, earn, freshWallet, grantPurchase, matchReward, melt, nextDaily, openBag, tradeUp, type ProductId, type Wallet } from '../core/economy';
 import { createStore } from './store';
 
 /**
@@ -32,24 +32,39 @@ wallet.subscribe(() => {
 
 const today = () => Math.floor(Date.now() / 86400000);
 
-/** A fresh random 32-bit seed: a new marble. Never Math.random (it isn't 32 bits of anything). */
-function freshSeed(): number {
-  const a = new Uint32Array(1);
+/** A fresh 64-bit instance id: a new marble. Never Math.random (it isn't 64 bits of anything). */
+function freshUid(): string {
+  const a = new Uint32Array(2);
   crypto.getRandomValues(a);
-  return a[0];
+  return localUid(a[0], a[1]);
 }
 
-export function rewardMatch(won: boolean, captured: number): number {
+/** A finished match: coins, and the captures go on the tally of the marble you played. */
+export function rewardMatch(won: boolean, captured: number, marbleId?: string): number {
   const coins = matchReward({ won, captured });
-  wallet.set((w) => earn(w, coins));
+  wallet.set((w) => (marbleId ? addTally(earn(w, coins), marbleId, captured) : earn(w, coins)));
   return coins;
 }
 
-export function buyBag(): { ok: true; marble: GeneratedMarble } | { ok: false; why: string } {
-  const r = openBag(wallet.get(), freshSeed(), Date.now());
+export function buyBag(): { ok: true; marble: Collectible } | { ok: false; why: string } {
+  const r = openBag(wallet.get(), freshUid(), Date.now());
   if (!r.ok) return r;
   wallet.set(r.wallet);
   return { ok: true, marble: r.marble };
+}
+
+export function tradeUpMarbles(ids: string[]): { ok: true; marble: Collectible } | { ok: false; why: string } {
+  const r = tradeUp(wallet.get(), ids, freshUid(), Date.now());
+  if (!r.ok) return r;
+  wallet.set(r.wallet);
+  return { ok: true, marble: r.marble };
+}
+
+export function claimBookSet(setId: string, extra: Collectible[] = []): { ok: true; coins: number } | { ok: false; why: string } {
+  const r = claimSet(wallet.get(), setId, extra);
+  if (!r.ok) return r;
+  wallet.set(r.wallet);
+  return { ok: true, coins: r.coins };
 }
 
 export function meltMarble(id: string): { ok: true; coins: number } | { ok: false; why: string } {

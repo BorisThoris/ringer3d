@@ -5,6 +5,7 @@ import { BOT_PROFILES } from '../ai/profiles';
 import { randomSeed } from '../game/maps';
 import { lookFor, MARBLES, uiColor } from '../game/marbles';
 import { wallet } from '../game/wallet';
+import { steamHeld } from '../steamItems';
 import { progress, settings, type GuideMode } from '../game/settings';
 import { fighter, FIGHTERS } from '../game/story';
 import type { Quality } from '../render/marbleMesh';
@@ -15,7 +16,8 @@ export const PLAYABLE_MARBLES = Object.keys(MARBLES).filter((m) => m !== 'mib' &
 /** The named marbles plus every generated one you own, newest first. */
 function usePlayable(): string[] {
   const owned = wallet.use((w) => w.owned);
-  return [...owned.map((o) => o.id).reverse(), ...PLAYABLE_MARBLES];
+  const onSteam = steamHeld.use((s) => s.marbles);
+  return [...onSteam.map((m) => m.id), ...owned.map((o) => o.id).reverse(), ...PLAYABLE_MARBLES];
 }
 
 /** The title, one marble colour per letter (Ember, sunshine, Jade, Tide, Nova, Volt). */
@@ -341,6 +343,8 @@ export interface ResultsInfo {
   secondary?: { label: string; action: () => void };
   /** What this match paid the player (single-player and online matches). */
   reward?: { coins: number; won: boolean };
+  /** Marbles Steam dropped after this match (playtime drops). */
+  drops?: string[];
 }
 
 /** Counts up to `to` over ~0.9 s, so a reward lands rather than just appears. */
@@ -387,6 +391,15 @@ export function Results({ info, onCollection }: { info: ResultsInfo; onCollectio
           </span>
         </div>
       )}
+      {info.drops?.map((id) => (
+        <div key={id} className="drop" aria-live="polite">
+          <MarbleChip id={id} size={52} />
+          <span>
+            <small>Steam drop!</small>
+            <b>{lookFor(id).name}</b>
+          </span>
+        </div>
+      ))}
       {info.reward && onCollection && coins >= ECONOMY.bagPrice && (
         <button
           className="btn bag-nudge"

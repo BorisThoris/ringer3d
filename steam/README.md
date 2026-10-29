@@ -30,6 +30,7 @@ is missing, run `node node_modules/electron/install.js` (set `ELECTRON_CACHE` to
 | Overlay | `electronEnableSteamOverlay` | Shift+Tab overlay draws into the window. |
 | Steam Deck | `initSteam` | Lighter graphics by default on first launch. |
 | Microtransactions | `src/platformStore.ts` `steamStore` | Coin packs: our server calls InitTxn/FinalizeTxn; the game waits for MicroTxnAuthorizationResponse. |
+| Inventory (ISteamInventory) | `inventory.cjs` (koffi → steam_api64.dll), `src/steamItems.ts` | Marbles as Steam items: tradable and marketable. Each item id is the marble's uid, so its look, wear float, pattern and Shiny roll travel with it. Playtime drops, Marble Bags from the item store (opened by an exchange), trade-ups (five of a tier into one of the next), capture tallies as a dynamic property. |
 | Launch through Steam | `main.cjs` | Released builds relaunch through Steam (restartAppIfNecessary); Steam's `SteamAppId` is used. |
 
 ## Setting up the Steamworks app (partner site)
@@ -47,8 +48,23 @@ cloud and presence work there; Spacewar's own achievement names differ from ours
    `STEAM_APP_ID` and, while testing, `STEAM_SANDBOX=1` (no money moves). Prices are in
    `STEAM_PRICES` and must match `PRODUCTS` (`src/core/economy.ts`; a test checks). Build the game
    with `VITE_STEAM_STORE_URL` pointing at that server.
-7. **Depots**: `npm run pack`, then upload `dist/win-unpacked` with steamcmd and `depot/app_build.vdf`
+7. **Inventory service** (marbles as Steam items): enable it, then upload `itemdefs.json` (Inventory
+   Service > Item Definitions). It is generated from `itemDefs()` in `src/steamItems.ts`; after
+   changing that, run `UPDATE_ITEMDEFS=1 npx vitest run tests/steamItems.test.ts` (the test fails
+   while the two differ). Set `appid` in the file, put tier and bag icons at the `icon_url`s, set the
+   Marble Bag's price, and turn on Market listing for the app. Itemdefs: 1001–1005 marbles by tier
+   (each above Common is made from five of the tier below), 800 Marble Bag, 801 its generator (the
+   bag odds in tenths of a percent), 900 playtime drops.
+8. **Depots**: `npm run pack`, then upload `dist/win-unpacked` with steamcmd and `depot/app_build.vdf`
    (fill in the App and depot ids).
+
+## Steam items on App 480
+
+Spacewar has real Steam inventory items and a playtime drop list (itemdef 10), so the inventory
+flow can be tried before the app exists: `src/steamItems.ts` reads Spacewar's ship parts as
+marbles of each tier. `npm run probe:inventory` (or `electron probe-inventory.cjs`) lists the
+inventory and triggers a drop; `node scripts/qa-steam-items.mjs` checks the Collection in the
+shell. Trade-ups and bags need our own itemdefs, so they report "opens with the Steam release" on 480.
 
 ## What one Steam account can't test
 

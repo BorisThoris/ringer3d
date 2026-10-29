@@ -41,6 +41,10 @@ const LOBBY_TYPE = { private: 0, friends: 1, public: 2 };
 const DIALOG = { friends: 0, community: 1, players: 2, settings: 3, stats: 5, achievements: 6 };
 const RELIABLE = 2;
 
+// Steam Inventory through koffi (inventory.cjs), made on first use.
+let inventory = null;
+const inv = () => (inventory ??= require('./inventory.cjs').createInventory());
+
 const keep = (lobby) => {
   lobbies.set(lobby.id.toString(), lobby);
   return lobby.id.toString();
@@ -78,6 +82,13 @@ const api = {
   cloudWrite: (file, text) => client.cloud.isEnabledForApp() && client.cloud.writeFile(file, text),
   presence: (key, value) => client.localplayer.setRichPresence(key, value ?? undefined),
   overlay: (d) => client.overlay.activateDialog(DIALOG[d] ?? 0),
+  invAll: () => inv().all(),
+  invDrop: (listDef) => inv().drop(Number(listDef)),
+  invExchange: (gen, destroy) => inv().exchange(gen.map(Number), destroy.map(String)),
+  invConsume: (itemId) => inv().consume(String(itemId)),
+  invBuy: (defs) => inv().buy(defs.map(Number)),
+  invDefs: () => inv().defs(),
+  invSetProps: (sets) => inv().setProps(sets),
   webApiTicket: async (identity) => {
     try {
       return (await client.auth.getAuthTicketForWebApi(identity)).getBytes().toString('hex');

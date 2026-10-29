@@ -50,7 +50,9 @@ function breakSpread(id: ArenaId): number {
   return ts.reduce((m, t) => m + Math.hypot(t.x, t.z), 0) / ts.length;
 }
 
-describe('surfaces', () => {
+// Every test here runs full physics rolls: a few seconds each alone, past vitest's 5 s default
+// when the whole suite runs in parallel.
+describe('surfaces', { timeout: 60_000 }, () => {
   it('every field changes how far a marble rolls, in the order you would expect', () => {
     for (const power of [0.25, 0.5]) {
       const d = Object.fromEntries(ARENA_LIST.map((a) => [a.id, roll(a.id, power).dist])) as Record<ArenaId, number>;

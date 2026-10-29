@@ -1,10 +1,13 @@
 import { useState, type CSSProperties } from 'react';
-import { bagOdds, ECONOMY, PRODUCTS } from '../core/economy';
-import { generateMarble, type Tier } from '../core/marbleGen';
+import { bookProgress, collectibleFromId, nextTier, SHINY_ODDS, TIERS, TRADE_UP_COUNT, WEARS, type Collectible } from '../core/collectible';
+import { bagOdds, ECONOMY, meltValue, PRODUCTS } from '../core/economy';
+import type { Tier } from '../core/marbleGen';
 import { lookFor, uiColor } from '../game/marbles';
 import { settings } from '../game/settings';
-import { buyBag, claimToday, credit, dailyPreview, meltMarble, wallet } from '../game/wallet';
+import { buyBag, claimBookSet, claimToday, credit, dailyPreview, meltMarble, tradeUpMarbles, wallet } from '../game/wallet';
 import { store } from '../platformStore';
+import { steam } from '../steam';
+import { itemConfig, steamBuyBag, steamDrop, steamHeld, steamOpenBag, steamTradeUp } from '../steamItems';
 import { Marble3D, MarbleChip, Screen, tap } from './components';
 
 export const TIER_COLOR: Record<Tier, string> = {
@@ -15,24 +18,153 @@ export const TIER_COLOR: Record<Tier, string> = {
   Mythic: '#ff46be',
 };
 
-/** The collection: Marble Bags, the marbles you've minted, the daily reward and the store. */
+/** One marble the player holds: in this device's collection, or as an item in their Steam inventory. */
+type Held = Collectible & { source: 'local' | 'steam'; itemId?: string; tally: number; at: number };
+type Sort = 'new' | 'rarity' | 'float';
+
+function useHeld(): Held[] {
+  const owned = wallet.use((w) => w.owned);
+  const onSteam = steamHeld.use((s) => s.marbles);
+  const local = owned.flatMap((o) => {
+    const c = collectibleFromId(o.id);
+    return c ? [{ ...c, source: 'local' as const, tally: o.tally ?? 0, at: o.at }] : [];
+  });
+  const remote = onSteam.map((m) => ({ ...m, source: 'steam' as const, at: Number(BigInt(m.itemId) % 1000000n) }));
+  return [...remote, ...local];
+}
+
+const fmtFloat = (f: number) => f.toFixed(6);
+
+/** The float on a strip of the five wear bands, with a marker where this marble sits. */
+export function FloatBar({ float }: { float: number }) {
+  return (
+    <div className="float-bar" aria-label={`Float ${fmtFloat(float)}`}>
+      {WEARS.map((w) => (
+        <span key={w.name} className={`band ${w.short}`} style={{ flexGrow: w.max - w.min }} title={`${w.name} ${w.min}–${w.max}`} />
+      ))}
+      <i style={{ left: `${float * 100}%` }} />
+    </div>
+  );
+}
+
+/** A big look at one marble: everything a collector checks. */
+function Inspect({ c, equipped, onEquip, onMelt, onClose }: { c: Held; equipped: boolean; onEquip: () => void; onMelt?: () => void; onClose: () => void }) {
+  return (
+    <section className={`inspect${c.shiny ? ' shiny' : ''}`} style={{ '--c': TIER_COLOR[c.tier] } as CSSProperties} aria-live="polite">
+      <div className="inspect-view">
+        <Marble3D id={c.id} size={200} />
+      </div>
+      <div className="inspect-info">
+        <small className="tier">
+          {c.tier}
+          {c.source === 'steam' && <span className="steam-tag">Steam item</span>}
+        </small>
+        <h2>{c.marble.name}</h2>
+        <div className="facts">
+          <span>
+            <b>{c.wear}</b>
+            <small>wear</small>
+          </span>
+          <span>
+            <b className="mono">{fmtFloat(c.float)}</b>
+            <small>float</small>
+          </span>
+          <span>
+            <b>#{c.pattern}</b>
+            <small>pattern</small>
+          </span>
+          <span>
+            <b>{c.tally}</b>
+            <small>captures</small>
+          </span>
+        </div>
+        <FloatBar float={c.float} />
+        <p className="fine">
+          {c.marble.pattern} · {c.marble.finish} · {c.marble.scheme} colours · {c.source === 'steam' ? `item ${c.itemId}` : `id ${c.uid}`}
+        </p>
+        {c.traits.length > 0 && (
+          <div className="traits">
+            {c.traits.map((t) => (
+              <span key={t} className="trait">
+                {t}
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="row">
+          <button
+            className="btn primary"
+            aria-pressed={equipped}
+            onClick={() => {
+              tap();
+              onEquip();
+            }}
+          >
+            {equipped ? 'Equipped' : 'Equip'}
+          </button>
+          {onMelt && (
+            <button className="btn" disabled={equipped} onClick={onMelt}>
+              Melt for {meltValue(c)}
+            </button>
+          )}
+          <button className="btn ghost" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** The collection: Marble Bags, your marbles (here and on Steam), the Marble Book, the daily reward and the store. */
 export function Collection({ onBack }: { onBack: () => void }) {
   const w = wallet.use((x) => x);
   const equipped = settings.use((s) => s.marble);
-  const [reveal, setReveal] = useState<string | null>(null);
+  const held = useHeld();
+  const steamState = steamHeld.use((s) => s);
+  const [open, setOpen] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const owned = [...w.owned].reverse();
+  const [sort, setSort] = useState<Sort>('new');
+  const [picking, setPicking] = useState(false);
+  const [picked, setPicked] = useState<string[]>([]);
   const daily = dailyPreview(w);
   // "Best value" is the pack with the most coins per dollar; the bonus is measured against the smallest.
   const perDollar = (p: (typeof PRODUCTS)[number]) => p.coins / p.usd;
   const best = PRODUCTS.reduce((a, b) => (perDollar(b) > perDollar(a) ? b : a));
   const bonus = Math.round((perDollar(best) / perDollar(PRODUCTS[0]) - 1) * 100);
-  const revealed = reveal ? generateMarble(Number(reveal.slice(1))) : null;
+  const steamCfg = itemConfig(steam?.appId);
+
+  const sorted = [...held].sort((a, b) =>
+    sort === 'rarity' ? TIERS.indexOf(b.tier) - TIERS.indexOf(a.tier) || a.float - b.float : sort === 'float' ? a.float - b.float : b.at - a.at,
+  );
+  const shown = open ? held.find((h) => h.id === open) ?? null : null;
+  const pickedHeld = picked.map((id) => held.find((h) => h.id === id)).filter((h): h is Held => !!h);
+  const pickTier = pickedHeld[0]?.tier;
+  const pickSource = pickedHeld[0]?.source;
+  const book = bookProgress(held);
+  const claimed = w.sets ?? [];
 
   const say = (s: string) => {
     setNote(s);
     window.setTimeout(() => setNote((n) => (n === s ? null : n)), 3500);
+  };
+  const show = (id: string) => {
+    setOpen(id);
+    requestAnimationFrame(() => document.querySelector('.inspect')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+  };
+
+  const doTradeUp = async () => {
+    tap();
+    setBusy(true);
+    const r = pickSource === 'steam' ? await steamTradeUp(pickedHeld.map((h) => h.itemId!)) : tradeUpMarbles(picked);
+    setBusy(false);
+    if (r.ok) {
+      setPicking(false);
+      setPicked([]);
+      show(r.marble.id);
+      say(`Traded up: ${r.marble.marble.name}`);
+    } else say(r.why);
   };
 
   return (
@@ -42,13 +174,14 @@ export function Collection({ onBack }: { onBack: () => void }) {
           <div className="bag" aria-hidden />
           <div>
             <h3>Marble Bag</h3>
-            <p>A brand-new marble, minted for you: nobody else has this one.</p>
+            <p>A brand-new marble, minted for you: its own look, wear float and pattern. Nobody else has this one.</p>
             <p className="odds">
               {bagOdds().map((o) => (
                 <span key={o.tier} style={{ color: TIER_COLOR[o.tier] }}>
                   {o.tier} {o.odds}%
                 </span>
               ))}
+              <span className="shiny-odds">✦ Shiny {100 / SHINY_ODDS}%</span>
             </p>
             <button
               className="btn primary"
@@ -56,7 +189,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
               onClick={() => {
                 tap();
                 const r = buyBag();
-                if (r.ok) setReveal(r.marble.id);
+                if (r.ok) show(r.marble.id);
                 else say(r.why);
               }}
             >
@@ -65,29 +198,73 @@ export function Collection({ onBack }: { onBack: () => void }) {
           </div>
         </section>
 
-        {revealed && (
-          <section className="reveal" style={{ '--c': TIER_COLOR[revealed.tier] } as CSSProperties} aria-live="polite">
-            <Marble3D id={revealed.id} size={170} />
-            <div>
-              <small>{revealed.tier}</small>
-              <h2>{revealed.name}</h2>
-              <p>
-                {revealed.pattern} · {revealed.finish} · {revealed.scheme} colours
-              </p>
-              <div className="row">
+        {shown && (
+          <Inspect
+            c={shown}
+            equipped={equipped === shown.id}
+            onEquip={() => settings.set({ marble: shown.id })}
+            onMelt={
+              shown.source === 'local'
+                ? () => {
+                    tap();
+                    const r = meltMarble(shown.id);
+                    if (r.ok) setOpen(null);
+                    say(r.ok ? `Melted ${shown.marble.name}: +${r.coins} coins` : r.why);
+                  }
+                : undefined
+            }
+            onClose={() => setOpen(null)}
+          />
+        )}
+
+        {steam && (
+          <section className="steam-inv">
+            <div className="daily-head">
+              <h3>Steam inventory</h3>
+              <small>{steamState.error ? `Steam: ${steamState.error}` : `${steamState.marbles.length} marbles · ${steamState.bags.length} bags · tradable on Steam`}</small>
+            </div>
+            <div className="row">
+              {steamState.bags.length > 0 && (
                 <button
                   className="btn primary"
-                  onClick={() => {
+                  disabled={busy}
+                  onClick={async () => {
                     tap();
-                    settings.set({ marble: revealed.id });
+                    setBusy(true);
+                    const r = await steamOpenBag(steamState.bags[0].itemId);
+                    setBusy(false);
+                    if (r.ok) show(r.marble.id);
+                    else say(r.why);
                   }}
                 >
-                  Equip
+                  Open a Steam bag ({steamState.bags.length})
                 </button>
-                <button className="btn ghost" onClick={() => setReveal(null)}>
-                  Nice!
+              )}
+              {steamCfg.bag && (
+                <button
+                  className="btn"
+                  onClick={async () => {
+                    tap();
+                    await steamBuyBag();
+                  }}
+                >
+                  Buy a bag on Steam
                 </button>
-              </div>
+              )}
+              <button
+                className="btn"
+                disabled={busy}
+                onClick={async () => {
+                  tap();
+                  setBusy(true);
+                  const got = await steamDrop();
+                  setBusy(false);
+                  if (got[0]) show(got[0].id);
+                  say(got.length ? `Steam drop: ${got.map((g) => g.marble.name).join(', ')}` : 'No drop yet: drops come with playtime.');
+                }}
+              >
+                Check for a drop
+              </button>
             </div>
           </section>
         )}
@@ -131,40 +308,110 @@ export function Collection({ onBack }: { onBack: () => void }) {
         </section>
 
         <section>
-          <h3>Your marbles ({owned.length})</h3>
-          {owned.length === 0 && <p>Open a bag to start your collection. Every match earns coins.</p>}
+          <div className="daily-head">
+            <h3>Your marbles ({held.length})</h3>
+            <div className="chips sort" role="group" aria-label="Sort">
+              {(['new', 'rarity', 'float'] as Sort[]).map((s) => (
+                <button key={s} className="chip" aria-pressed={sort === s} onClick={() => setSort(s)}>
+                  {s === 'new' ? 'Newest' : s === 'rarity' ? 'Rarity' : 'Best float'}
+                </button>
+              ))}
+              <button
+                className="chip"
+                aria-pressed={picking}
+                onClick={() => {
+                  setPicking(!picking);
+                  setPicked([]);
+                }}
+              >
+                Trade up
+              </button>
+            </div>
+          </div>
+          {picking && (
+            <div className="tradeup">
+              <p>
+                {pickTier
+                  ? nextTier(pickTier)
+                    ? `${picked.length} of ${TRADE_UP_COUNT} ${pickTier} → 1 brand-new ${nextTier(pickTier)}`
+                    : 'Mythic is the top: pick another rarity.'
+                  : `Pick ${TRADE_UP_COUNT} marbles of one rarity: they become one marble of the next.`}
+              </p>
+              <button className="btn primary" disabled={busy || picked.length !== TRADE_UP_COUNT || !pickTier || !nextTier(pickTier)} onClick={doTradeUp}>
+                Trade up
+              </button>
+            </div>
+          )}
+          {held.length === 0 && <p>Open a bag to start your collection. Every match earns coins.</p>}
           <div className="gen-grid">
-            {owned.map((o) => {
-              const look = lookFor(o.id);
-              const isOn = equipped === o.id;
+            {sorted.map((h) => {
+              const look = lookFor(h.id);
+              const isOn = equipped === h.id;
+              const sel = picked.includes(h.id);
+              const blocked = picking && !sel && ((pickTier && (h.tier !== pickTier || h.source !== pickSource)) || picked.length >= TRADE_UP_COUNT || isOn);
               return (
-                <div key={o.id} className="gen-card" style={{ '--c': TIER_COLOR[o.tier], '--a': uiColor(look) } as CSSProperties}>
-                  <MarbleChip id={o.id} size={56} />
-                  <b>{look.name}</b>
-                  <small>{o.tier}</small>
-                  <div className="row">
-                    <button
-                      className="btn small"
-                      aria-pressed={isOn}
-                      onClick={() => {
-                        tap();
-                        settings.set({ marble: o.id });
-                      }}
-                    >
-                      {isOn ? 'Equipped' : 'Equip'}
-                    </button>
-                    <button
-                      className="btn small ghost"
-                      disabled={isOn}
-                      onClick={() => {
-                        tap();
-                        const r = meltMarble(o.id);
-                        say(r.ok ? `Melted ${look.name}: +${r.coins} coins` : r.why);
-                      }}
-                    >
-                      Melt {ECONOMY.melt[o.tier]}
-                    </button>
+                <button
+                  key={h.id}
+                  className={`gen-card${h.shiny ? ' shiny' : ''}${sel ? ' picked' : ''}`}
+                  style={{ '--c': TIER_COLOR[h.tier], '--a': uiColor(look) } as CSSProperties}
+                  aria-pressed={picking ? sel : open === h.id}
+                  disabled={!!blocked}
+                  onClick={() => {
+                    tap();
+                    if (picking) setPicked((p) => (p.includes(h.id) ? p.filter((x) => x !== h.id) : p.length < TRADE_UP_COUNT ? [...p, h.id] : p));
+                    else show(h.id);
+                  }}
+                >
+                  {h.source === 'steam' && <span className="corner steam">Steam</span>}
+                  {isOn && <span className="corner on">Equipped</span>}
+                  <MarbleChip id={h.id} size={56} />
+                  <b>{h.marble.name}</b>
+                  <small className="tier">{h.tier}</small>
+                  <span className="wear-line">
+                    <abbr title={h.wear}>{WEARS.find((x) => x.name === h.wear)!.short}</abbr> <span className="mono">{h.float.toFixed(4)}</span>
+                    {h.tally > 0 && <span className="tally"> · {h.tally}✕</span>}
+                  </span>
+                  {h.traits.length > 0 && <span className="trait mini">{h.traits[0]}</span>}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="book">
+          <h3>Marble Book</h3>
+          <div className="book-sets">
+            {book.map(({ set, got, done }) => {
+              const paid = claimed.includes(set.id);
+              return (
+                <div key={set.id} className={`book-set${done ? ' done' : ''}`}>
+                  <div className="book-head">
+                    <b>{set.name}</b>
+                    <small>
+                      {got.length}/{set.needs.length}
+                    </small>
                   </div>
+                  <div className="book-slots">
+                    {set.needs.map((n) => (
+                      <span key={n} className={`slot${got.includes(n) ? ' got' : ''}`} title={n}>
+                        {n}
+                      </span>
+                    ))}
+                  </div>
+                  <button
+                    className={done && !paid ? 'btn small primary' : 'btn small'}
+                    disabled={!done || paid}
+                    onClick={() => {
+                      tap();
+                      const r = claimBookSet(
+                        set.id,
+                        held.filter((h) => h.source === 'steam'),
+                      );
+                      say(r.ok ? `${set.name}: +${r.coins} coins` : r.why);
+                    }}
+                  >
+                    {paid ? 'Claimed' : `+${set.reward.toLocaleString()} coins`}
+                  </button>
                 </div>
               );
             })}

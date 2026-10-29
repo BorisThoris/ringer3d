@@ -31,7 +31,11 @@ try {
     page.on('pageerror', (e) => errors.push(e.message));
     await page.evaluateOnNewDocument(() => {
       localStorage.setItem('ringer3d.settings.v1', JSON.stringify({ quality: 'low', playerName: 'Bobby' }));
-      localStorage.setItem('ringer3d.wallet.v1', JSON.stringify({ coins: 1240, owned: [{ id: 'g99', tier: 'Rare', at: 1 }, { id: 'g4242', tier: 'Common', at: 2 }, { id: 'g31337', tier: 'Epic', at: 3 }], lastDaily: -1, streak: 2, receipts: [], bagsOpened: 3 }));
+      // A collection with one of everything worth showing: a Shiny, Mint and Chipped glass, the top tiers, five Commons to trade up.
+      const ids = ['cR-Lqa000011', 'cE-Lqa000124', 'cR-Lqa000003', 'cL-Lqa000019', 'cM-Lqa000010', 'cE-Lqa000307', 'cC-Lqa000001', 'cC-Lqa000002', 'cC-Lqa000004', 'cC-Lqa000005', 'cC-Lqa000008'];
+      const tierOf = { C: 'Common', R: 'Rare', E: 'Epic', L: 'Legendary', M: 'Mythic' };
+      const owned = ids.map((id, i) => ({ id, tier: tierOf[id[1]], at: i + 1, tally: i === 0 ? 37 : 0 }));
+      localStorage.setItem('ringer3d.wallet.v1', JSON.stringify({ coins: 1240, owned, lastDaily: -1, streak: 2, receipts: [], bagsOpened: 11 }));
     });
     await page.goto(URL_, { waitUntil: 'networkidle2', timeout: 90000 });
     await sleep(5000);
@@ -94,6 +98,22 @@ try {
       if (await click(label)) {
         await shot(name);
         if (name === 'collection') {
+          // Inspect the Shiny, then trade-up mode with five Commons picked, then the Book and the store.
+          await page.evaluate(() => [...document.querySelectorAll('.gen-card')].find((c) => c.classList.contains('shiny'))?.click());
+          await sleep(1800);
+          await shot('inspect');
+          await click('Close');
+          await click('Trade up');
+          await page.evaluate(() => {
+            const commons = [...document.querySelectorAll('.gen-card')].filter((c) => c.querySelector('.tier')?.textContent === 'Common').slice(0, 5);
+            for (const c of commons) c.click();
+            document.querySelector('.tradeup')?.scrollIntoView({ block: 'start' });
+          });
+          await sleep(900);
+          await shot('tradeup');
+          await page.evaluate(() => document.querySelector('.book')?.scrollIntoView({ block: 'start' }));
+          await sleep(600);
+          await shot('book');
           await page.evaluate(() => document.querySelector('.screen')?.scrollTo(0, 1e5));
           await sleep(600);
           await shot('collection-store');

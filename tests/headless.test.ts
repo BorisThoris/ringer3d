@@ -88,25 +88,27 @@ describe('generated marbles', () => {
   });
 });
 
-import { claimDaily, ECONOMY, freshWallet, grantPurchase, matchReward, melt, openBag } from '../src/core/economy';
+import { claimDaily, ECONOMY, freshWallet, grantPurchase, matchReward, melt, meltValue, openBag } from '../src/core/economy';
 
 describe('economy', () => {
-  it('a bag costs its price and mints the seed\'s marble', () => {
+  it('a bag costs its price and mints the uid\'s marble', () => {
     const w = { ...freshWallet(), coins: 1000 };
-    const r = openBag(w, 777, 5);
+    const r = openBag(w, 'L00000000000000aa', 5);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.wallet.coins).toBe(1000 - ECONOMY.bagPrice);
-    expect(r.wallet.owned).toEqual([{ id: 'g777', tier: r.marble.tier, at: 5 }]);
-    expect(openBag({ ...freshWallet(), coins: 10 }, 1).ok).toBe(false);
+    expect(r.wallet.owned).toEqual([{ id: r.marble.id, tier: r.marble.tier, at: 5 }]);
+    expect(r.marble.id).toMatch(/^c[CRELM]-L00000000000000aa$/);
+    expect(openBag({ ...freshWallet(), coins: 10 }, 'L1').ok).toBe(false);
   });
 
-  it('melting pays the tier and removes the marble', () => {
-    const r = openBag({ ...freshWallet(), coins: 300 }, 42);
+  it('melting pays the marble\'s value and removes it', () => {
+    const r = openBag({ ...freshWallet(), coins: 300 }, 'L42');
     if (!r.ok) throw new Error('bag');
-    const m = melt(r.wallet, 'g42');
-    expect(m.ok && m.wallet.owned.length === 0 && m.coins === ECONOMY.melt[r.marble.tier]).toBe(true);
-    expect(melt(r.wallet, 'g43').ok).toBe(false);
+    const m = melt(r.wallet, r.marble.id);
+    expect(m.ok && m.wallet.owned.length === 0 && m.coins === meltValue(r.marble)).toBe(true);
+    expect(m.ok && m.coins).toBeGreaterThanOrEqual(ECONOMY.melt[r.marble.tier]);
+    expect(melt(r.wallet, 'cC-L43').ok).toBe(false);
   });
 
   it('daily streaks grow, reset after a gap, and pay once a day', () => {

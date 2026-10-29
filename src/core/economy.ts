@@ -1,4 +1,5 @@
-import { generateMarble, RARITY, type GeneratedMarble, type Tier } from './marbleGen';
+import { bookProgress, collectibleFromId, mintCollectible, nextTier, TRADE_UP_COUNT, type Collectible } from './collectible';
+import { RARITY, type Tier } from './marbleGen';
 
 /**
  * The collectible economy, the same on every platform: coins earned by playing (and bought
@@ -13,14 +14,16 @@ import { generateMarble, RARITY, type GeneratedMarble, type Tier } from './marbl
 
 export interface Wallet {
   coins: number;
-  /** Generated marbles owned, by id ("g" + seed), oldest first. */
-  owned: { id: string; tier: Tier; at: number }[];
+  /** Collectible marbles owned, by marble id (core/collectible.ts), oldest first; tally = captures made with it. */
+  owned: { id: string; tier: Tier; at: number; tally?: number }[];
   /** Day number (UTC) of the last daily claim, and the streak so far. */
   lastDaily: number;
   streak: number;
   /** Store receipts already credited: a purchase is granted once, however often it's reported. */
   receipts: string[];
   bagsOpened: number;
+  /** Marble Book sets already paid out. */
+  sets?: string[];
 }
 
 export const ECONOMY = {
@@ -63,15 +66,15 @@ export function earn(w: Wallet, coins: number): Wallet {
 export type Refusal = { ok: false; why: string };
 
 /**
- * Open a Marble Bag: spend the price and mint the marble for `seed` (a fresh random 32-bit
- * number from the caller). The seed is the marble; its tier comes from the seed with the
- * published odds.
+ * Open a Marble Bag: spend the price and mint the collectible for `uid` (a fresh random
+ * instance id from the caller, core/collectible.ts localUid). The uid is the marble: its tier
+ * (with the published odds), look, float and pattern all follow from it.
  */
-export function openBag(w: Wallet, seed: number, now = 0): { ok: true; wallet: Wallet; marble: GeneratedMarble } | Refusal {
+export function openBag(w: Wallet, uid: string, now = 0): { ok: true; wallet: Wallet; marble: Collectible } | Refusal {
   if (w.coins < ECONOMY.bagPrice) return { ok: false, why: 'Not enough coins.' };
   if (w.owned.length >= ECONOMY.maxCollection) return { ok: false, why: 'Your collection is full: melt a few marbles first.' };
-  const marble = generateMarble(seed);
-  if (w.owned.some((o) => o.id === marble.id)) return { ok: false, why: 'Try again.' }; // a 1 in 4 billion repeat
+  const marble = mintCollectible(uid);
+  if (w.owned.some((o) => o.id === marble.id)) return { ok: false, why: 'Try again.' }; // a 1 in 2^64 repeat
   return {
     ok: true,
     marble,
@@ -79,12 +82,51 @@ export function openBag(w: Wallet, seed: number, now = 0): { ok: true; wallet: W
   };
 }
 
-/** Melt an owned generated marble back into coins. */
+/** What melting pays: the tier's price, doubled for Mint glass, five times for a Shiny. */
+export function meltValue(c: Pick<Collectible, 'tier' | 'wear' | 'shiny'>): number {
+  const wear = c.wear === 'Mint' ? 2 : c.wear === 'Polished' ? 1.25 : 1;
+  return Math.round(ECONOMY.melt[c.tier] * wear * (c.shiny ? 5 : 1));
+}
+
+/** Melt an owned marble back into coins. */
 export function melt(w: Wallet, id: string): { ok: true; wallet: Wallet; coins: number } | Refusal {
   const m = w.owned.find((o) => o.id === id);
   if (!m) return { ok: false, why: "You don't own that marble." };
-  const coins = ECONOMY.melt[m.tier];
+  const c = collectibleFromId(id);
+  const coins = c ? meltValue(c) : ECONOMY.melt[m.tier];
   return { ok: true, coins, wallet: { ...w, coins: w.coins + coins, owned: w.owned.filter((o) => o.id !== id) } };
+}
+
+/**
+ * Trade up: five marbles of one tier become one brand-new marble of the next tier (`uid` from
+ * the caller, as for a bag). Steam runs the same rule for Steam-held marbles (itemdef exchanges).
+ */
+export function tradeUp(w: Wallet, ids: string[], uid: string, now = 0): { ok: true; wallet: Wallet; marble: Collectible } | Refusal {
+  const picked = [...new Set(ids)].map((id) => w.owned.find((o) => o.id === id));
+  if (picked.length !== TRADE_UP_COUNT || picked.some((o) => !o)) return { ok: false, why: `Pick ${TRADE_UP_COUNT} of your marbles.` };
+  const tier = picked[0]!.tier;
+  if (picked.some((o) => o!.tier !== tier)) return { ok: false, why: 'They all need to be the same rarity.' };
+  const up = nextTier(tier);
+  if (!up) return { ok: false, why: 'Mythic is the top: nothing to trade up to.' };
+  const marble = mintCollectible(uid, up);
+  const gone = new Set(ids);
+  return { ok: true, marble, wallet: { ...w, owned: [...w.owned.filter((o) => !gone.has(o.id)), { id: marble.id, tier: up, at: now }] } };
+}
+
+/** Add captures to a marble's tally (the marble you played a match with). */
+export function addTally(w: Wallet, id: string, captures: number): Wallet {
+  if (captures <= 0 || !w.owned.some((o) => o.id === id)) return w;
+  return { ...w, owned: w.owned.map((o) => (o.id === id ? { ...o, tally: (o.tally ?? 0) + captures } : o)) };
+}
+
+/** Pay out a completed Marble Book set, once. `extra` = collectibles held elsewhere (Steam). */
+export function claimSet(w: Wallet, setId: string, extra: Collectible[] = []): { ok: true; wallet: Wallet; coins: number } | Refusal {
+  if ((w.sets ?? []).includes(setId)) return { ok: false, why: 'Already claimed.' };
+  const owned = [...w.owned.map((o) => collectibleFromId(o.id)).filter((c): c is Collectible => !!c), ...extra];
+  const p = bookProgress(owned).find((x) => x.set.id === setId);
+  if (!p) return { ok: false, why: 'No such set.' };
+  if (!p.done) return { ok: false, why: `${p.got.length} of ${p.set.needs.length}: not complete yet.` };
+  return { ok: true, coins: p.set.reward, wallet: { ...w, coins: w.coins + p.set.reward, sets: [...(w.sets ?? []), setId] } };
 }
 
 /** Claim today's reward (`day` = days since the epoch, UTC). Streaks break after a missed day. */

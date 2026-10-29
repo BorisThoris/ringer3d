@@ -14,6 +14,15 @@ export interface SteamLobbySummary {
   max: number;
 }
 
+/** One stack in the player's Steam inventory. `props` = the item's dynamic properties. */
+export interface SteamItem {
+  itemId: string;
+  def: number;
+  qty: number;
+  removed: boolean;
+  props: Record<string, unknown>;
+}
+
 export interface SteamBridge {
   readonly appId: number;
   me(): Promise<{ steamId: string; name: string; deck: boolean; language: string }>;
@@ -48,6 +57,17 @@ export interface SteamBridge {
   cloudWrite(file: string, text: string): Promise<boolean>;
   presence(key: string, value: string | null): Promise<void>;
   overlay(dialog: 'friends' | 'community' | 'players' | 'settings' | 'stats' | 'achievements'): Promise<void>;
+  // Steam Inventory (ISteamInventory, steam/inventory.cjs): item ids are decimal strings.
+  invAll(): Promise<SteamItem[]>;
+  /** A playtime drop from a playtimegenerator itemdef, if Steam says one is due. */
+  invDrop(listDef: number): Promise<SteamItem[]>;
+  /** Make `gen` itemdefs from the `destroy` items; Steam enforces the itemdef's recipe. */
+  invExchange(gen: number[], destroy: string[]): Promise<SteamItem[]>;
+  invConsume(itemId: string): Promise<SteamItem[]>;
+  /** Opens Steam's checkout overlay for these itemdefs. */
+  invBuy(defs: number[]): Promise<string>;
+  invDefs(): Promise<{ def: number; name: string; type: string }[]>;
+  invSetProps(sets: { itemId: string; name: string; value: number }[]): Promise<SteamItem[]>;
   /** A session ticket for our server to check with ISteamUserAuth (store purchases). */
   webApiTicket(identity: string): Promise<string | null>;
   onMicroTxn(cb: (orderId: string, authorized: boolean) => void): () => void;

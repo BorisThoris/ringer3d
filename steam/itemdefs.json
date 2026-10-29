@@ -1,0 +1,110 @@
+{
+  "appid": 0,
+  "items": [
+    {
+      "itemdefid": 1001,
+      "type": "item",
+      "name": "Common Marble",
+      "display_type": "Common Marble",
+      "description": "A one-of-a-kind Ringer marble. Its look, wear float, pattern and Shiny roll come from this item, so no two are alike; inspect it in the game.",
+      "background_color": "1d1638",
+      "name_color": "b9c1d0",
+      "icon_url": "https://ringer3d.modaxxx009.workers.dev/steam-items/common.png",
+      "icon_url_large": "https://ringer3d.modaxxx009.workers.dev/steam-items/common-large.png",
+      "tradable": true,
+      "marketable": true,
+      "tags": "rarity:common"
+    },
+    {
+      "itemdefid": 1002,
+      "type": "item",
+      "name": "Rare Marble",
+      "display_type": "Rare Marble",
+      "description": "A one-of-a-kind Ringer marble. Its look, wear float, pattern and Shiny roll come from this item, so no two are alike; inspect it in the game.",
+      "background_color": "1d1638",
+      "name_color": "4f9dff",
+      "icon_url": "https://ringer3d.modaxxx009.workers.dev/steam-items/rare.png",
+      "icon_url_large": "https://ringer3d.modaxxx009.workers.dev/steam-items/rare-large.png",
+      "tradable": true,
+      "marketable": true,
+      "tags": "rarity:rare",
+      "exchange": "1001x5"
+    },
+    {
+      "itemdefid": 1003,
+      "type": "item",
+      "name": "Epic Marble",
+      "display_type": "Epic Marble",
+      "description": "A one-of-a-kind Ringer marble. Its look, wear float, pattern and Shiny roll come from this item, so no two are alike; inspect it in the game.",
+      "background_color": "1d1638",
+      "name_color": "b45cff",
+      "icon_url": "https://ringer3d.modaxxx009.workers.dev/steam-items/epic.png",
+      "icon_url_large": "https://ringer3d.modaxxx009.workers.dev/steam-items/epic-large.png",
+      "tradable": true,
+      "marketable": true,
+      "tags": "rarity:epic",
+      "exchange": "1002x5"
+    },
+    {
+      "itemdefid": 1004,
+      "type": "item",
+      "name": "Legendary Marble",
+      "display_type": "Legendary Marble",
+      "description": "A one-of-a-kind Ringer marble. Its look, wear float, pattern and Shiny roll come from this item, so no two are alike; inspect it in the game.",
+      "background_color": "1d1638",
+      "name_color": "ffaa1e",
+      "icon_url": "https://ringer3d.modaxxx009.workers.dev/steam-items/legendary.png",
+      "icon_url_large": "https://ringer3d.modaxxx009.workers.dev/steam-items/legendary-large.png",
+      "tradable": true,
+      "marketable": true,
+      "tags": "rarity:legendary",
+      "exchange": "1003x5"
+    },
+    {
+      "itemdefid": 1005,
+      "type": "item",
+      "name": "Mythic Marble",
+      "display_type": "Mythic Marble",
+      "description": "A one-of-a-kind Ringer marble. Its look, wear float, pattern and Shiny roll come from this item, so no two are alike; inspect it in the game.",
+      "background_color": "1d1638",
+      "name_color": "ff46be",
+      "icon_url": "https://ringer3d.modaxxx009.workers.dev/steam-items/mythic.png",
+      "icon_url_large": "https://ringer3d.modaxxx009.workers.dev/steam-items/mythic-large.png",
+      "tradable": true,
+      "marketable": true,
+      "tags": "rarity:mythic",
+      "exchange": "1004x5"
+    },
+    {
+      "itemdefid": 800,
+      "type": "item",
+      "name": "Marble Bag",
+      "description": "Open it in the game for one brand-new marble. Odds: Common 55%, Rare 28%, Epic 12%, Legendary 4.5%, Mythic 0.5%.",
+      "background_color": "1d1638",
+      "name_color": "ffd23f",
+      "icon_url": "https://ringer3d.modaxxx009.workers.dev/steam-items/bag.png",
+      "icon_url_large": "https://ringer3d.modaxxx009.workers.dev/steam-items/bag-large.png",
+      "tradable": true,
+      "marketable": true,
+      "price_category": "1;VLV100",
+      "tags": "type:bag"
+    },
+    {
+      "itemdefid": 801,
+      "type": "generator",
+      "name": "Marble Bag contents",
+      "bundle": "1001x550;1002x280;1003x120;1004x45;1005x5",
+      "exchange": "800x1"
+    },
+    {
+      "itemdefid": 900,
+      "type": "playtimegenerator",
+      "name": "Playtime drops",
+      "bundle": "800x60;1001x40",
+      "drop_interval": 60,
+      "use_drop_window": true,
+      "drop_window": 1440,
+      "drop_max_per_window": 3
+    }
+  ]
+}

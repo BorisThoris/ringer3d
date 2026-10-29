@@ -87,6 +87,13 @@ class FakeSteam {
       overlay: async () => {},
       webApiTicket: async () => 'ticket',
       onMicroTxn: () => () => {},
+      invAll: async () => [],
+      invDrop: async () => [],
+      invExchange: async () => [],
+      invConsume: async () => [],
+      invBuy: async () => '0',
+      invDefs: async () => [],
+      invSetProps: async () => [],
     };
   }
 }

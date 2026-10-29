@@ -5,6 +5,7 @@ import type { Difficulty, MapDef } from '../game/maps';
 import type { SessionMode, SessionResult } from '../game/session';
 import { lookFor, uiColor } from '../game/marbles';
 import { rewardMatch } from '../game/wallet';
+import { steamAddTally, steamDrop } from '../steamItems';
 import { steamMatchEnd, steamPresence } from '../steamFeatures';
 import { Collection } from './collection';
 import { progress, settings, type GuideMode } from '../game/settings';
@@ -102,11 +103,13 @@ export function App() {
     players.map((p, i) => ({ name: p.name, marble: p.marble, score: r.scores[i] ?? 0, winner: r.winners.includes(i) }));
 
   /** Records a finished match; returns the coins it paid, if any. */
-  const recordStats = (r: SessionResult): number | undefined => {
+  const recordStats = (r: SessionResult, marble?: string): number | undefined => {
     if (r.aborted || r.localSeats.length !== 1) return undefined;
     const me = r.localSeats[0];
-    // Every finished match pays coins toward Marble Bags (core/economy.ts).
-    const coins = rewardMatch(r.winners.length === 1 && r.winners[0] === me, r.scores[me] ?? 0);
+    // Every finished match pays coins toward Marble Bags (core/economy.ts); the captures go on
+    // the tally of the marble you played (a Steam marble keeps its tally on the Steam item).
+    const coins = rewardMatch(r.winners.length === 1 && r.winners[0] === me, r.scores[me] ?? 0, marble);
+    if (marble) void steamAddTally(marble, r.scores[me] ?? 0);
     steamMatchEnd({
       won: r.winners.length === 1 && r.winners[0] === me,
       myScore: r.scores[me] ?? 0,
@@ -136,10 +139,15 @@ export function App() {
       localSeats: a.localSeats,
       net: a.room,
       onEnd: (r) => {
-        const coins = recordStats(r);
         const me = r.localSeats.length === 1 ? r.localSeats[0] : -1;
+        const coins = recordStats(r, a.players[me]?.marble);
         const info = a.results(r);
         setScreen({ name: 'results', info: coins === undefined ? info : { ...info, reward: { coins, won: r.winners.length === 1 && r.winners[0] === me } } });
+        // Playtime drops: Steam decides whether one is due; if one comes, it lands on the results.
+        if (coins !== undefined)
+          void steamDrop().then((drops) => {
+            if (drops.length) setScreen((s) => (s.name === 'results' ? { ...s, info: { ...s.info, drops: drops.map((d) => d.id) } } : s));
+          });
       },
     });
     setScreen({ name: 'game', online: !!a.room });

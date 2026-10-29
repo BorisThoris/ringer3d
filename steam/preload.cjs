@@ -26,6 +26,7 @@ if (status.ok) {
     'me', 'createLobby', 'joinLobby', 'listLobbies', 'leaveLobby', 'setLobbyData', 'lobbyData', 'lobbyMembers', 'lobbyOwner',
     'setJoinable', 'inviteFriends', 'sendP2P', 'unlock', 'achievements', 'statGet', 'statSet', 'statsStore', 'cloudRead',
     'cloudWrite', 'presence', 'overlay', 'webApiTicket',
+    'invAll', 'invDrop', 'invExchange', 'invConsume', 'invBuy', 'invDefs', 'invSetProps',
   ];
   const bridge = { appId: status.appId, onP2P: listen('p2p'), onLobbyChange: listen('lobby'), onJoinRequested: listen('join'), onMicroTxn: listen('microtxn') };
   for (const m of methods) bridge[m] = (...args) => call(m, ...args);

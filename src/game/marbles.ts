@@ -1,4 +1,5 @@
-import { generateMarble, marbleLook } from '../core/marbleGen';
+import { collectibleFromId, isCollectibleId } from '../core/collectible';
+import { marbleLook } from '../core/marbleGen';
 /** Visual identity of a marble. Purely cosmetic: every marble plays identically (fairness). */
 export type MarbleCore = 'catseye' | 'swirl' | 'solid' | 'galaxy' | 'steelie' | 'onyx' | 'opal' | 'neon' | 'onionskin' | 'clearie';
 
@@ -20,6 +21,9 @@ export interface MarbleLook {
   /** Generated collectibles (core/marbleGen.ts): the glass finish and glitter flecks 0..1. */
   finish?: 'glass' | 'frosted' | 'pearl' | 'metallic' | 'glitter' | 'holo' | 'prism';
   sparkle?: number;
+  /** Collectibles (core/collectible.ts): wear float 0..1 (scratches, scuffs, chips) and the Shiny sheen. */
+  wear?: number;
+  shiny?: boolean;
 }
 
 /** The interface colour for a marble: its own, or the brighter of its feature colours. */
@@ -66,10 +70,11 @@ const generatedLooks = new Map<string, MarbleLook>();
  */
 export function lookFor(id: string | undefined | null): MarbleLook {
   if (id && MARBLES[id]) return MARBLES[id];
-  if (id && /^g\d+$/.test(id)) {
+  if (id && isCollectibleId(id)) {
     let look = generatedLooks.get(id);
     if (!look) {
-      look = marbleLook(generateMarble(Number(id.slice(1))));
+      const c = collectibleFromId(id)!;
+      look = { ...marbleLook(c.marble), wear: c.float, shiny: c.shiny };
       generatedLooks.set(id, look);
     }
     return look;

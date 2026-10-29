@@ -5,6 +5,8 @@ import { ARENA_LIST, type ArenaId } from '../game/arenas';
 import { generateMap, type Difficulty } from '../game/maps';
 import { PROP_TRAITS } from '../core/props';
 import { generateMarble, HUE_NAMES, MARBLE_WORDS, marbleFixtures, RARITY } from '../core/marbleGen';
+import { mintCollectible } from '../core/collectible';
+import type { Tier } from '../core/marbleGen';
 import { botAgent, playMatch, randomAgent, type Agent } from './agents';
 import { HeadlessGame, type GameSpec } from './game';
 import { stdioAgent } from './node';
@@ -15,7 +17,8 @@ import { stdioAgent } from './node';
  *   play  [options] <agent> <agent> [...]   play matches between agents, one JSON line per game
  *   serve                                   an environment on stdin/stdout for an outside driver
  *   map   [options]                         print a generated map as JSON
- *   marble <seed> [...]                     print generated collectible marbles as JSON
+ *   marble <seed> [...]                     print generated marbles (by look seed) as JSON
+ *   collectible <uid> [...] [--tier Rare]   print collectible marbles (float, wear, pattern, Shiny) by instance id
  *   export [--maps N]                       maps, marble rules and fixtures for other ports (Roblox)
  *
  * Agents: bot:<rookie|novice|casual|regular|skilled|expert|master|legend>, random,
@@ -156,9 +159,10 @@ async function main() {
   else if (cmd === 'serve') await serve();
   else if (cmd === 'map') out(generateMap(specFrom(opts) as { arena: ArenaId; difficulty: Difficulty; seed: number }));
   else if (cmd === 'marble') for (const s of rest) out(generateMarble(Number(s)));
+  else if (cmd === 'collectible') for (const u of rest) out(mintCollectible(u, opts.tier as Tier | undefined));
   else if (cmd === 'export') out(exportBundle(Number(opts.maps ?? 12)));
   else {
-    process.stderr.write(`usage: ringer-headless play|serve|map|marble  (bots: ${Object.keys(BOT_PROFILES).join(', ')})\n`);
+    process.stderr.write(`usage: ringer-headless play|serve|map|marble|collectible  (bots: ${Object.keys(BOT_PROFILES).join(', ')})\n`);
     process.exitCode = 2;
   }
 }
