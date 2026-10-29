@@ -9,7 +9,9 @@ const OUT = process.env.OUT_DIR ?? 'e2e-out/collection';
 mkdirSync(OUT, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const server = await preview({ preview: { port: 4179, strictPort: true, host: '127.0.0.1' }, logLevel: 'error' });
+// QA_URL: test a deployed copy (e.g. the live Worker) instead of a local preview of dist/.
+const URL_ = process.env.QA_URL ?? 'http://127.0.0.1:4179/';
+const server = process.env.QA_URL ? null : await preview({ preview: { port: 4179, strictPort: true, host: '127.0.0.1' }, logLevel: 'error' });
 const browser = await puppeteer.launch({
   executablePath: CHROME,
   headless: true,
@@ -24,7 +26,7 @@ try {
     localStorage.setItem('ringer3d.settings.v1', JSON.stringify({ quality: 'medium' }));
     localStorage.setItem('ringer3d.wallet.v1', JSON.stringify({ coins: 2400, owned: [{ id: 'g99', tier: 'Rare', at: 1 }, { id: 'g4242', tier: 'Common', at: 2 }], lastDaily: -1, streak: 0, receipts: [], bagsOpened: 0 }));
   });
-  await page.goto('http://127.0.0.1:4179/', { waitUntil: 'networkidle2', timeout: 60000 });
+  await page.goto(URL_, { waitUntil: 'networkidle2', timeout: 60000 });
   await sleep(4000);
   await page.screenshot({ path: `${OUT}/1-menu.png` });
   const click = async (text) => {
@@ -50,5 +52,5 @@ try {
   console.log(JSON.stringify({ coins: state.coins, owned: state.owned.length, streak: state.streak, errors }));
 } finally {
   await browser.close();
-  server.httpServer.close();
+  server?.httpServer.close();
 }
