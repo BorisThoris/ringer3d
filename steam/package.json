@@ -28,9 +28,15 @@
     "files": [
       "main.cjs",
       "preload.cjs",
+      "api.cjs",
+      "pump.cjs",
+      "flatlib.cjs",
+      "inventory.cjs",
+      "social.cjs",
       "app/**",
       "package.json",
-      "node_modules/steamworks.js/**"
+      "node_modules/steamworks.js/**",
+      "node_modules/koffi/**"
     ],
     "extraFiles": [
       {

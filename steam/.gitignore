@@ -3,3 +3,4 @@ app
 dist
 probe.json
 probe-inventory.json
+probe-headless.json

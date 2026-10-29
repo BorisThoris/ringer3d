@@ -13,7 +13,9 @@ const require = createRequire(new URL('../steam/package.json', import.meta.url))
 const electron = require('electron');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const child = spawn(electron, ['.', '--remote-debugging-port=9334', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'], {
+// STEAM_SHELL_EXE: test a packaged build (steam/dist/win-unpacked/Ringer 3D.exe) instead.
+const exe = process.env.STEAM_SHELL_EXE;
+const child = spawn(exe ?? electron, [...(exe ? [] : ['.']), '--remote-debugging-port=9334', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'], {
   cwd: new URL('../steam/', import.meta.url),
   env: { ...process.env, SteamNoOverlayUIDrawing: '1' },
   stdio: ['ignore', 'pipe', 'pipe'],

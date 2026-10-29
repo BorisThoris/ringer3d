@@ -7,8 +7,12 @@ const path = require('node:path');
 let cached = null;
 
 function dllPath() {
+  // It must be the very copy steamworks.js's native module loaded: Windows resolves that one next
+  // to the .node file, and a second copy is a second, uninitialised Steam (interfaces come back
+  // null). In a packaged build that copy is unpacked from app.asar (asarUnpack), and koffi needs
+  // the real file, so point into app.asar.unpacked. The exe-side copy is only a last resort.
   const candidates = [
-    path.join(path.dirname(require.resolve('steamworks.js')), 'dist', 'win64', 'steam_api64.dll'),
+    path.join(path.dirname(require.resolve('steamworks.js')), 'dist', 'win64', 'steam_api64.dll').replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`),
     path.join(path.dirname(process.execPath), 'steam_api64.dll'),
   ];
   const p = candidates.find((c) => fs.existsSync(c));
