@@ -42,9 +42,11 @@ cloud and presence work there; Spacewar's own achievement names differ from ours
 3. **Stats**: create the integer stats in `STATS`.
 4. **Steam Cloud**: enable it; byte quota 1 MB and 10 files is plenty.
 5. **Rich presence**: upload `rich_presence.vdf` (Localization > Rich Presence).
-6. **Microtransactions** (only for a free-to-play release): the store server (InitTxn,
-   FinalizeTxn with the publisher Web API key) and the items in `PRODUCTS` (`src/core/economy.ts`);
-   then build the game with `VITE_STEAM_STORE_URL`.
+6. **Microtransactions** (only for a free-to-play release): run the lobby server
+   (`server/index.mjs`, which includes `server/steamStore.mjs`) with `STEAM_PUBLISHER_KEY`,
+   `STEAM_APP_ID` and, while testing, `STEAM_SANDBOX=1` (no money moves). Prices are in
+   `STEAM_PRICES` and must match `PRODUCTS` (`src/core/economy.ts`; a test checks). Build the game
+   with `VITE_STEAM_STORE_URL` pointing at that server.
 7. **Depots**: `npm run pack`, then upload `dist/win-unpacked` with steamcmd and `depot/app_build.vdf`
    (fill in the App and depot ids).
 

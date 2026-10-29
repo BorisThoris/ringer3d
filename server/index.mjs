@@ -10,7 +10,8 @@
  *  - Optionally serves the built web app from ../dist, so one process hosts everything.
  *
  * Env: PORT (default 8787), STATIC_DIR (default ../dist), ICE_SERVERS (JSON array, optional;
- * e.g. to hand clients a TURN server).
+ * e.g. to hand clients a TURN server). STEAM_PUBLISHER_KEY + STEAM_APP_ID (+ STEAM_SANDBOX=1)
+ * turn on the Steam coin-pack store (steamStore.mjs).
  */
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
@@ -18,6 +19,7 @@ import { extname, join, normalize, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { WebSocketServer } from 'ws';
+import { createSteamStore } from './steamStore.mjs';
 
 const PORT = Number(process.env.PORT ?? 8787);
 const here = dirname(fileURLToPath(import.meta.url));
@@ -169,8 +171,29 @@ const MIME = {
   '.wasm': 'application/wasm',
 };
 
+const steamStore = createSteamStore({ key: process.env.STEAM_PUBLISHER_KEY, appId: process.env.STEAM_APP_ID, sandbox: process.env.STEAM_SANDBOX === '1' });
+
 const http = createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', 'http://x');
+  if (url.pathname.startsWith('/steam/')) {
+    let body = null;
+    if (req.method === 'POST') {
+      let text = '';
+      for await (const chunk of req) {
+        text += chunk;
+        if (text.length > 8192) break;
+      }
+      try {
+        body = JSON.parse(text);
+      } catch {
+        body = null;
+      }
+    }
+    const [status, out] = (await steamStore(req.method ?? 'GET', url.pathname, body).catch(() => [500, { error: 'store error' }])) ?? [404, { error: 'not found' }];
+    res.writeHead(status, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'access-control-allow-headers': 'content-type' });
+    res.end(out ? JSON.stringify(out) : '');
+    return;
+  }
   if (url.pathname === '/health') {
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' });
     res.end(JSON.stringify({ ok: true, rooms: rooms.size, clients: clients.size }));
