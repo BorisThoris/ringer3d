@@ -43,7 +43,6 @@ export function Profile({ onBack }: { onBack: () => void }) {
     ['Tower', p.cleared.length ? `Cleared ×${p.cleared.length}` : `Floor ${floors}/8`],
     ['Marbles', owned.length.toLocaleString()],
     ['Collection', `${value.toLocaleString()} ¢`],
-    ['Bags opened', w.bagsOpened.toLocaleString()],
   ];
 
   return (
