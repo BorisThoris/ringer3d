@@ -147,6 +147,7 @@ function watchStores() {
     if (all.some((c) => c.tier === 'Legendary')) unlock('LEGENDARY_PULL');
     if (all.some((c) => c.tier === 'Mythic')) unlock('MYTHIC_PULL');
     if (all.some((c) => c.shiny)) unlock('SHINY_PULL');
+    if (all.some((c) => c.effect !== 'none')) unlock('PHENOMENON_PULL');
     if (all.some((c) => c.wear === 'Mint')) unlock('MINT_PULL');
     if (all.length >= 25) unlock('COLLECTOR_25');
     if (w.streak >= 7) unlock('DAILY_7');

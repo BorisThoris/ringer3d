@@ -1,7 +1,7 @@
 import { useState, type CSSProperties } from 'react';
 import { bookProgress, collectibleFromId, nextTier, SHINY_ODDS, TIERS, TRADE_UP_COUNT, WEARS, type Collectible } from '../core/collectible';
 import { bagOdds, ECONOMY, meltValue, PRODUCTS } from '../core/economy';
-import type { Tier } from '../core/marbleGen';
+import { EFFECTS, phenomenonOdds, type Tier } from '../core/marbleGen';
 import { lookFor, uiColor } from '../game/marbles';
 import { settings } from '../game/settings';
 import { buyBag, claimBookSet, claimToday, credit, dailyPreview, meltMarble, tradeUpMarbles, wallet } from '../game/wallet';
@@ -51,7 +51,11 @@ export function FloatBar({ float }: { float: number }) {
 /** A big look at one marble: everything a collector checks. */
 function Inspect({ c, equipped, onEquip, onMelt, onClose }: { c: Held; equipped: boolean; onEquip: () => void; onMelt?: () => void; onClose: () => void }) {
   return (
-    <section className={`inspect${c.shiny ? ' shiny' : ''}`} style={{ '--c': TIER_COLOR[c.tier] } as CSSProperties} aria-live="polite">
+    <section
+      className={`inspect${c.shiny ? ' shiny' : ''}${c.effect !== 'none' ? ' phenomenon' : ''}`}
+      style={{ '--c': TIER_COLOR[c.tier], '--fx': c.marble.effectColor } as CSSProperties}
+      aria-live="polite"
+    >
       <div className="inspect-view">
         <Marble3D id={c.id} size={200} />
       </div>
@@ -61,6 +65,11 @@ function Inspect({ c, equipped, onEquip, onMelt, onClose }: { c: Held; equipped:
           {c.source === 'steam' && <span className="steam-tag">Steam item</span>}
         </small>
         <h2>{c.marble.name}</h2>
+        {c.effect !== 'none' && (
+          <p className="fx-line">
+            <b>✦ {EFFECTS[c.effect].title}</b> {EFFECTS[c.effect].desc}
+          </p>
+        )}
         <div className="facts">
           <span>
             <b>{c.wear}</b>
@@ -137,7 +146,8 @@ export function Collection({ onBack }: { onBack: () => void }) {
   const bonus = Math.round((perDollar(best) / perDollar(PRODUCTS[0]) - 1) * 100);
 
   const sorted = [...held].sort((a, b) =>
-    sort === 'rarity' ? TIERS.indexOf(b.tier) - TIERS.indexOf(a.tier) || a.float - b.float : sort === 'float' ? a.float - b.float : b.at - a.at,
+    sort === 'rarity'
+      ? TIERS.indexOf(b.tier) - TIERS.indexOf(a.tier) || +(b.effect !== 'none') - +(a.effect !== 'none') || +b.shiny - +a.shiny || a.float - b.float : sort === 'float' ? a.float - b.float : b.at - a.at,
   );
   const shown = open ? held.find((h) => h.id === open) ?? null : null;
   const pickedHeld = picked.map((id) => held.find((h) => h.id === id)).filter((h): h is Held => !!h);
@@ -184,6 +194,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
                 </span>
               ))}
               <span className="shiny-odds">✦ Shiny {100 / SHINY_ODDS}%</span>
+              <span className="fx-odds">✦ Phenomenon {phenomenonOdds().toFixed(1)}%</span>
             </p>
             <button
               className="btn primary"
@@ -354,8 +365,8 @@ export function Collection({ onBack }: { onBack: () => void }) {
               return (
                 <button
                   key={h.id}
-                  className={`gen-card${h.shiny ? ' shiny' : ''}${sel ? ' picked' : ''}`}
-                  style={{ '--c': TIER_COLOR[h.tier], '--a': uiColor(look) } as CSSProperties}
+                  className={`gen-card${h.shiny ? ' shiny' : ''}${h.effect !== 'none' ? ' phenomenon' : ''}${sel ? ' picked' : ''}`}
+                  style={{ '--c': TIER_COLOR[h.tier], '--a': uiColor(look), '--fx': h.marble.effectColor } as CSSProperties}
                   aria-pressed={picking ? sel : open === h.id}
                   disabled={!!blocked}
                   onClick={() => {
@@ -366,6 +377,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
                 >
                   {h.source === 'steam' && <span className="corner steam">Steam</span>}
                   {isOn && <span className="corner on">Equipped</span>}
+                  {h.effect !== 'none' && !isOn && h.source !== 'steam' && <span className="corner fx">✦</span>}
                   <MarbleChip id={h.id} size={56} />
                   <b>{h.marble.name}</b>
                   <small className="tier">{h.tier}</small>

@@ -38,7 +38,7 @@ is missing, run `node node_modules/electron/install.js` (set `ELECTRON_CACHE` to
 | Lobbies (ISteamMatchmaking) | `src/net/steamMatchmaker.ts` | Online rooms are Steam lobbies. Public ones show in the server browser and join by code; private ones join through Steam invites. |
 | P2P networking (ISteamNetworking) | same, `main.cjs` packet pump | Match messages, reliable, relayed by Valve when needed. P2P sessions are accepted for lobby peers. |
 | Invites and Join Game | `listenForSteamInvites` (`ui/online.tsx`), "Invite Steam friends" in a room | Accepting an invite drops you into the room. |
-| Achievements | `src/services/catalog.ts` `ACHIEVEMENTS`, unlocked in `src/platformFeatures.ts` | First win, clean sweep, online win, Tower cleared, first bag, Legendary, Mythic, Shiny and Mint pulls, a trade-up, a Marble Book set, 25 marbles, 7-day streak, five wins in a row. |
+| Achievements | `src/services/catalog.ts` `ACHIEVEMENTS`, unlocked in `src/platformFeatures.ts` | First win, clean sweep, online win, Tower cleared, first bag, Legendary, Mythic, Shiny, Mint and phenomenon pulls, a trade-up, a Marble Book set, 25 marbles, 7-day streak, five wins in a row. |
 | Stats | `catalog.ts` `STATS` | games_played, games_won, marbles_captured, bags_opened, marbles_owned (integers). |
 | Steam Cloud | `platformFeatures.ts` `syncCloud` | settings.json, progress.json, wallet.json: newer copy wins on launch, then write-through. |
 | Rich presence | `presence` (`platformFeatures.ts`, called from `ui/App.tsx`) | "In the menu", "Opening Marble Bags", "Playing online"...; lobby members grouped. |

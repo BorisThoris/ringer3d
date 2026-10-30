@@ -289,22 +289,24 @@ export function Marble3D({ id, size = 120, accent, style }: { id: string; size?:
   const preview = useRef<MarblePreview | null>(null);
   const quality = settings.use((s) => s.quality);
   const look = lookFor(id);
+  // A phenomenon is the point of its marble: its close-up is live even on low quality.
+  const live = quality !== 'low' || (!!look.effect && look.effect !== 'none');
 
   useEffect(() => {
-    if (quality === 'low' || !ref.current) return;
+    if (!live || !ref.current) return;
     preview.current = new MarblePreview(ref.current, look, accent ?? look.accent, quality === 'high' ? 'high' : 'low');
     return () => {
       preview.current?.dispose();
       preview.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quality, accent]);
+  }, [quality, accent, live]);
 
   useEffect(() => {
     preview.current?.setLook(look);
   }, [look]);
 
-  if (quality === 'low') return <MarbleChip id={id} size={size * 0.7} style={style} />;
+  if (!live) return <MarbleChip id={id} size={size * 0.7} style={style} />;
   // The preview canvas is opaque (glass must refract something); feather it into the panel.
   const feather = 'radial-gradient(circle at 50% 46%, #000 50%, transparent 70%)';
   return (

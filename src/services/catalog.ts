@@ -14,6 +14,7 @@ export const ACHIEVEMENTS = {
   LEGENDARY_PULL: { title: 'Legend in the bag', desc: 'Pull a Legendary marble', steam: 'LEGENDARY_PULL', play: '' },
   MYTHIC_PULL: { title: 'Myth made glass', desc: 'Pull a Mythic marble', steam: 'MYTHIC_PULL', play: '' },
   SHINY_PULL: { title: 'Something shiny', desc: 'Own a Shiny marble', steam: 'SHINY_PULL', play: '' },
+  PHENOMENON_PULL: { title: 'Something stirs', desc: 'Own a marble with a phenomenon inside', steam: 'PHENOMENON_PULL', play: '' },
   MINT_PULL: { title: 'Factory fresh', desc: 'Own a Mint marble', steam: 'MINT_PULL', play: '' },
   TRADE_UP: { title: 'Five for one', desc: 'Trade up five marbles', steam: 'TRADE_UP', play: '' },
   BOOK_SET: { title: 'Page complete', desc: 'Complete a Marble Book set', steam: 'BOOK_SET', play: '' },

@@ -32,7 +32,7 @@ try {
     await page.evaluateOnNewDocument(() => {
       localStorage.setItem('ringer3d.settings.v1', JSON.stringify({ quality: 'low', playerName: 'Bobby' }));
       // A collection with one of everything worth showing: a Shiny, Mint and Chipped glass, the top tiers, five Commons to trade up.
-      const ids = ['cR-Lqa000011', 'cE-Lqa000124', 'cR-Lqa000003', 'cL-Lqa000019', 'cM-Lqa000010', 'cE-Lqa000307', 'cC-Lqa000001', 'cC-Lqa000002', 'cC-Lqa000004', 'cC-Lqa000005', 'cC-Lqa000008'];
+      const ids = ['cL-F4e6bdb2c47998e2e', 'cR-Lqa000011', 'cE-Lqa000124', 'cR-Lqa000003', 'cL-Lqa000019', 'cM-Lqa000010', 'cE-Lqa000307', 'cC-Lqa000001', 'cC-Lqa000002', 'cC-Lqa000004', 'cC-Lqa000005', 'cC-Lqa000008'];
       const tierOf = { C: 'Common', R: 'Rare', E: 'Epic', L: 'Legendary', M: 'Mythic' };
       const owned = ids.map((id, i) => ({ id, tier: tierOf[id[1]], at: i + 1, tally: i === 0 ? 37 : 0 }));
       localStorage.setItem('ringer3d.wallet.v1', JSON.stringify({ coins: 1240, owned, lastDaily: -1, streak: 2, receipts: [], bagsOpened: 11 }));
@@ -102,6 +102,11 @@ try {
           await page.evaluate(() => [...document.querySelectorAll('.gen-card')].find((c) => c.classList.contains('shiny'))?.click());
           await sleep(1800);
           await shot('inspect');
+          await click('Close');
+          // A marble with a phenomenon inside (a Void): its ring, headline and live effect.
+          await page.evaluate(() => [...document.querySelectorAll('.gen-card')].find((c) => c.classList.contains('phenomenon'))?.click());
+          await sleep(2500);
+          await shot('inspect-phenomenon');
           await click('Close');
           await click('Trade up');
           await page.evaluate(() => {

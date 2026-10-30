@@ -2636,3 +2636,64 @@ button.profile {
   10%, 88% { opacity: 1; transform: translate(-50%, 0) scale(1); }
   100% { opacity: 0; transform: translate(-50%, -10px); }
 }
+
+/* ---- Phenomena -------------------------------------------------------------------------- */
+.fx-odds {
+  background: linear-gradient(90deg, #ff9a3c, #ff4fa3, #7a6bff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 800;
+}
+.fx-line {
+  margin: -4px 0 8px;
+  font-size: var(--t-sm);
+  color: var(--chalk-dim);
+}
+.fx-line b {
+  color: var(--fx, var(--sun));
+  filter: brightness(1.25);
+}
+/* A slow turning ring of the phenomenon's colour round the card and the inspect panel. */
+.gen-card.phenomenon,
+.inspect.phenomenon {
+  position: relative;
+  isolation: isolate;
+}
+.gen-card.phenomenon::before,
+.inspect.phenomenon::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  z-index: -1;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(from var(--fx-turn, 0deg), var(--fx, #ff4fa3), transparent 30%, var(--fx, #ff4fa3) 50%, transparent 80%, var(--fx, #ff4fa3));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: fx-spin 4s linear infinite;
+}
+.gen-card.phenomenon .marble {
+  box-shadow: 0 0 18px 2px var(--fx, #ff4fa3);
+}
+.corner.fx {
+  background: linear-gradient(135deg, #ff9a3c, #ff4fa3 50%, #7a6bff);
+  color: white;
+}
+@property --fx-turn {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes fx-spin {
+  to {
+    --fx-turn: 360deg;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gen-card.phenomenon::before,
+  .inspect.phenomenon::before {
+    animation: none;
+  }
+}
