@@ -1,0 +1,1 @@
+2026-10-30 14:49:07.277 E  App[5095:4f86] [com.apple.TextInputUI:CandidateGeneration] Attempted to update accumulator from source type: 0, after completion has already been called for token:[FE99B24D]. This is an error and will be ignored.
