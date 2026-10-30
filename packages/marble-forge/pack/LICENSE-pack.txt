@@ -1,0 +1,21 @@
+MARBLE FORGE VOLUME 1 - ASSET LICENCE
+
+Copyright (c) 2026 BorisThoris. All rights reserved except as granted below.
+
+By buying this pack you get a perpetual, worldwide, non-exclusive licence to use the images,
+models, animations and data in it ("the Assets") in your own projects, personal or
+commercial: games, apps, websites, videos, streams, print and merchandise, for as many
+projects as you like.
+
+You may modify the Assets in any way.
+
+You may NOT:
+  - sell, give away or share the Assets on their own, or as part of another asset pack,
+    sprite library, template or marketplace item, modified or not, where the Assets are the
+    thing being offered;
+  - use the Assets to train or fine-tune machine-learning models;
+  - claim you made the Assets.
+
+Credit is welcome but not required: "Marbles from Marble Forge".
+
+The Assets are provided as is, without warranty of any kind.

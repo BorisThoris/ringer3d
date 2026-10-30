@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { hashString, Rng } from '../rng';
 import type { MarbleLook } from '../look';
 import { marbleTexture } from './textures';
-import { buildEffect } from './effects';
+import { buildCoreVolume, buildEffect } from './effects';
 import { inkMaterial } from './ink';
 
 /**
@@ -341,6 +341,8 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
   const glowK = Math.max(0.25, look.glow);
   // A phenomenon needs to be seen: its marble leaves out the opaque cores some patterns have.
   const hollow = !!look.effect && look.effect !== 'none';
+  // Galaxies and onyx get a deep glowing interior (a nebula, magma veins); a phenomenon replaces it.
+  const deep = hollow ? null : look.core === 'galaxy' ? 'nebula' : look.core === 'onyx' ? 'magma' : null;
 
   // ---- Opaque marbles ----------------------------------------------------------------------
   if (look.core === 'steelie') {
@@ -500,6 +502,7 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
   // A phenomenon: a living effect inside the glass (three/effects.ts).
   const effect = buildEffect(look, r, quality);
   if (effect) group.add(effect);
+  if (deep) group.add(buildCoreVolume(deep, look, r, quality));
 
   // ---- Glass shell --------------------------------------------------------------------------
   const tint = new THREE.Color(look.base);
@@ -526,7 +529,9 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
           // low-clarity marble (a dark galaxy, a neon core) read as milky haze. Tint it
           // toward the marble's own base, more so the less clear the glass is.
           // Tinted glass (the targets) takes its colour straight; clear glass only a touch.
-          color: clarity < 0.5 ? tint.clone() : new THREE.Color('#ffffff').lerp(dark ? absorb : tint, 1 - clarity),
+          // Dark glass keeps its own deep colour (lifted a little); lerping it toward white by
+          // clarity turned galaxies and onyx milky grey.
+          color: dark ? absorb.clone().lerp(new THREE.Color('#ffffff'), 0.22) : clarity < 0.5 ? tint.clone() : new THREE.Color('#ffffff').lerp(tint, 1 - clarity),
           // Finishes of generated collectibles: frosted glass is matte, pearl and holo shimmer,
           // prism splits the light into colours.
           roughness: look.finish === 'frosted' ? 0.38 : 0,

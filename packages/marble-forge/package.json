@@ -9,7 +9,20 @@
     ".": "./src/index.ts",
     "./three": "./src/three/index.ts"
   },
+  "scripts": {
+    "dev": "vite --config vite.config.ts",
+    "build": "tsc --noEmit -p . && vite build --config vite.config.ts",
+    "qa": "node scripts/qa-forge.mjs",
+    "pack": "node scripts/pack.mjs"
+  },
   "peerDependencies": {
     "three": ">=0.160.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.186.0",
+    "puppeteer-core": "^25.16.0",
+    "three": "^0.186.1",
+    "typescript": "~5.9",
+    "vite": "^8.3.5"
   }
 }

@@ -105,13 +105,33 @@ const SAMPLERS: Record<string, string> = {
       vec3 col = mix(uColor, uColor2, n);
       return vec4(col * 2.4, d);
     }`,
+  // Not phenomena: the deep interiors of the galaxy and onyx patterns, in the marble's own colours.
+  nebula: /* glsl */ `
+    vec4 fx(vec3 q, float rr) {
+      float n = fbm(q * 2.4 + vec3(uTime * 0.03, 0.0, -uTime * 0.02));
+      float n2 = fbm(q * 4.5 - vec3(0.0, uTime * 0.02, 0.0));
+      float d = smoothstep(0.42, 0.85, n) * smoothstep(1.0, 0.15, rr) * 0.55;
+      vec3 col = mix(uColor, uColor2, smoothstep(0.3, 0.8, n2));
+      float star = step(0.992, hash(floor(q * 26.0))) * smoothstep(1.0, 0.6, rr);
+      return vec4(col * 2.2 + vec3(star) * 9.0, d + star * 0.9);
+    }`,
+  magma: /* glsl */ `
+    vec4 fx(vec3 q, float rr) {
+      float n = fbm(q * 2.6 + vec3(0.0, uTime * 0.04, 0.0));
+      float vein = pow(1.0 - abs(n * 2.0 - 1.0), 40.0);
+      float pulse = 0.8 + 0.2 * sin(uTime * 1.3 + n * 9.0);
+      float d = vein * smoothstep(1.0, 0.35, rr) * pulse;
+      vec3 col = mix(uColor, uColor2, smoothstep(0.3, 0.9, vein));
+      return vec4(col * 2.4, d * 0.9);
+    }`,
 };
 
 function volumeMaterial(kind: string, look: MarbleLook, R: number, steps: number): THREE.ShaderMaterial {
-  const c = new THREE.Color(look.effectColor ?? look.accent);
+  const own = kind === 'nebula' || kind === 'magma';
+  const c = new THREE.Color(own ? look.accent : look.effectColor ?? look.accent);
   const hsl = { h: 0, s: 0, l: 0 };
   c.getHSL(hsl);
-  const c2 = new THREE.Color().setHSL(hsl.h + (kind === 'aurora' ? 0.28 : 0.12), 1, 0.62);
+  const c2 = own ? new THREE.Color(look.accent2) : new THREE.Color().setHSL(hsl.h + (kind === 'aurora' ? 0.28 : 0.12), 1, 0.62);
   return new THREE.ShaderMaterial({
     uniforms: { uTime: forgeClock, uR: { value: R }, uColor: { value: c }, uColor2: { value: c2 } },
     defines: kind === 'void' ? { STEPS: steps, VOID_CORE: 0.27 } : { STEPS: steps },
@@ -287,6 +307,16 @@ function crystals(look: MarbleLook, r: number, count: number): THREE.InstancedMe
 }
 
 /** The phenomenon inside a marble, or null when it has none. */
+/** A deep interior for the top patterns: a drifting nebula with stars (galaxy), magma veins (onyx). */
+export function buildCoreVolume(kind: 'nebula' | 'magma', look: MarbleLook, r: number, quality: Quality): THREE.Mesh {
+  const steps = quality === 'low' ? 8 : quality === 'medium' ? 12 : 18;
+  const m = new THREE.Mesh(new THREE.SphereGeometry(r * 1.03, 64, 44), volumeMaterial(kind, look, r * 0.9, steps));
+  m.renderOrder = 2.5;
+  m.userData.noInk = true;
+  m.name = `core-${kind}`;
+  return m;
+}
+
 export function buildEffect(look: MarbleLook, r: number, quality: Quality): THREE.Object3D | null {
   const kind = look.effect;
   if (!kind || kind === 'none') return null;

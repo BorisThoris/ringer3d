@@ -15,6 +15,7 @@ import {
   type Tier,
 } from '../src';
 import { exportGlb, MarblePreview, snapshot } from '../src/three';
+import './tools';
 
 /**
  * The Forge: roll marbles, look at them up close, download them. Also the engine of the asset
@@ -153,6 +154,24 @@ function wire() {
 }
 
 // ---- Automation (the asset pack builder) ------------------------------------------------------
+/** A smooth downscale in halving steps (one big drawImage step aliases). */
+function scaled(src: HTMLCanvasElement, size: number): HTMLCanvasElement {
+  let cur = src;
+  while (cur.width / 2 >= size) {
+    const n = document.createElement('canvas');
+    n.width = n.height = cur.width / 2;
+    n.getContext('2d')!.drawImage(cur, 0, 0, n.width, n.height);
+    cur = n;
+  }
+  if (cur.width === size) return cur;
+  const n = document.createElement('canvas');
+  n.width = n.height = size;
+  const g = n.getContext('2d')!;
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(cur, 0, 0, size, size);
+  return n;
+}
+
 async function toBase64(buf: ArrayBuffer | Blob): Promise<string> {
   const blob = buf instanceof Blob ? buf : new Blob([buf]);
   return new Promise((ok) => {
@@ -179,6 +198,27 @@ const api = {
     const r = resolve(uid, o);
     const c = snapshot(r.look, { size: o.size ?? 512, time: o.time, turn: o.turn, background: o.background ?? 'transparent' });
     return toBase64(await new Promise<Blob>((ok) => c.toBlob((b) => ok(b!), 'image/png')));
+  },
+  /** One render, downscaled to every size asked for (largest first): base64 PNGs, same order. */
+  pngSet: async (uid: string, o: { wear?: boolean; sizes: number[]; time?: number; turn?: number }) => {
+    const r = resolve(uid, o);
+    const big = snapshot(r.look, { size: o.sizes[0], time: o.time, turn: o.turn });
+    const out: string[] = [];
+    for (const s of o.sizes) {
+      const c = s === o.sizes[0] ? big : scaled(big, s);
+      out.push(await toBase64(await new Promise<Blob>((ok) => c.toBlob((b) => ok(b!), 'image/png'))));
+    }
+    return out;
+  },
+  /** A turntable: `count` transparent frames, one full turn while the phenomenon plays. */
+  frames: async (uid: string, o: { wear?: boolean; size: number; count: number; seconds?: number }) => {
+    const r = resolve(uid, o);
+    const out: string[] = [];
+    for (let i = 0; i < o.count; i++) {
+      const c = snapshot(r.look, { size: o.size, turn: (i / o.count) * Math.PI * 2, time: 1 + (i / o.count) * (o.seconds ?? 4) });
+      out.push(await toBase64(await new Promise<Blob>((ok) => c.toBlob((b) => ok(b!), 'image/png'))));
+    }
+    return out;
   },
   glb: async (uid: string, o: { tier?: Tier; wear?: boolean } = {}) => toBase64(await exportGlb(resolve(uid, o).look)),
   show: (uid: string, o: { tier?: Tier; wear?: boolean } = {}) => show(resolve(uid, o)),

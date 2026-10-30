@@ -36,6 +36,8 @@ try {
     geode: 'cL-Fae8bbe3f6943219a',
     starfall: 'cL-Fac711cedbad5a390',
     none: 'cE-Fdd141f41c617c3d1',
+    'mythic-galaxy': '1:Mythic',
+    'mythic-onyx': '2:Mythic',
   };
   for (const [effect, uid] of Object.entries(FIXED)) {
     const info = await page.evaluate((u) => window.forge.resolve(u), uid);

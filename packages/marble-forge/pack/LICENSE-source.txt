@@ -1,0 +1,20 @@
+MARBLE FORGE GENERATOR - SOURCE LICENCE
+
+Copyright (c) 2026 BorisThoris. All rights reserved except as granted below.
+
+By buying the generator you get a perpetual, worldwide, non-exclusive licence to use and
+modify its source code ("the Software"), and to ship the Software and anything it generates
+inside your own products, personal or commercial, for as many products as you like.
+Marbles the Software generates for you are yours to use like any of your own assets.
+
+You may NOT:
+  - sell, give away or publish the Software's source code, modified or not, on its own or as
+    part of a template, library, asset or marketplace item (shipping it compiled inside your
+    game or app is fine);
+  - sell or give away generated marbles as a standalone asset pack;
+  - claim you wrote the Software.
+
+The Software uses three.js (MIT licence, (c) 2010-2026 three.js authors), which you install
+yourself; its licence is unchanged by this one.
+
+The Software is provided as is, without warranty of any kind.
