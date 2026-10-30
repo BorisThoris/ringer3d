@@ -228,7 +228,11 @@ export function generateMarble(seed: number, tier?: Tier): GeneratedMarble {
   const effect: Effect = fxRoll < EFFECT_ODDS[t] && !opaque ? fxPick : 'none';
   const range = EFFECTS[fxPick].hue;
   const effectColor = hsl(range[0] + (range[1] - range[0]) * fxHue, 1, fxLight);
-  if (effect !== 'none') words.unshift(EFFECTS[effect].title);
+  if (effect !== 'none') {
+    // The title leads the name; a word that repeats it ("Aurora Aurora ...") is dropped.
+    const title = EFFECTS[effect].title;
+    words.splice(0, words.length, title, ...words.filter((w) => w !== title));
+  }
   return {
     seed,
     id: `g${seed}`,

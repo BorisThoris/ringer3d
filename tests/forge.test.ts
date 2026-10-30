@@ -11,20 +11,25 @@ const fnv = (s: string) => {
   return h.toString(16);
 };
 
-/** A marble as the generator made it before phenomena and shapes existed. */
+/** A marble as the generator made it before phenomena and shapes existed (a phenomenon renames it). */
 function legacy(m: GeneratedMarble) {
   const { effect, effectColor, shape, ...rest } = m;
   void effectColor;
   void shape;
-  return { ...rest, name: effect === 'none' ? m.name : m.name.slice(EFFECTS[effect].title.length + 1) };
+  return effect === 'none' ? rest : { ...rest, name: '' };
 }
 
 describe('Marble Forge', () => {
   it('keeps every existing marble exactly as it was (phenomena and shapes are drawn last)', () => {
     const old = [];
     for (let i = 0; i < 3000; i++) old.push(JSON.stringify(legacy(generateMarble(i * 104729 + 3))));
-    // Digest of the same 3,000 marbles from the generator before this change.
-    expect(fnv(old.join('|'))).toBe('5e73ad37');
+    // Digest of the same 3,000 marbles from the generator before this change (5e73ad37 with the
+    // effect prefix stripped from names; c3c5b2bb with phenomenon names blanked, both verified).
+    expect(fnv(old.join('|'))).toBe('c3c5b2bb');
+    for (let i = 0; i < 20000; i++) {
+      const m = generateMarble(i * 7919 + 1);
+      if (m.effect !== 'none') expect(m.name.split(' ').filter((w) => w === EFFECTS[m.effect as keyof typeof EFFECTS].title)).toHaveLength(1);
+    }
   });
 
   it('rolls phenomena at the advertised odds, per tier', () => {

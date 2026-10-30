@@ -5,11 +5,12 @@
 //     OUT_DIR     where to build (default e2e-out/pack)
 //     LIMIT       marbles per tier, for a quick trial run (default: the full pack)
 //     CHROME_PATH Chrome to drive
+//     RESUME=1    keep the marbles an earlier build already rendered (store art and zips are redone)
 //
 // Output: <OUT>/MarbleForge-Vol1/ (the pack), MarbleForge-Vol1.zip, MarbleForge-Generator.zip (the
 // source), MarbleForge-Web.zip (the Forge as an itch.io HTML5 upload) and store/ (page media).
 import { execFileSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { preview } from 'vite';
@@ -18,6 +19,7 @@ import puppeteer from 'puppeteer-core';
 const PKG = fileURLToPath(new URL('..', import.meta.url));
 const OUT = process.env.OUT_DIR ?? 'e2e-out/pack';
 const LIMIT = process.env.LIMIT ? Number(process.env.LIMIT) : null;
+const RESUME = process.env.RESUME === '1';
 const CHROME = process.env.CHROME_PATH ?? 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const VOL = 'MarbleForge-Vol1';
 const PACK = join(OUT, VOL);
@@ -34,7 +36,8 @@ const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const save = (path, b64) => writeFileSync(path, Buffer.from(b64, 'base64'));
 
-rmSync(OUT, { recursive: true, force: true });
+if (RESUME) for (const p of ['store', 'MarbleForge-Generator', 'MarbleForge-Vol1.zip', 'MarbleForge-Generator.zip', 'MarbleForge-Web.zip']) rmSync(join(OUT, p), { recursive: true, force: true });
+else rmSync(OUT, { recursive: true, force: true });
 for (const d of [...SIZES.map((s) => `png/${s}`), 'glb', 'sheets', 'phenomena']) mkdirSync(join(PACK, d), { recursive: true });
 mkdirSync(STORE, { recursive: true });
 
@@ -95,10 +98,17 @@ try {
   for (const [i, c] of chosen.entries()) {
     const m = (await page.evaluate((id) => window.forge.resolve(id), c.id)).marble;
     const file = `${String(i + 1).padStart(3, '0')}-${slug(m.name)}`;
-    const pngs = await page.evaluate((id, sizes) => window.forge.pngSet(id, { sizes }), c.id, SIZES);
-    SIZES.forEach((s, k) => save(join(PACK, `png/${s}/${file}.png`), pngs[k]));
-    icons.push(pngs[SIZES.indexOf(128)]);
-    save(join(PACK, `glb/${file}.glb`), await page.evaluate((id) => window.forge.glb(id), c.id));
+    const fx = m.effect !== 'none';
+    const outputs = [...SIZES.map((s) => `png/${s}/${file}.png`), `glb/${file}.glb`];
+    if (fx) outputs.push(`phenomena/${file}/${file}-turntable-256.png`, `phenomena/${file}/${file}.mp4`, `phenomena/${file}/${file}.gif`);
+    const reuse = RESUME && outputs.every((p) => existsSync(join(PACK, p)));
+    if (reuse) icons.push(readFileSync(join(PACK, `png/128/${file}.png`)).toString('base64'));
+    else {
+      const pngs = await page.evaluate((id, sizes) => window.forge.pngSet(id, { sizes }), c.id, SIZES);
+      SIZES.forEach((s, k) => save(join(PACK, `png/${s}/${file}.png`), pngs[k]));
+      icons.push(pngs[SIZES.indexOf(128)]);
+      save(join(PACK, `glb/${file}.glb`), await page.evaluate((id) => window.forge.glb(id), c.id));
+    }
     const entry = {
       file,
       id: c.id,
@@ -114,7 +124,7 @@ try {
       glow: m.glow,
       sparkle: m.sparkle,
     };
-    if (m.effect !== 'none') {
+    if (fx && !reuse) {
       // A turntable while the phenomenon plays: a sprite sheet (8 across) and a GIF/MP4 preview.
       const frames = await page.evaluate((id, n) => window.forge.frames(id, { size: 256, count: n, seconds: 5 }), c.id, TURN_FRAMES);
       const dir = join(PACK, 'phenomena', file);
@@ -127,10 +137,19 @@ try {
       ff(...inFrames, '-f', 'lavfi', '-i', 'color=c=0x0b0f1c:s=256x256', '-filter_complex', '[1][0]overlay=shortest=1,format=yuv420p', '-c:v', 'libx264', '-crf', '18', join(dir, `${file}.mp4`));
       ff(...inFrames, '-filter_complex', '[0]split[a][b];[a]palettegen=reserve_transparent=1[p];[b][p]paletteuse', '-loop', '0', join(dir, `${file}.gif`));
       rmSync(join(dir, 'frames'), { recursive: true });
+    }
+    if (fx) {
       entry.turntable = { sheet: `phenomena/${file}/${file}-turntable-256.png`, frames: TURN_FRAMES, columns: 8, size: 256, fps: 12 };
     }
     manifest.push(entry);
     if ((i + 1) % 10 === 0 || i === chosen.length - 1) log(`rendered ${i + 1}/${chosen.length}`);
+  }
+
+  // A resumed build drops what an earlier build rendered under names this one no longer uses.
+  if (RESUME) {
+    const keep = new Set(manifest.map((m) => m.file));
+    for (const d of [...SIZES.map((s) => `png/${s}`), 'glb', 'phenomena'])
+      for (const n of readdirSync(join(PACK, d))) if (!keep.has(n.replace(/\.(png|glb)$/, ''))) rmSync(join(PACK, d, n), { recursive: true });
   }
 
   // ---- Sheets: every marble as a 128px icon atlas, with its frame list ----------------------------
@@ -181,7 +200,7 @@ try {
   zip(OUT, `${VOL}.zip`, [VOL]);
   // The generator: the package source (no build output), with its own docs and licence.
   const src = join(OUT, 'MarbleForge-Generator');
-  cpSync(PKG, src, { recursive: true, filter: (p) => !/dist-forge|node_modules|[\\/]pack[\\/]README-pack|e2e-out/.test(p) });
+  cpSync(PKG, src, { recursive: true, filter: (p) => !/dist-forge|node_modules|[\\/]pack[\\/](README-pack|ITCH)|e2e-out/.test(p) });
   cpSync(join(PKG, 'pack/LICENSE-source.txt'), join(src, 'LICENSE.txt'));
   zip(OUT, 'MarbleForge-Generator.zip', ['MarbleForge-Generator']);
   // The Forge as a web page (itch.io HTML5 upload: index.html at the zip's root).

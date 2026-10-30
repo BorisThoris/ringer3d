@@ -61,6 +61,9 @@ async function storeSheet(title: string, items: { png: string; name: string; tie
     const y = 230 + Math.floor(i / cols) * 270;
     g.drawImage(await load(it.png), x + 20, y, 180, 180);
     g.textAlign = 'center';
+    // A soft dark halo keeps the labels readable over the backdrop's glow.
+    g.shadowColor = 'rgba(8,6,20,0.95)';
+    g.shadowBlur = 6;
     g.font = '700 17px system-ui, sans-serif';
     g.fillStyle = '#f4f1ea';
     const name = it.name.length > 24 ? `${it.name.slice(0, 23)}…` : it.name;
@@ -68,6 +71,7 @@ async function storeSheet(title: string, items: { png: string; name: string; tie
     g.font = '700 13px system-ui, sans-serif';
     g.fillStyle = TIER_COLOUR[it.tier] ?? '#fff';
     g.fillText(it.fx !== 'none' ? `✦ ${it.fx.toUpperCase()} · ${it.tier.toUpperCase()}` : it.tier.toUpperCase(), x + cell / 2, y + 226);
+    g.shadowBlur = 0;
   }
   return out(c);
 }
