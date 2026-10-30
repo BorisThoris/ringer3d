@@ -1,10 +1,7 @@
-10-30 14:56:02.966  3187  3187 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
-10-30 14:56:02.984  3187  3187 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
-10-30 14:56:02.985  3187  3187 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
-10-30 14:56:02.985  3187  3187 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
-10-30 14:56:04.358  3187  3187 W Capacitor/Console: File: https://localhost/assets/index-DcHdAk-0.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
-10-30 14:56:22.994  3187  3187 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-10-30 14:56:22.999  3187  3187 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-10-30 14:56:23.871  3187  3187 I Capacitor/Console: File:  - Line 333 - Msg: {}
-10-30 14:56:25.455  3187  3187 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-10-30 14:56:26.159  3187  3187 I Capacitor/Console: File:  - Line 333 - Msg: undefined
+10-30 17:53:39.399  3328  3328 W Capacitor/Console: File: https://localhost/assets/index-M0PX3YmL.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+10-30 17:53:55.832  3328  3328 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+10-30 17:53:55.835  3328  3328 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+10-30 17:53:56.438  3328  3328 I Capacitor/Console: File:  - Line 333 - Msg: {}
+10-30 17:53:58.059  3328  3328 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+10-30 17:53:58.420  3328  3328 I Capacitor/Console: File:  - Line 333 - Msg: undefined
+10-30 17:54:12.100  1036  4144 E JavaBinder: *** Uncaught remote exception! Exceptions are not yet supported across processes. Client PID 4025 UID 10118.
