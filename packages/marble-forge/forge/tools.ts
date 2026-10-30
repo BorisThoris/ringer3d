@@ -68,10 +68,17 @@ async function storeSheet(title: string, items: { png: string; name: string; tie
     g.fillStyle = '#f4f1ea';
     const name = it.name.length > 24 ? `${it.name.slice(0, 23)}…` : it.name;
     g.fillText(name, x + cell / 2, y + 205);
-    g.font = '700 13px system-ui, sans-serif';
-    g.fillStyle = TIER_COLOUR[it.tier] ?? '#fff';
-    g.fillText(it.fx !== 'none' ? `✦ ${it.fx.toUpperCase()} · ${it.tier.toUpperCase()}` : it.tier.toUpperCase(), x + cell / 2, y + 226);
     g.shadowBlur = 0;
+    // The tier tag sits on a dark pill: a Mythic's pink would vanish into the pink backdrop.
+    g.font = '700 13px system-ui, sans-serif';
+    const tag = it.fx !== 'none' ? `✦ ${it.fx.toUpperCase()} · ${it.tier.toUpperCase()}` : it.tier.toUpperCase();
+    const tw = g.measureText(tag).width + 18;
+    g.fillStyle = 'rgba(8,6,20,0.72)';
+    g.beginPath();
+    g.roundRect(x + cell / 2 - tw / 2, y + 212, tw, 20, 10);
+    g.fill();
+    g.fillStyle = TIER_COLOUR[it.tier] ?? '#fff';
+    g.fillText(tag, x + cell / 2, y + 226);
   }
   return out(c);
 }
