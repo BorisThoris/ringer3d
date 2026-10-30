@@ -1,6 +1,0 @@
-10-30 18:09:15.171  3345  3345 W Capacitor/Console: File: https://localhost/assets/index-Blrr7nkW.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
-10-30 18:09:42.502  3345  3345 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-10-30 18:09:42.509  3345  3345 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-10-30 18:09:43.785  3345  3345 I Capacitor/Console: File:  - Line 333 - Msg: {}
-10-30 18:09:44.044  3345  3345 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-10-30 18:09:46.436  3345  3345 I Capacitor/Console: File:  - Line 333 - Msg: undefined
