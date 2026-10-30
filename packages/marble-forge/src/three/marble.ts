@@ -450,12 +450,20 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
   if (deep) group.add(buildCoreVolume(deep, look, r, quality));
 
   // The glass body: milk and little clouds in the glass, and the glass's own optics (body.ts).
-  // A phenomenon needs to be seen, so its glass stays nearly clear and lightly clouded.
+  // A phenomenon needs to be seen, so its glass stays nearly clear and lightly clouded; ribbons
+  // and cores need it too, so only a clearie (nothing inside but the glass) takes the full body.
   const hasFxBody = !!look.effect && look.effect !== 'none';
   const body: MarbleBody | null = look.body === false ? null : marbleBody(look.id);
   if (body) {
-    const veil = hasFxBody ? { ...body, milk: Math.min(body.milk, 0.1), clouds: body.clouds * 0.35 } : deep ? { ...body, milk: body.milk * 0.4, clouds: body.clouds * 0.6 } : body;
-    const vol = buildBodyVolume(look, veil, r, quality, hashString(`cloud:${look.id}`));
+    // Opal is milky already: more milk would only wash it white. Over ribbons the clouds go thin.
+    const [veil, thin] = hasFxBody
+      ? [{ ...body, milk: 0, clouds: body.clouds * 0.5 }, 0.2]
+      : look.core === 'clearie'
+        ? [body, 1]
+        : look.core === 'opal'
+          ? [{ ...body, milk: 0 }, 0.4]
+          : [{ ...body, milk: body.milk * 0.25 }, 0.25];
+    const vol = buildBodyVolume(look, veil, r, quality, hashString(`cloud:${look.id}`), thin);
     if (vol) group.add(vol);
   }
 

@@ -353,9 +353,10 @@ const BACK_DIR = new THREE.Vector3(-2.5, 1.2, -2).normalize();
  * (premultiplied, front to back), so a cloud hides what is behind it. Clouds are lit by the key
  * light and shade themselves (one step toward the light per sample); milk brightens toward the
  * key and glows when the light is behind the marble, warm through opal glass, blue off it.
+ * cloudOpacity thins the clouds (1 = solid puffs), so a marble's ribbons show through them.
  * Null when there is nothing to draw, and on low quality.
  */
-export function buildBodyVolume(look: MarbleLook, body: MarbleBody, r: number, quality: Quality, seed: number): THREE.Mesh | null {
+export function buildBodyVolume(look: MarbleLook, body: MarbleBody, r: number, quality: Quality, seed: number, cloudOpacity = 1): THREE.Mesh | null {
   if (quality === 'low' || (body.milk < 0.02 && body.clouds === 0)) return null;
   const steps = quality === 'medium' ? 14 : 24;
   const white = new THREE.Color('#ffffff');
@@ -372,6 +373,7 @@ export function buildBodyVolume(look: MarbleLook, body: MarbleBody, r: number, q
       uR: { value: r * 0.97 },
       uMilk: { value: body.milk },
       uClouds: { value: body.clouds },
+      uCloudK: { value: 3.2 * cloudOpacity },
       uScale: { value: body.cloudScale },
       uSoft: { value: body.cloudSoft },
       uStretch: { value: body.cloudStretch },
@@ -408,6 +410,7 @@ export function buildBodyVolume(look: MarbleLook, body: MarbleBody, r: number, q
       uniform float uR;
       uniform float uMilk;
       uniform float uClouds;
+      uniform float uCloudK;
       uniform float uScale;
       uniform float uSoft;
       uniform float uStretch;
@@ -447,14 +450,14 @@ export function buildBodyVolume(look: MarbleLook, body: MarbleBody, r: number, q
           vec3 q = (vPos + rd * (t0 + dt * (float(i) + 0.5))) / uR;
           float c = cloud(q);
           float m = uMilk * 0.75 * smoothstep(1.0, 0.8, length(q));
-          float dens = m + c * 3.2;
+          float dens = m + c * uCloudK;
           if (dens < 0.001) continue;
           // Clouds shade themselves: how much cloud lies a little way toward the key light.
           float shade = c > 0.01 ? exp(-cloud(q + vKey * 0.22) * 2.2) : 1.0;
           float lam = 0.55 + 0.45 * dot(normalize(q + 1e-4), vKey);
           vec3 cc = uCloudCol * mix(0.42, 1.08, shade) * (0.75 + 0.25 * lam);
           vec3 mc = uMilkCol * (0.55 + 0.45 * lam) + uFireCol * fwd;
-          vec3 col = (cc * c * 3.2 + mc * m) / dens;
+          vec3 col = (cc * c * uCloudK + mc * m) / dens;
           float k = clamp(dens * dt / uR, 0.0, 1.0);
           acc += (1.0 - a) * col * k;
           a += (1.0 - a) * k;
