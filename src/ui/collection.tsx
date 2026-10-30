@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { bookProgress, collectibleFromId, nextTier, SHINY_ODDS, TIERS, TRADE_UP_COUNT, WEARS, type Collectible } from '../core/collectible';
 import { bagOdds, ECONOMY, meltValue, PRODUCTS } from '../core/economy';
 import { EFFECTS, phenomenonOdds, type Tier } from '../core/marbleGen';
@@ -126,8 +126,19 @@ function Inspect({ c, equipped, onEquip, onMelt, onClose }: { c: Held; equipped:
   );
 }
 
-/** The collection: Marble Bags, your marbles (here and on Steam), the Marble Book, the daily reward and the store. */
-export function Collection({ onBack }: { onBack: () => void }) {
+/** Which half to open on: the shop, the shop scrolled to the coin packs, or your marbles. */
+export type CollectionTab = 'shop' | 'coins' | 'marbles';
+
+/**
+ * Two tabs. Shop: Marble Bags, coin packs, the daily reward and Steam. My marbles: what you hold
+ * (here and on Steam), trade-ups and the Marble Book. A marble you open or pick shows above both.
+ */
+export function Collection({ onBack, tab: initial = 'shop' }: { onBack: () => void; tab?: CollectionTab }) {
+  const [tab, setTab] = useState<'shop' | 'marbles'>(initial === 'marbles' ? 'marbles' : 'shop');
+  useEffect(() => {
+    setTab(initial === 'marbles' ? 'marbles' : 'shop');
+    if (initial === 'coins') requestAnimationFrame(() => document.getElementById('coin-packs')?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+  }, [initial]);
   const w = wallet.use((x) => x);
   const equipped = settings.use((s) => s.marble);
   const held = useHeld();
@@ -180,8 +191,46 @@ export function Collection({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <Screen title="Collection" onBack={onBack} wide>
+    <Screen title={tab === 'shop' ? 'Shop' : 'My marbles'} onBack={onBack} wide>
+      <div className="tabs" role="tablist" aria-label="Shop or your marbles">
+        {(['shop', 'marbles'] as const).map((t) => (
+          <button
+            key={t}
+            role="tab"
+            className="tab"
+            aria-selected={tab === t}
+            onClick={() => {
+              tap();
+              setTab(t);
+            }}
+          >
+            {t === 'shop' ? 'Shop' : 'My marbles'}
+            {t === 'marbles' && <span className="count">{held.length}</span>}
+          </button>
+        ))}
+      </div>
       <div className="collection">
+        {shown && (
+          <Inspect
+            c={shown}
+            equipped={equipped === shown.id}
+            onEquip={() => settings.set({ marble: shown.id })}
+            onMelt={
+              shown.source === 'local'
+                ? () => {
+                    tap();
+                    const r = meltMarble(shown.id);
+                    if (r.ok) setOpen(null);
+                    say(r.ok ? `Melted ${shown.marble.name}: +${r.coins} coins` : r.why);
+                  }
+                : undefined
+            }
+            onClose={() => setOpen(null)}
+          />
+        )}
+
+        {tab === 'shop' && (
+          <>
         <section className="bag-card">
           <div className="bag" aria-hidden />
           <div>
@@ -211,24 +260,43 @@ export function Collection({ onBack }: { onBack: () => void }) {
           </div>
         </section>
 
-        {shown && (
-          <Inspect
-            c={shown}
-            equipped={equipped === shown.id}
-            onEquip={() => settings.set({ marble: shown.id })}
-            onMelt={
-              shown.source === 'local'
-                ? () => {
-                    tap();
-                    const r = meltMarble(shown.id);
-                    if (r.ok) setOpen(null);
-                    say(r.ok ? `Melted ${shown.marble.name}: +${r.coins} coins` : r.why);
-                  }
-                : undefined
-            }
-            onClose={() => setOpen(null)}
-          />
-        )}
+        <section id="coin-packs">
+          <div className="daily-head">
+            <h3>Coins</h3>
+            <small>Every match pays coins too</small>
+          </div>
+          <div className="packs">
+            {PRODUCTS.map((p, i) => (
+              <button
+                key={p.id}
+                className={`pack${p.id === best.id ? ' best' : ''}`}
+                style={{ '--stack': i + 1 } as CSSProperties}
+                disabled={!!store.unavailable || busy}
+                onClick={async () => {
+                  tap();
+                  setBusy(true);
+                  const r = await store.purchase(p.id);
+                  setBusy(false);
+                  if (r.ok && r.receipt) {
+                    credit(r.receipt, p.id);
+                    say(`+${p.coins} coins. Thank you!`);
+                  } else say(r.error ?? 'The purchase did not go through.');
+                }}
+              >
+                {p.id === best.id && bonus > 0 && <span className="ribbon">Best value</span>}
+                <span className="pile" aria-hidden>
+                  {Array.from({ length: i + 2 }, (_, k) => (
+                    <span key={k} className="coin" />
+                  ))}
+                </span>
+                <b>{p.coins.toLocaleString()}</b>
+                <small>{p.id === best.id && bonus > 0 ? `coins · +${bonus}%` : 'coins'}</small>
+                <span className="price">US${p.usd.toFixed(2)}</span>
+              </button>
+            ))}
+          </div>
+          {store.unavailable && <p className="fine">{store.unavailable}</p>}
+        </section>
 
         {items && (
           <section className="steam-inv">
@@ -319,7 +387,11 @@ export function Collection({ onBack }: { onBack: () => void }) {
             {daily.ready ? `Claim ${daily.coins} coins` : 'Claimed today'}
           </button>
         </section>
+          </>
+        )}
 
+        {tab === 'marbles' && (
+          <>
         <section>
           <div className="daily-head">
             <h3>Your marbles ({held.length})</h3>
@@ -355,7 +427,15 @@ export function Collection({ onBack }: { onBack: () => void }) {
               </button>
             </div>
           )}
-          {held.length === 0 && <p>Open a bag to start your collection. Every match earns coins.</p>}
+          {held.length === 0 && (
+            <p>
+              Open a bag in the{' '}
+              <button className="link" onClick={() => setTab('shop')}>
+                Shop
+              </button>{' '}
+              to start your collection. Every match earns coins.
+            </p>
+          )}
           <div className="gen-grid">
             {sorted.map((h) => {
               const look = lookFor(h.id);
@@ -431,41 +511,8 @@ export function Collection({ onBack }: { onBack: () => void }) {
             })}
           </div>
         </section>
-
-        <section>
-          <h3>Coins</h3>
-          <div className="packs">
-            {PRODUCTS.map((p, i) => (
-              <button
-                key={p.id}
-                className={`pack${p.id === best.id ? ' best' : ''}`}
-                style={{ '--stack': i + 1 } as CSSProperties}
-                disabled={!!store.unavailable || busy}
-                onClick={async () => {
-                  tap();
-                  setBusy(true);
-                  const r = await store.purchase(p.id);
-                  setBusy(false);
-                  if (r.ok && r.receipt) {
-                    credit(r.receipt, p.id);
-                    say(`+${p.coins} coins. Thank you!`);
-                  } else say(r.error ?? 'The purchase did not go through.');
-                }}
-              >
-                {p.id === best.id && bonus > 0 && <span className="ribbon">Best value</span>}
-                <span className="pile" aria-hidden>
-                  {Array.from({ length: i + 2 }, (_, k) => (
-                    <span key={k} className="coin" />
-                  ))}
-                </span>
-                <b>{p.coins.toLocaleString()}</b>
-                <small>{p.id === best.id && bonus > 0 ? `coins · +${bonus}%` : 'coins'}</small>
-                <span className="price">US${p.usd.toFixed(2)}</span>
-              </button>
-            ))}
-          </div>
-          {store.unavailable && <p className="fine">{store.unavailable}</p>}
-        </section>
+          </>
+        )}
         {note && (
           <p className="toast" role="status">
             {note}

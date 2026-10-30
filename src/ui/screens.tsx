@@ -74,6 +74,15 @@ export function MainMenu({ go }: { go: (s: 'story' | 'quick' | 'local' | 'online
       ))}
       <div className="menu-foot">
         <button
+          className="btn small shop-btn"
+          onClick={() => {
+            tap();
+            go('collection');
+          }}
+        >
+          Shop &amp; marbles
+        </button>
+        <button
           className="btn small ghost"
           onClick={() => {
             tap();
@@ -107,7 +116,25 @@ export function QuickPlay({ onBack, onStart }: { onBack: () => void; onStart: (m
   const oppOptions = FIGHTERS.filter((f) => f.marble !== st.marble).map((f) => f.id);
 
   return (
-    <Screen title="Quick match" onBack={onBack}>
+    <Screen
+      title="Quick match"
+      onBack={onBack}
+      footer={
+        <button
+          className="btn primary"
+          onClick={() => {
+            tap();
+            const f = fighter(opp);
+            onStart(map, [
+              { id: 'me', name: st.playerName, marble: st.marble, kind: 'human' },
+              { id: 'bot', name: f.name, marble: f.marble, kind: 'bot', botProfile: diff },
+            ]);
+          }}
+        >
+          Play
+        </button>
+      }
+    >
       <div className="section-title">Opponent</div>
       <div className="chips">
         {oppOptions.map((id) => {
@@ -139,19 +166,6 @@ export function QuickPlay({ onBack, onStart }: { onBack: () => void; onStart: (m
         <Marble3D id={st.marble} size={150} />
       </div>
       <MarblePicker value={st.marble} onChange={(m) => settings.set({ marble: m })} options={playable} />
-      <button
-        className="btn primary"
-        onClick={() => {
-          tap();
-          const f = fighter(opp);
-          onStart(map, [
-            { id: 'me', name: st.playerName, marble: st.marble, kind: 'human' },
-            { id: 'bot', name: f.name, marble: f.marble, kind: 'bot', botProfile: diff },
-          ]);
-        }}
-      >
-        Play
-      </button>
     </Screen>
   );
 }
@@ -166,7 +180,24 @@ export function LocalPlay({ onBack, onStart }: { onBack: () => void; onStart: (m
   const update = (i: number, p: Partial<{ name: string; marble: string }>) => setPlayers((ps) => ps.map((x, j) => (j === i ? { ...x, ...p } : x)));
 
   return (
-    <Screen title="Pass and play" onBack={onBack}>
+    <Screen
+      title="Pass and play"
+      onBack={onBack}
+      footer={
+        <button
+          className="btn primary"
+          onClick={() => {
+            tap();
+            onStart(
+              map,
+              players.map((p, i) => ({ id: `p${i}`, name: p.name.trim() || `Player ${i + 1}`, marble: p.marble, kind: 'human' })),
+            );
+          }}
+        >
+          Play
+        </button>
+      }
+    >
       <p className="lede">Take turns on one device. The camera swings to whoever is up.</p>
       <div className="list">
         {players.map((p, i) => (
@@ -206,18 +237,6 @@ export function LocalPlay({ onBack, onStart }: { onBack: () => void; onStart: (m
       )}
       <div className="section-title">Field &amp; map</div>
       <MapPicker value={map} onChange={setMap} />
-      <button
-        className="btn primary"
-        onClick={() => {
-          tap();
-          onStart(
-            map,
-            players.map((p, i) => ({ id: `p${i}`, name: p.name.trim() || `Player ${i + 1}`, marble: p.marble, kind: 'human' })),
-          );
-        }}
-      >
-        Play
-      </button>
     </Screen>
   );
 }

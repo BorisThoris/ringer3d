@@ -13,7 +13,22 @@ export function StorySelect({ onBack, onChoose }: { onBack: () => void; onChoose
   const unlocked = p.unlocked.includes(sel);
 
   return (
-    <Screen title="Choose your marble" onBack={onBack}>
+    <Screen
+      title="Choose your marble"
+      onBack={onBack}
+      footer={
+        <button
+          className="btn primary"
+          disabled={!unlocked}
+          onClick={() => {
+            tap();
+            onChoose(sel);
+          }}
+        >
+          {p.run?.fighter === sel ? `Continue · stage ${p.run.stage + 1}` : `Climb as ${f.name}`}
+        </button>
+      }
+    >
       <div className="fighter-grid" role="radiogroup" aria-label="Fighters">
         {playable.map((x) => {
           const locked = !p.unlocked.includes(x.id);
@@ -43,16 +58,6 @@ export function StorySelect({ onBack, onChoose }: { onBack: () => void; onChoose
           {unlocked && <p>{f.bio}</p>}
         </div>
       </div>
-      <button
-        className="btn primary"
-        disabled={!unlocked}
-        onClick={() => {
-          tap();
-          onChoose(sel);
-        }}
-      >
-        {p.run?.fighter === sel ? `Continue · stage ${p.run.stage + 1}` : `Climb as ${f.name}`}
-      </button>
     </Screen>
   );
 }
@@ -64,7 +69,21 @@ export function Tower({ fighterId, stage, onBack, onFight }: { fighterId: string
   const stages = buildTower(fighterId);
   const me = fighter(fighterId);
   return (
-    <Screen title={`${me.name}'s climb`} onBack={onBack}>
+    <Screen
+      title={`${me.name}'s climb`}
+      onBack={onBack}
+      footer={
+        <button
+          className="btn primary"
+          onClick={() => {
+            tap();
+            onFight();
+          }}
+        >
+          Fight
+        </button>
+      }
+    >
       <div className="tower">
         {stages.map((s, i) => {
           const opp = fighter(s.opponent);
@@ -86,15 +105,6 @@ export function Tower({ fighterId, stage, onBack, onFight }: { fighterId: string
           );
         })}
       </div>
-      <button
-        className="btn primary"
-        onClick={() => {
-          tap();
-          onFight();
-        }}
-      >
-        Fight
-      </button>
     </Screen>
   );
 }

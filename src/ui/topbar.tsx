@@ -5,7 +5,8 @@ import { progress, settings } from '../game/settings';
 import { dailyReady, wallet } from '../game/wallet';
 import { MarbleChip, tap } from './components';
 
-type Target = 'collection' | 'settings' | 'profile';
+/** `shop` and `coins` open the Collection's shop (`coins` at the coin packs). */
+export type Target = 'shop' | 'coins' | 'settings' | 'profile';
 
 /** A drawstring Marble Bag, like the one in the Collection. */
 const BagIcon = () => (
@@ -61,7 +62,7 @@ export function TopBar({ on, go }: { on: string; go: (t: Target) => void }) {
         </span>
       </button>
       <div className="wallet">
-        <button className="coin-bank" aria-label={`${coins.toLocaleString()} coins: get more`} onClick={() => open('collection')}>
+        <button className="coin-bank" aria-label={`${coins.toLocaleString()} coins: get more`} onClick={() => open('coins')}>
           <span className="coin" aria-hidden />
           <span key={coins} className="num">
             {coins.toLocaleString()}
@@ -70,8 +71,9 @@ export function TopBar({ on, go }: { on: string; go: (t: Target) => void }) {
             +
           </span>
         </button>
-        <button className="bar-btn shop" aria-label="Collection" aria-current={on === 'collection'} onClick={() => open('collection')}>
+        <button className="bar-btn shop" aria-label="Shop" aria-current={on === 'collection'} onClick={() => open('shop')}>
           <BagIcon />
+          <span className="label">Shop</span>
           {waiting && on !== 'collection' && <span className="badge">!</span>}
         </button>
         <button className="bar-btn" aria-label="Settings" aria-current={on === 'settings'} onClick={() => open('settings')}>
