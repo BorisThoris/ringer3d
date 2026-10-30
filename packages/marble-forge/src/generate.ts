@@ -11,6 +11,11 @@ import { hashString, Rng } from './rng';
  * Colours come from harmony schemes on the colour wheel, tuned per pattern, so every roll
  * is pretty, and the traits multiply out to millions of distinct marbles.
  *
+ * Phenomena and shape (drawn last, so they never change the traits above): a rare few marbles
+ * hold a living effect inside the glass (an aurora, a fire, a black hole...), and every marble
+ * carries its own interior shape (blade count, swirl turns, ribbon width, tilt, bubbles), so the
+ * same seed renders the same on every renderer.
+ *
  * Parity rules for the Luau copy: only `next()`, `int()` and `range()` (never `gaussian()`),
  * colours rounded to whole 0..255 channels, numbers rounded to 3 decimals.
  */
@@ -19,6 +24,35 @@ export type Pattern = 'catseye' | 'swirl' | 'solid' | 'galaxy' | 'steelie' | 'on
 export type Finish = 'glass' | 'frosted' | 'pearl' | 'metallic' | 'glitter' | 'holo' | 'prism';
 export type Tier = 'Common' | 'Rare' | 'Epic' | 'Legendary' | 'Mythic';
 export type Scheme = 'mono' | 'analogous' | 'complement' | 'split' | 'triad' | 'rainbow';
+export type Effect = 'none' | 'aurora' | 'inferno' | 'void' | 'storm' | 'geode' | 'starfall';
+
+/** The phenomena: a living effect inside the glass. Hue range (turns) of each one's colour. */
+export const EFFECTS: Record<Exclude<Effect, 'none'>, { title: string; desc: string; hue: [number, number] }> = {
+  aurora: { title: 'Aurora', desc: 'Northern lights drift through the glass.', hue: [0.3, 0.5] },
+  inferno: { title: 'Inferno', desc: 'A fire that never goes out.', hue: [0.0, 0.08] },
+  void: { title: 'Void', desc: 'A black hole wrapped in its own burning disc.', hue: [0.72, 0.85] },
+  storm: { title: 'Storm', desc: 'A thundercloud, and lightning inside it.', hue: [0.52, 0.62] },
+  geode: { title: 'Geode', desc: 'Crystals grow inward from the shell.', hue: [0, 1] },
+  starfall: { title: 'Starfall', desc: 'Stars orbit a tiny nebula.', hue: [0.55, 0.95] },
+};
+export const EFFECT_IDS = Object.keys(EFFECTS) as Exclude<Effect, 'none'>[];
+
+/** Chance (percent) that a marble of each tier holds a phenomenon. */
+export const EFFECT_ODDS: Record<Tier, number> = { Common: 0, Rare: 1.5, Epic: 5, Legendary: 15, Mythic: 40 };
+
+/** The interior's own shape, so a marble looks the same in every renderer and every slot. */
+export interface MarbleShape {
+  /** Cat's-eye blades, 3..5. */
+  blades: number;
+  /** Swirl turns, 0.6..1.4. */
+  turns: number;
+  /** Ribbon width factor, 0.7..1.3. */
+  width: number;
+  /** Interior tilt, -0.4..0.4 rad. */
+  tilt: number;
+  /** Air bubbles in the glass, 1..6. */
+  bubbles: number;
+}
 
 export interface GeneratedMarble {
   seed: number;
@@ -41,6 +75,10 @@ export interface GeneratedMarble {
   sparkle: number;
   /** The brightest colour, for the interface. */
   ui: string;
+  /** A phenomenon inside the glass, and its colour. */
+  effect: Effect;
+  effectColor: string;
+  shape: MarbleShape;
 }
 
 /** Tier odds in percent (a Marble Bag), and what each tier may roll. */
@@ -124,6 +162,11 @@ function schemeHues(scheme: Scheme, rng: Rng): [number, number] {
   }
 }
 
+/** Exact chance (percent) that a Marble Bag holds a phenomenon: tier odds, see-through patterns only. */
+export function phenomenonOdds(): number {
+  return RARITY.reduce((a, r) => a + (r.odds * EFFECT_ODDS[r.tier] * r.patterns.filter((p) => p !== 'solid' && p !== 'steelie').length) / r.patterns.length / 100, 0);
+}
+
 /** The tier a roll of `t` (0..100) lands in. */
 export function tierFor(t: number): Tier {
   let acc = 0;
@@ -168,6 +211,24 @@ export function generateMarble(seed: number, tier?: Tier): GeneratedMarble {
   const words = [pick(rng, MARBLE_WORDS.hue[hueName]), pick(rng, MARBLE_WORDS.pattern[pattern])];
   const fw = MARBLE_WORDS.finish[finish];
   if (fw.length) words.unshift(pick(rng, fw));
+
+  // Drawn last: everything above stays exactly as it was before phenomena existed.
+  const shape: MarbleShape = {
+    blades: 3 + rng.int(3),
+    turns: r3(rng.range(0.6, 1.4)),
+    width: r3(rng.range(0.7, 1.3)),
+    tilt: r3(rng.range(-0.4, 0.4)),
+    bubbles: 1 + rng.int(6),
+  };
+  const fxRoll = rng.next() * 100;
+  const fxPick = pick(rng, EFFECT_IDS);
+  const fxHue = rng.next();
+  const fxLight = rng.range(0.55, 0.68);
+  // Phenomena live inside see-through glass: solid clay and steelies never hold one.
+  const effect: Effect = fxRoll < EFFECT_ODDS[t] && !opaque ? fxPick : 'none';
+  const range = EFFECTS[fxPick].hue;
+  const effectColor = hsl(range[0] + (range[1] - range[0]) * fxHue, 1, fxLight);
+  if (effect !== 'none') words.unshift(EFFECTS[effect].title);
   return {
     seed,
     id: `g${seed}`,
@@ -183,12 +244,15 @@ export function generateMarble(seed: number, tier?: Tier): GeneratedMarble {
     glow: r3(glow),
     sparkle: r3(sparkle),
     ui: accent,
+    effect,
+    effectColor,
+    shape,
   };
 }
 
 /** The look the renderers draw (game/marbles.ts MarbleLook, plus finish and sparkle). */
 export function marbleLook(g: GeneratedMarble) {
-  return { id: g.id, name: g.name, core: g.pattern, base: g.base, accent: g.accent, accent2: g.accent2, clarity: g.clarity, glow: g.glow, ui: g.ui, finish: g.finish, sparkle: g.sparkle };
+  return { id: g.id, name: g.name, core: g.pattern, base: g.base, accent: g.accent, accent2: g.accent2, clarity: g.clarity, glow: g.glow, ui: g.ui, finish: g.finish, sparkle: g.sparkle, effect: g.effect, effectColor: g.effectColor, shape: g.shape };
 }
 
 /** Reference marbles for the Luau copy's parity check. */

@@ -1,4 +1,4 @@
-import { generateMarble, RARITY, type Finish, type GeneratedMarble, type Pattern, type Tier } from './generate';
+import { EFFECT_IDS, EFFECTS, generateMarble, RARITY, type Effect, type Finish, type GeneratedMarble, type Pattern, type Tier } from './generate';
 import { hashString, Rng } from './rng';
 
 /**
@@ -42,6 +42,8 @@ export interface Collectible {
   /** 0..999: which variation of its look this is. */
   pattern: number;
   shiny: boolean;
+  /** A phenomenon inside the glass ('none' for most). */
+  effect: Effect;
   /** Notable things a collector looks for, best first. */
   traits: string[];
   marble: GeneratedMarble;
@@ -82,6 +84,7 @@ export function mintCollectible(uid: string, tier?: Tier): Collectible {
   const shiny = rng.int(SHINY_ODDS) === 0;
 
   const traits: string[] = [];
+  if (base.effect !== 'none') traits.push(EFFECTS[base.effect].title);
   if (shiny) traits.push('Shiny');
   if (float < 0.01) traits.push('Pristine');
   if (float > 0.99) traits.push('Rock bottom');
@@ -95,7 +98,7 @@ export function mintCollectible(uid: string, tier?: Tier): Collectible {
     marble.sparkle = Math.max(marble.sparkle, 0.7);
     if (marble.finish === 'glass' || marble.finish === 'frosted') marble.finish = 'holo';
   }
-  return { id, uid, tier: t, float, wear: wearFor(float), pattern, shiny, traits, marble };
+  return { id, uid, tier: t, float, wear: wearFor(float), pattern, shiny, effect: base.effect, traits, marble };
 }
 
 /** A collectible from its marble id, or null for named marbles and anything malformed. */
@@ -138,6 +141,7 @@ export const BOOK: BookSet[] = [
   { id: 'tiers', name: 'Every rarity', needs: TIERS, reward: 2500, have: (c) => c.tier },
   { id: 'wears', name: 'Every wear', needs: WEARS.map((w) => w.name), reward: 800, have: (c) => c.wear },
   { id: 'shiny', name: 'A Shiny', needs: ['Shiny'], reward: 1000, have: (c) => (c.shiny ? 'Shiny' : null) },
+  { id: 'phenomena', name: 'Every phenomenon', needs: EFFECT_IDS.map((e) => EFFECTS[e].title), reward: 6000, have: (c) => (c.effect !== 'none' ? EFFECTS[c.effect].title : null) },
 ];
 
 /** How far along each set is, given the collection. */

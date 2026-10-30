@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { hashString, Rng } from '../rng';
 import type { MarbleLook } from '../look';
 import { marbleTexture } from './textures';
+import { buildEffect } from './effects';
 import { inkMaterial } from './ink';
 
 /**
@@ -314,7 +315,7 @@ function addScratches(group: THREE.Group, look: MarbleLook, r: number, seg: numb
   if (!scratches) return;
   const skin = new THREE.Mesh(
     sphere(r * 1.004, seg),
-    new THREE.MeshBasicMaterial({ map: scratches, transparent: true, opacity: 0.35 + (look.wear ?? 0) * 0.45, depthWrite: false }),
+    new THREE.MeshBasicMaterial({ map: scratches, transparent: true, opacity: 0.25 + (look.wear ?? 0) * 0.4, depthWrite: false }),
   );
   skin.renderOrder = 3;
   group.add(skin);
@@ -324,7 +325,10 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
   const group = new THREE.Group();
   group.userData.radius = radius;
   const r = radius;
-  const rand = rng(seed + look.id.length * 0.37);
+  // A generated marble carries its own shape: seed the details from its id, so it looks the
+  // same in every slot and every renderer. Named marbles vary with the slot's seed.
+  const rand = rng(look.shape ? (hashString(look.id) % 100000) + 1 : seed + look.id.length * 0.37);
+  const shape = look.shape;
   const seg = quality === 'low' ? 20 : quality === 'medium' ? 32 : 48;
   const interior = (color: string, glow: number) =>
     new THREE.MeshStandardMaterial({
@@ -335,6 +339,8 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
       emissiveIntensity: glow,
     });
   const glowK = Math.max(0.25, look.glow);
+  // A phenomenon needs to be seen: its marble leaves out the opaque cores some patterns have.
+  const hollow = !!look.effect && look.effect !== 'none';
 
   // ---- Opaque marbles ----------------------------------------------------------------------
   if (look.core === 'steelie') {
@@ -364,9 +370,10 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
 
   // ---- Interiors ---------------------------------------------------------------------------
   const colors = [look.accent, look.accent2, look.base];
+  const before = group.children.length;
   switch (look.core) {
     case 'catseye': {
-      const n = 3 + Math.floor(rand() * 2);
+      const n = shape?.blades ?? 3 + Math.floor(rand() * 2);
       const g = cached(`vane-${r}`, () => vaneGeometry(r, 1.1));
       for (let i = 0; i < n; i++) {
         const v = new THREE.Mesh(g, interior(colors[i % 2], glowK));
@@ -380,15 +387,15 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
       const onion = look.core === 'onionskin';
       const n = onion ? 7 : 4;
       for (let i = 0; i < n; i++) {
-        const curve = new SpiralCurve(r * (onion ? 0.95 : 0.85), 0.6 + rand() * 0.8, (i / n) * Math.PI * 2, (rand() - 0.5) * 0.6);
-        group.add(new THREE.Mesh(ribbonGeometry(curve, r * (onion ? 0.15 : 0.07 + rand() * 0.05)), interior(colors[i % 2], glowK)));
+        const curve = new SpiralCurve(r * (onion ? 0.95 : 0.85), (shape?.turns ?? 1) * (0.6 + rand() * 0.8), (i / n) * Math.PI * 2, (rand() - 0.5) * 0.6);
+        group.add(new THREE.Mesh(ribbonGeometry(curve, r * (shape?.width ?? 1) * (onion ? 0.15 : 0.07 + rand() * 0.05)), interior(colors[i % 2], glowK)));
       }
-      if (onion) group.add(new THREE.Mesh(sphere(r * 0.55, 24), interior('#f6f1e6', 0.05)));
+      if (onion && !hollow) group.add(new THREE.Mesh(sphere(r * 0.55, 24), interior('#f6f1e6', 0.05)));
       break;
     }
     case 'galaxy': {
       // Deep core with aventurine flecks that catch the light (and the bloom).
-      group.add(new THREE.Mesh(sphere(r * 0.55, 24), interior(look.base, 0.05)));
+      if (!hollow) group.add(new THREE.Mesh(sphere(r * 0.55, 24), interior(look.base, 0.05)));
       const flake = cached(`flake-${r}`, () => new THREE.OctahedronGeometry(r * 0.018, 0));
       const count = quality === 'low' ? 90 : 240;
       const inst = new THREE.InstancedMesh(
@@ -416,7 +423,7 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
         const curve = new SpiralCurve(r * 0.92, 0.9 + i * 0.3, (i / 3) * Math.PI * 2, 0.3 * (i - 1));
         group.add(new THREE.Mesh(ribbonGeometry(curve, r * 0.1), interior(colors[i % 2], 1.6)));
       }
-      group.add(new THREE.Mesh(sphere(r * 0.5, 24), interior(look.base, 0.02)));
+      if (!hollow) group.add(new THREE.Mesh(sphere(r * 0.5, 24), interior(look.base, 0.02)));
       break;
     }
     case 'onyx': {
@@ -424,7 +431,9 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
       group.add(
         new THREE.Mesh(
           sphere(r * 0.96, seg),
-          new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: new THREE.Color('#ffffff').multiplyScalar(look.glow * 1.6), roughness: 0.5 }),
+          hollow
+            ? new THREE.MeshBasicMaterial({ map: tex, color: new THREE.Color('#ffffff').multiplyScalar(0.6 + look.glow), blending: THREE.AdditiveBlending, depthWrite: false })
+            : new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: new THREE.Color('#ffffff').multiplyScalar(look.glow * 1.6), roughness: 0.5 }),
         ),
       );
       break;
@@ -432,7 +441,7 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
     case 'opal':
       group.add(
         new THREE.Mesh(
-          sphere(r * 0.7, seg),
+          sphere(r * (hollow ? 0.38 : 0.7), seg),
           new THREE.MeshPhysicalMaterial({ color: look.accent, iridescence: 1, roughness: 0.3, emissive: new THREE.Color(look.accent2).multiplyScalar(look.glow) }),
         ),
       );
@@ -443,6 +452,14 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
       break;
     default:
       break;
+  }
+
+  // The interior leans the way this marble's shape says.
+  if (shape?.tilt) {
+    const lean = new THREE.Group();
+    lean.rotation.set(shape.tilt, 0, shape.tilt * 0.6);
+    lean.add(...group.children.slice(before));
+    group.add(lean);
   }
 
   // Glitter: generated collectibles carry flecks through the glass (galaxies have their own).
@@ -468,7 +485,7 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
   }
 
   // Bubbles: every glass marble has a few, clearies more.
-  const bubbles = look.core === 'clearie' ? 9 : 3;
+  const bubbles = (shape?.bubbles ?? 3) + (look.core === 'clearie' ? 6 : 0);
   const bubbleMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.05, metalness: 0.2 });
   for (let i = 0; i < bubbles; i++) {
     const b = new THREE.Mesh(cached('bubble', () => new THREE.SphereGeometry(1, 10, 8)), bubbleMat);
@@ -480,8 +497,18 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
     if ((o as THREE.Mesh).isMesh) o.renderOrder = 1;
   });
 
+  // A phenomenon: a living effect inside the glass (three/effects.ts).
+  const effect = buildEffect(look, r, quality);
+  if (effect) group.add(effect);
+
   // ---- Glass shell --------------------------------------------------------------------------
   const tint = new THREE.Color(look.base);
+  // Near-black glass (galaxies, neon, onyx) would swallow its own interior: let more light
+  // through and absorb toward the accent instead of black. A phenomenon wants clear glass.
+  const dark = tint.r * 0.2126 + tint.g * 0.7152 + tint.b * 0.0722 < 0.05;
+  const hasFx = !!look.effect && look.effect !== 'none';
+  const clarity = hasFx ? Math.max(look.clarity, 0.72) : dark ? Math.max(look.clarity, 0.5) : look.clarity;
+  const absorb = dark ? tint.clone().lerp(new THREE.Color(look.accent), 0.45) : tint;
   const glass =
     quality === 'low'
       ? new THREE.MeshPhysicalMaterial({
@@ -490,7 +517,7 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
           clearcoat: 1,
           clearcoatRoughness: 0.03,
           transparent: true,
-          opacity: look.core === 'clearie' ? 0.5 : 1 - look.clarity * 0.7,
+          opacity: look.core === 'clearie' ? 0.5 : 1 - clarity * 0.7,
           envMapIntensity: 2,
           depthWrite: false,
         })
@@ -499,19 +526,19 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
           // low-clarity marble (a dark galaxy, a neon core) read as milky haze. Tint it
           // toward the marble's own base, more so the less clear the glass is.
           // Tinted glass (the targets) takes its colour straight; clear glass only a touch.
-          color: look.clarity < 0.5 ? tint.clone() : new THREE.Color('#ffffff').lerp(tint, 1 - look.clarity),
+          color: clarity < 0.5 ? tint.clone() : new THREE.Color('#ffffff').lerp(dark ? absorb : tint, 1 - clarity),
           // Finishes of generated collectibles: frosted glass is matte, pearl and holo shimmer,
           // prism splits the light into colours.
           roughness: look.finish === 'frosted' ? 0.38 : 0,
-          transmission: look.clarity,
+          transmission: clarity,
           // three's transmission is screen-space: thickness sets how far the refracted image
           // shifts. A full diameter smears the interior to the rim; ~0.6r gives a real
           // marble's gentle magnification.
           thickness: r * 0.6,
           ior: 1.5,
-          attenuationColor: tint,
+          attenuationColor: absorb,
           // Tinted glass deepens its colour quickly; clear glass barely at all.
-          attenuationDistance: look.core === 'clearie' ? r * 2.6 : look.clarity < 0.5 ? r * 2.2 : r * 7,
+          attenuationDistance: look.core === 'clearie' ? r * 2.6 : dark ? r * 4.5 : clarity < 0.5 ? r * 2.2 : r * 7,
           dispersion: quality === 'high' ? (look.finish === 'prism' ? 1.2 : 0.35) : 0,
           specularIntensity: 1,
           envMapIntensity: 1.15,

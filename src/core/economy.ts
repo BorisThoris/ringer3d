@@ -83,9 +83,10 @@ export function openBag(w: Wallet, uid: string, now = 0): { ok: true; wallet: Wa
 }
 
 /** What melting pays: the tier's price, doubled for Mint glass, five times for a Shiny. */
-export function meltValue(c: Pick<Collectible, 'tier' | 'wear' | 'shiny'>): number {
+export function meltValue(c: Pick<Collectible, 'tier' | 'wear' | 'shiny'> & { effect?: Collectible['effect'] }): number {
   const wear = c.wear === 'Mint' ? 2 : c.wear === 'Polished' ? 1.25 : 1;
-  return Math.round(ECONOMY.melt[c.tier] * wear * (c.shiny ? 5 : 1));
+  const fx = c.effect && c.effect !== 'none' ? 4 : 1;
+  return Math.round(ECONOMY.melt[c.tier] * wear * (c.shiny ? 5 : 1) * fx);
 }
 
 /** Melt an owned marble back into coins. */

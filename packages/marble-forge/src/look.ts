@@ -1,3 +1,5 @@
+import type { Effect, MarbleShape } from './generate';
+
 /** What a renderer needs to draw a marble. Purely cosmetic. */
 export type MarbleCore = 'catseye' | 'swirl' | 'solid' | 'galaxy' | 'steelie' | 'onyx' | 'opal' | 'neon' | 'onionskin' | 'clearie';
 
@@ -22,5 +24,9 @@ export interface MarbleLook {
   /** Collectibles (core/collectible.ts): wear float 0..1 (scratches, scuffs, chips) and the Shiny sheen. */
   wear?: number;
   shiny?: boolean;
+  /** Generated marbles: a phenomenon inside the glass, its colour, and the interior's shape. */
+  effect?: Effect;
+  effectColor?: string;
+  shape?: MarbleShape;
 }
 

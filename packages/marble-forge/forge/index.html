@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Marble Forge</title>
+    <link rel="stylesheet" href="./forge.css" />
+  </head>
+  <body>
+    <main class="forge">
+      <section class="stage">
+        <canvas id="view" aria-label="The marble, live. Drag to spin it."></canvas>
+        <p class="hint">Drag to spin</p>
+      </section>
+      <section class="panel">
+        <header>
+          <h1>Marble Forge</h1>
+          <p class="sub">Every seed is a marble. Every marble is one of a kind.</p>
+        </header>
+        <div class="card">
+          <span id="tier" class="tier">Common</span>
+          <h2 id="name">…</h2>
+          <div id="chips" class="chips"></div>
+          <div id="swatches" class="swatches"></div>
+          <dl id="facts" class="facts"></dl>
+        </div>
+        <div class="controls">
+          <label>Marble id <input id="uid" spellcheck="false" autocomplete="off" /></label>
+          <div class="row">
+            <label>Rarity
+              <select id="want-tier">
+                <option value="">Any (bag odds)</option>
+                <option>Common</option><option>Rare</option><option>Epic</option><option>Legendary</option><option>Mythic</option>
+              </select>
+            </label>
+            <label>Phenomenon
+              <select id="want-fx"><option value="">Any</option><option value="none">None</option></select>
+            </label>
+          </div>
+          <label class="check"><input id="wear" type="checkbox" checked /> Collectible wear, float and Shiny</label>
+          <div class="row buttons">
+            <button id="roll" class="primary">Roll a marble</button>
+            <button id="roll12">Roll 12</button>
+          </div>
+          <div class="row buttons">
+            <button id="png">PNG 1024</button>
+            <button id="glb">GLB model</button>
+            <button id="json">JSON</button>
+          </div>
+        </div>
+        <p id="odds" class="fine"></p>
+      </section>
+      <section class="strip" id="strip" aria-label="Recent rolls"></section>
+    </main>
+    <script type="module" src="./forge.ts"></script>
+  </body>
+</html>

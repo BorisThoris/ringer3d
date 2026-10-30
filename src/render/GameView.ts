@@ -9,7 +9,7 @@ import type { Match } from '../core/match';
 import { ARENAS, type ArenaId } from '../game/arenas';
 import { MIB_LOOKS, uiColor, type MarbleLook } from '../game/marbles';
 import { buildArena, type BuiltArena } from './arenaBuilder';
-import { buildMarble, disposeObject, type Quality } from './marbleMesh';
+import { advanceMarbles, buildMarble, disposeObject, type Quality } from './marbleMesh';
 import { Juice } from './juice';
 import { buildPieces, type BuiltPieces } from './mapPieces';
 import type { Piece } from '../core/types';
@@ -433,6 +433,7 @@ export class GameView {
     this.syncProps();
     this.updateGuide(dt);
     this.updateEffects(dt);
+    advanceMarbles();
     this.updateCamera(dt);
     this.arena?.update(this.elapsed, dt);
     this.pieces?.update(this.elapsed, dt);
