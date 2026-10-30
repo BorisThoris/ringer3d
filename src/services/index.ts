@@ -32,8 +32,9 @@ const browserKV: KeyValue = {
  */
 function pick(): PlatformServices {
   if (steam) return createSteamServices(steam);
-  if (Capacitor.isPluginAvailable('PlayGames')) return createPlayServices(registerPlugin<PlayGamesPlugin>('PlayGames'));
-  return createLocalServices(browserKV, () => settings.get().playerName);
+  const local = createLocalServices(browserKV, () => settings.get().playerName);
+  if (Capacitor.isPluginAvailable('PlayGames')) return createPlayServices(registerPlugin<PlayGamesPlugin>('PlayGames'), local);
+  return local;
 }
 
 export const services: PlatformServices = pick();

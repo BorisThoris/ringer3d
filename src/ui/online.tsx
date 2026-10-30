@@ -13,6 +13,7 @@ import type { Matchmaker } from '../net/transport';
 import { ArenaPicker, Chips, MapPicker, MapPreview, MarbleChip, Screen, tap } from './components';
 import { FriendsPanel } from './social';
 import { generateMap, type Difficulty } from '../game/maps';
+import { onInviteLink, shareInvite } from '../invite';
 
 let shared: { key: string; mm: Matchmaker } | null = null;
 /** One matchmaker per connection mode; switching mode in Settings swaps it. */
@@ -36,6 +37,21 @@ export function listenForSteamInvites(onRoom: (r: OnlineRoom) => void) {
       onRoom(await OnlineRoom.join(matchmakerFor('steam', st.lobbyUrl), { roomId: lobby, name: st.playerName, marble: st.marble }));
     } catch {
       /* the room closed before we got there */
+    }
+  });
+}
+
+/**
+ * Invite links (src/invite.ts): opening one joins that peer-to-peer room, whatever connection
+ * Settings picked, since links are how web and Android players meet. onError hears why not.
+ */
+export function listenForInviteLinks(onRoom: (r: OnlineRoom) => void, onError: (why: string) => void) {
+  return onInviteLink(async (code) => {
+    const st = settings.get();
+    try {
+      onRoom(await OnlineRoom.join(matchmakerFor('p2p', st.lobbyUrl), { code, name: st.playerName, marble: st.marble }));
+    } catch (e) {
+      onError(`Couldn't join room ${code}: ${(e as Error).message}`);
     }
   });
 }
@@ -266,6 +282,7 @@ export function RoomLobby({ room, onLeave }: { room: OnlineRoom; onLeave: () => 
   const s = room.state.use((x) => x);
   const [ready, setReady] = useState(false);
   const [botSkill, setBotSkill] = useState<'casual' | 'skilled' | 'expert'>('skilled');
+  const [invited, setInvited] = useState<'shared' | 'copied' | 'failed' | null>(null);
   const myId = room.myId;
 
   return (
@@ -293,6 +310,17 @@ export function RoomLobby({ room, onLeave }: { room: OnlineRoom; onLeave: () => 
           >
             Copy
           </button>
+          {room.mm.kind === 'p2p' && (
+            <button
+              className="btn small primary"
+              onClick={() => {
+                tap();
+                void shareInvite(s.room!.code, settings.get().playerName).then((r) => setInvited(r));
+              }}
+            >
+              {invited === 'copied' ? 'Link copied' : 'Invite'}
+            </button>
+          )}
           {room.mm.kind === 'steam' && (
             <button
               className="btn small primary"

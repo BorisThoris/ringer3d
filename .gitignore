@@ -13,3 +13,8 @@ e2e-out
 !.env.example
 .deploy-history
 dist-headless
+
+# Signing keys never go in the repo (the upload key lives in D:/agent-work/ringer3d/play-secrets).
+*.jks
+*.keystore
+keystore.properties

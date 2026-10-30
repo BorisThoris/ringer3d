@@ -1,5 +1,13 @@
 apply plugin: 'com.android.application'
 
+// Release signing: the upload key lives outside the repo. RINGER_KEYSTORE_PROPS (env or -P) names a
+// properties file with storeFile, storePassword, keyAlias, keyPassword. Without it the release is unsigned.
+def keystorePropsPath = System.getenv('RINGER_KEYSTORE_PROPS') ?: project.findProperty('RINGER_KEYSTORE_PROPS')
+def keystoreProps = new Properties()
+if (keystorePropsPath && file(keystorePropsPath).exists()) file(keystorePropsPath).withInputStream { keystoreProps.load(it) }
+// The Play Games project id from the Play Console (Grow > Play Games Services > Setup). Empty: no Play Games.
+def playGamesProjectId = (System.getenv('RINGER_PLAY_GAMES_ID') ?: project.findProperty('RINGER_PLAY_GAMES_ID') ?: '').toString()
+
 android {
     namespace = "com.boristhoris.ringer3d"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +15,9 @@ android {
         applicationId "com.boristhoris.ringer3d"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode 2
+        versionName "1.0.1"
+        resValue 'string', 'game_services_project_id', playGamesProjectId
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +25,19 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (keystoreProps['storeFile']) {
+            upload {
+                storeFile file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
+        }
+    }
     buildTypes {
         release {
+            if (keystoreProps['storeFile']) signingConfig signingConfigs.upload
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
@@ -36,7 +56,8 @@ dependencies {
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
-    implementation "com.android.billingclient:billing:7.1.1"
+    implementation "com.android.billingclient:billing:8.0.0"
+    implementation "com.google.android.gms:play-services-games-v2:21.0.0"
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"

@@ -80,8 +80,9 @@ public class PlayBillingPlugin extends Plugin {
                         .setProductType(BillingClient.ProductType.INAPP)
                         .build()))
                 .build();
-            client.queryProductDetailsAsync(q, (r, details) -> {
-                if (r.getResponseCode() != BillingClient.BillingResponseCode.OK || details == null || details.isEmpty()) {
+            client.queryProductDetailsAsync(q, (r, result) -> {
+                List<ProductDetails> details = result.getProductDetailsList();
+                if (r.getResponseCode() != BillingClient.BillingResponseCode.OK || details.isEmpty()) {
                     call.reject("No such product in the Play Console: " + productId, "unknown");
                     return;
                 }
