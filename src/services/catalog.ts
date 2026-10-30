@@ -8,6 +8,7 @@ export const ACHIEVEMENTS = {
   FIRST_WIN: { title: 'First knuckle', desc: 'Win your first match', steam: 'FIRST_WIN', play: '' },
   CLEAN_SWEEP: { title: 'Clean sweep', desc: 'Win a match without your opponent capturing a marble', steam: 'CLEAN_SWEEP', play: '' },
   ONLINE_WIN: { title: 'Ringer abroad', desc: 'Win an online match', steam: 'ONLINE_WIN', play: '' },
+  STREAK_5: { title: 'On a roll', desc: 'Win five matches in a row', steam: 'STREAK_5', play: '' },
   TOWER_CLEARED: { title: 'Black Taw', desc: 'Beat the Tower with any fighter', steam: 'TOWER_CLEARED', play: '' },
   FIRST_BAG: { title: 'Mint condition', desc: 'Open your first Marble Bag', steam: 'FIRST_BAG', play: '' },
   LEGENDARY_PULL: { title: 'Legend in the bag', desc: 'Pull a Legendary marble', steam: 'LEGENDARY_PULL', play: '' },

@@ -1,6 +1,7 @@
 import { collectibleFromId, type Collectible } from './core/collectible';
 import { meltValue } from './core/economy';
 import { progress, settings } from './game/settings';
+import { createStore } from './game/store';
 import { wallet } from './game/wallet';
 import { services, type AchievementId } from './services';
 
@@ -11,7 +12,23 @@ import { services, type AchievementId } from './services';
  * code has to know which one it's on.
  */
 
-const unlock = (id: AchievementId) => void services.unlock(id).catch(() => {});
+/**
+ * Achievements this player holds (from the platform at boot), and the ones earned since that the
+ * UI hasn't announced yet. Unlocks found while catching up at boot are recorded quietly.
+ */
+export const achieved = createStore<{ list: AchievementId[]; fresh: AchievementId[] }>({ list: [], fresh: [] });
+let quiet = true;
+
+function unlock(id: AchievementId) {
+  const { list, fresh } = achieved.get();
+  if (!list.includes(id)) achieved.set({ list: [...list, id], fresh: quiet ? fresh : [...fresh, id] });
+  void services.unlock(id).catch(() => {});
+}
+
+/** The announcement for the oldest fresh achievement has been shown. */
+export function achievementShown() {
+  achieved.set((a) => ({ fresh: a.fresh.slice(1) }));
+}
 
 /** Called when a match ends for the local player. */
 export function matchEnded(r: { won: boolean; myScore: number; otherScores: number[]; online: boolean }) {
@@ -112,6 +129,7 @@ function watchStores() {
     services.setStat('games_won', p.stats.won);
     services.setStat('marbles_captured', p.stats.captured);
     if (p.cleared.length > 0) unlock('TOWER_CLEARED');
+    if ((p.stats.bestStreak ?? 0) >= 5) unlock('STREAK_5');
     flush();
     // Leaderboards only when the number moved (each submit is a network call).
     if (p.stats.won !== last.won) board('wins', p.stats.won);
@@ -156,6 +174,7 @@ export async function initServices() {
       settings.set({ quality: 'medium' });
       localStorage.setItem('ringer3d.deckDefaults', '1');
     }
+    achieved.set({ list: await services.unlocked().catch(() => []) });
     await syncCloud();
     // Platform-held marbles, then any playtime drop that's due.
     if (services.items) await services.items.sync().then(() => services.items!.drop());
@@ -163,5 +182,7 @@ export async function initServices() {
     presence('In the menu');
   } catch (e) {
     console.warn('Platform services failed', e);
+  } finally {
+    quiet = false;
   }
 }

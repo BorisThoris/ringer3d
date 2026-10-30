@@ -20,13 +20,14 @@ import type { MapChoice } from './components';
 import { HowTo, LocalPlay, MainMenu, QuickPlay, Results, SettingsScreen, type ResultsInfo } from './screens';
 import { Ending, StorySelect, Tower, Versus } from './story';
 import { Leaderboards } from './social';
+import { AchievementToast, Profile } from './profile';
 import { TopBar } from './topbar';
 
 /** Screens that sit under the top bar (everything but the match and the Tower's cut-scenes). */
-const BAR_SCREENS = new Set<ScreenState['name']>(['menu', 'quick', 'local', 'settings', 'howto', 'story-select', 'online', 'collection', 'leaderboards', 'tower', 'results']);
+const BAR_SCREENS = new Set<ScreenState['name']>(['menu', 'quick', 'local', 'settings', 'howto', 'story-select', 'online', 'collection', 'leaderboards', 'profile', 'tower', 'results']);
 
 type ScreenState =
-  | { name: 'menu' | 'quick' | 'local' | 'settings' | 'howto' | 'story-select' | 'online' | 'collection' | 'leaderboards' }
+  | { name: 'menu' | 'quick' | 'local' | 'settings' | 'howto' | 'story-select' | 'online' | 'collection' | 'leaderboards' | 'profile' }
   | { name: 'tower'; fighter: string; stage: number }
   | { name: 'versus'; fighter: string; stage: number }
   | { name: 'ending'; fighter: string; unlocked: string | null }
@@ -98,7 +99,7 @@ export function App() {
   };
 
   /** Leave a finished match (and its room) for a menu screen. */
-  const leaveTo = (name: 'collection' | 'settings') => {
+  const leaveTo = (name: 'collection' | 'settings' | 'profile') => {
     toMenu();
     setScreen({ name });
   };
@@ -120,13 +121,19 @@ export function App() {
       otherScores: r.scores.filter((_, i) => i !== me),
       online: !!roomRef.current,
     });
-    progress.set((p) => ({
-      stats: {
-        played: p.stats.played + 1,
-        won: p.stats.won + (r.winners.length === 1 && r.winners[0] === me ? 1 : 0),
-        captured: p.stats.captured + (r.scores[me] ?? 0),
-      },
-    }));
+    const won = r.winners.length === 1 && r.winners[0] === me;
+    progress.set((p) => {
+      const streak = won ? (p.stats.streak ?? 0) + 1 : 0;
+      return {
+        stats: {
+          played: p.stats.played + 1,
+          won: p.stats.won + (won ? 1 : 0),
+          captured: p.stats.captured + (r.scores[me] ?? 0),
+          streak,
+          bestStreak: Math.max(p.stats.bestStreak ?? 0, streak),
+        },
+      };
+    });
     return coins;
   };
 
@@ -332,6 +339,9 @@ export function App() {
     case 'leaderboards':
       body = <Leaderboards onBack={toMenu} />;
       break;
+    case 'profile':
+      body = <Profile onBack={toMenu} />;
+      break;
     case 'story-select':
       body = <StorySelect onBack={toMenu} onChoose={continueStory} />;
       break;
@@ -368,6 +378,7 @@ export function App() {
   return (
     <>
       {screen.name === 'game' && <Hud online={screen.online} onQuit={toMenu} />}
+      <AchievementToast />
       {body && (
         <div className={BAR_SCREENS.has(screen.name) ? 'overlay has-bar' : 'overlay'}>
           {BAR_SCREENS.has(screen.name) && <TopBar on={screen.name} go={(t) => (screen.name === 'results' ? leaveTo(t) : setScreen({ name: t }))} />}

@@ -26,7 +26,8 @@ export interface Progress {
   best: Record<string, number>;
   /** Saved in-progress tower run. */
   run: { fighter: string; stage: number } | null;
-  stats: { played: number; won: number; captured: number };
+  /** Lifetime record; streak = wins in a row right now, bestStreak = the longest run. */
+  stats: { played: number; won: number; captured: number; streak?: number; bestStreak?: number };
 }
 
 const SETTINGS_KEY = 'ringer3d.settings.v1';

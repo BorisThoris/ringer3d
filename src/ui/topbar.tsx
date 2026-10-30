@@ -5,7 +5,7 @@ import { progress, settings } from '../game/settings';
 import { dailyReady, wallet } from '../game/wallet';
 import { MarbleChip, tap } from './components';
 
-type Target = 'collection' | 'settings';
+type Target = 'collection' | 'settings' | 'profile';
 
 /** A drawstring Marble Bag, like the one in the Collection. */
 const BagIcon = () => (
@@ -45,7 +45,7 @@ export function TopBar({ on, go }: { on: string; go: (t: Target) => void }) {
   };
   return (
     <header className="topbar">
-      <div className="profile" title={`${lv.xp.toLocaleString()} XP`}>
+      <button className="profile" title={`${lv.xp.toLocaleString()} XP`} aria-label="Profile" aria-current={on === 'profile'} onClick={() => open('profile')}>
         <span className="avatar">
           <MarbleChip id={marble} size={40} />
           <b className="lv" aria-label={`Level ${lv.level}`}>
@@ -59,7 +59,7 @@ export function TopBar({ on, go }: { on: string; go: (t: Target) => void }) {
           </span>
           <small>{lookFor(marble).name}</small>
         </span>
-      </div>
+      </button>
       <div className="wallet">
         <button className="coin-bank" aria-label={`${coins.toLocaleString()} coins: get more`} onClick={() => open('collection')}>
           <span className="coin" aria-hidden />

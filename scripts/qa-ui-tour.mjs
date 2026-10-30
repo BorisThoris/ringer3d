@@ -94,7 +94,7 @@ try {
       await back();
       await back();
     }
-    for (const [label, name] of [['Leaderboards', 'leaderboards'], ['Online', 'online'], ['Pass and play', 'local'], ['Collection', 'collection'], ['How to play', 'howto'], ['Settings', 'settings']]) {
+    for (const [label, name] of [['Profile', 'profile'], ['Leaderboards', 'leaderboards'], ['Online', 'online'], ['Pass and play', 'local'], ['Collection', 'collection'], ['How to play', 'howto'], ['Settings', 'settings']]) {
       if (await click(label)) {
         await shot(name);
         if (name === 'collection') {
