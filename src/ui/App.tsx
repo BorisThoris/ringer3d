@@ -7,7 +7,7 @@ import { lookFor, uiColor } from '../game/marbles';
 import { rewardMatch } from '../game/wallet';
 import { matchEnded, presence } from '../platformFeatures';
 import { services } from '../services';
-import { Collection } from './collection';
+import { Collection, type CollectionTab } from './collection';
 import { progress, settings, type GuideMode } from '../game/settings';
 import { buildTower, fighter } from '../game/story';
 import type { OnlineMatchConfig } from '../net/protocol';
@@ -21,13 +21,14 @@ import { HowTo, LocalPlay, MainMenu, QuickPlay, Results, SettingsScreen, type Re
 import { Ending, StorySelect, Tower, Versus } from './story';
 import { Leaderboards } from './social';
 import { AchievementToast, Profile } from './profile';
-import { TopBar } from './topbar';
+import { TopBar, type Target } from './topbar';
 
 /** Screens that sit under the top bar (everything but the match and the Tower's cut-scenes). */
 const BAR_SCREENS = new Set<ScreenState['name']>(['menu', 'quick', 'local', 'settings', 'howto', 'story-select', 'online', 'collection', 'leaderboards', 'profile', 'tower', 'results']);
 
 type ScreenState =
-  | { name: 'menu' | 'quick' | 'local' | 'settings' | 'howto' | 'story-select' | 'online' | 'collection' | 'leaderboards' | 'profile' }
+  | { name: 'menu' | 'quick' | 'local' | 'settings' | 'howto' | 'story-select' | 'online' | 'leaderboards' | 'profile' }
+  | { name: 'collection'; tab?: CollectionTab }
   | { name: 'tower'; fighter: string; stage: number }
   | { name: 'versus'; fighter: string; stage: number }
   | { name: 'ending'; fighter: string; unlocked: string | null }
@@ -119,10 +120,13 @@ export function App() {
     setScreen({ name: 'menu' });
   };
 
+  /** A top-bar button's screen. */
+  const barScreen = (t: Target): ScreenState => (t === 'shop' || t === 'coins' ? { name: 'collection', tab: t } : { name: t });
+
   /** Leave a finished match (and its room) for a menu screen. */
-  const leaveTo = (name: 'collection' | 'settings' | 'profile') => {
+  const leaveTo = (t: Target | 'marbles') => {
     toMenu();
-    setScreen({ name });
+    setScreen(t === 'marbles' ? { name: 'collection', tab: 'marbles' } : barScreen(t));
   };
 
   const scoresOf = (players: PlayerInfo[], r: SessionResult) =>
@@ -337,7 +341,7 @@ export function App() {
               const run = progress.get().run;
               if (run) continueStory(run.fighter);
               else setScreen({ name: 'story-select' });
-            } else setScreen({ name: s });
+            } else setScreen(s === 'collection' ? { name: s } : { name: s });
           }}
         />
       );
@@ -355,7 +359,7 @@ export function App() {
       body = <HowTo onBack={toMenu} />;
       break;
     case 'collection':
-      body = <Collection onBack={toMenu} />;
+      body = <Collection onBack={toMenu} tab={screen.tab} />;
       break;
     case 'leaderboards':
       body = <Leaderboards onBack={toMenu} />;
@@ -389,7 +393,7 @@ export function App() {
       body = <RoomLobby room={screen.room} onLeave={toMenu} />;
       break;
     case 'results':
-      body = <Results info={screen.info} onCollection={() => leaveTo('collection')} />;
+      body = <Results info={screen.info} onCollection={() => leaveTo('marbles')} />;
       break;
     case 'game':
       body = null;
@@ -407,7 +411,7 @@ export function App() {
       )}
       {body && (
         <div className={BAR_SCREENS.has(screen.name) ? 'overlay has-bar' : 'overlay'}>
-          {BAR_SCREENS.has(screen.name) && <TopBar on={screen.name} go={(t) => (screen.name === 'results' ? leaveTo(t) : setScreen({ name: t }))} />}
+          {BAR_SCREENS.has(screen.name) && <TopBar on={screen.name} go={(t) => (screen.name === 'results' ? leaveTo(t) : setScreen(barScreen(t)))} />}
           {body}
         </div>
       )}

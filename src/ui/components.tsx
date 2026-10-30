@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { WORLD } from '../core/constants';
 import { ARENA_LIST, ARENAS, type ArenaId } from '../game/arenas';
 import { DIFFICULTIES, generateMap, randomSeed, type Difficulty, type MapDef } from '../game/maps';
@@ -47,15 +47,38 @@ export function Screen({
   children,
   wide,
   actions,
+  footer,
 }: {
   title: string;
   onBack?: () => void;
   children: ReactNode;
   wide?: boolean;
   actions?: ReactNode;
+  /** The screen's main action (Play, Fight): pinned to the bottom, so it never hides below the fold. */
+  footer?: ReactNode;
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [more, setMore] = useState(false);
+  // On a phone most screens scroll: say so while there is more below, since the scrollbar is hidden.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const check = () => setMore(el.scrollTop + el.clientHeight < el.scrollHeight - 24);
+    check();
+    el.addEventListener('scroll', check, { passive: true });
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    for (const c of el.children) ro.observe(c);
+    const mo = new MutationObserver(check);
+    mo.observe(el, { childList: true, subtree: true });
+    return () => {
+      el.removeEventListener('scroll', check);
+      ro.disconnect();
+      mo.disconnect();
+    };
+  }, []);
   return (
-    <div className={`sheet screen${wide ? ' wide' : ''}`} role="dialog" aria-label={title}>
+    <div ref={ref} className={`sheet screen${wide ? ' wide' : ''}`} role="dialog" aria-label={title}>
       <div className="screen-head">
         {onBack && (
           <button
@@ -73,6 +96,17 @@ export function Screen({
         {actions}
       </div>
       {children}
+      <div className={`screen-foot${footer ? ' has-action' : ''}${more ? ' more' : ''}`}>
+        <button
+          className="more-hint"
+          tabIndex={-1}
+          aria-hidden
+          onClick={() => ref.current?.scrollBy({ top: ref.current.clientHeight * 0.7, behavior: 'smooth' })}
+        >
+          More ▾
+        </button>
+        {footer}
+      </div>
     </div>
   );
 }

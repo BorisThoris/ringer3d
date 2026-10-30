@@ -2704,3 +2704,304 @@ button.profile {
   font-weight: 700;
   animation-duration: 6000ms;
 }
+
+/* ---- Phones: nothing hides off screen ------------------------------------------------- */
+/* Flex columns that scroll must not squash their rows to fit (landscape menus did). */
+.menu > *,
+.screen > * {
+  flex-shrink: 0;
+}
+
+/* The screen's main action rides the bottom edge; above it, a fade and "More" while there is
+   more to scroll to (the scrollbar itself is hidden). */
+.screen-foot {
+  position: sticky;
+  bottom: -22px;
+  z-index: 3;
+  margin: 0 -22px -22px;
+  padding: 0 22px;
+}
+.screen-foot.has-action {
+  margin-top: -4px;
+  padding: 12px 22px 18px;
+  background: linear-gradient(180deg, rgba(14, 9, 30, 0.55), rgba(14, 9, 30, 0.94) 40%);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.screen-foot.has-action > .btn {
+  width: 100%;
+}
+.screen-foot::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 56px;
+  background: linear-gradient(180deg, transparent, rgba(14, 9, 30, 0.7));
+  opacity: 0;
+  transition: opacity 200ms ease;
+  pointer-events: none;
+}
+.screen-foot:not(.has-action)::before {
+  bottom: 22px;
+}
+.screen-foot.more::before {
+  opacity: 1;
+}
+.more-hint {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translate(-50%, 6px);
+  padding: 6px 14px;
+  border-radius: var(--r-pill);
+  border: 1.5px solid var(--glass-line);
+  background: rgba(12, 8, 28, 0.85);
+  color: var(--chalk);
+  font: 800 var(--t-sm) / 1 var(--display);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease, transform 200ms var(--spring);
+}
+/* Without an action bar the hint keeps to the corner, clear of the content's own buttons. */
+.screen-foot:not(.has-action) .more-hint {
+  left: auto;
+  right: 0;
+  bottom: 30px;
+  transform: translate(0, 6px);
+}
+.screen-foot.more:not(.has-action) .more-hint {
+  transform: none;
+  animation: hint-bob-corner 1.6s ease-in-out infinite;
+}
+@keyframes hint-bob-corner {
+  50% {
+    transform: translateY(4px);
+  }
+}
+.screen-foot.more .more-hint {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
+  animation: hint-bob 1.6s ease-in-out infinite;
+}
+@keyframes hint-bob {
+  50% {
+    transform: translate(-50%, 4px);
+  }
+}
+
+/* Shop / My marbles. */
+.tabs {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: var(--r-pill);
+  background: rgba(0, 0, 0, 0.28);
+  border: 1.5px solid var(--glass-line);
+}
+.tab {
+  flex: 1;
+  min-height: 44px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--chalk-dim);
+  font: 800 var(--t-md) / 1 var(--display);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.tab[aria-selected='true'] {
+  background: linear-gradient(180deg, rgba(255, 210, 63, 0.95), #e0a91c);
+  color: var(--ink);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.3);
+}
+.tab .count {
+  min-width: 24px;
+  padding: 2px 7px;
+  border-radius: var(--r-pill);
+  background: rgba(0, 0, 0, 0.3);
+  font-size: var(--t-sm);
+}
+.link {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--sun);
+  font: inherit;
+  font-weight: 800;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* The shop is a labelled button, not a mystery bag. */
+.bar-btn.shop {
+  width: auto;
+  padding: 0 14px 0 8px;
+  grid-auto-flow: column;
+  gap: 6px;
+}
+.bar-btn.shop .label {
+  font: 800 var(--t-md) / 1 var(--display);
+  color: var(--sun);
+}
+.menu-foot {
+  flex-wrap: wrap;
+}
+.btn.shop-btn {
+  color: var(--ink);
+  background: linear-gradient(180deg, rgba(255, 210, 63, 0.95), #e0a91c);
+  border-color: rgba(255, 230, 140, 0.8);
+}
+
+/* Narrow phones: the avatar alone opens the profile, so the shop keeps its label. */
+@media (max-width: 440px) {
+  .topbar .who {
+    display: none;
+  }
+  .topbar .profile {
+    padding: 4px;
+  }
+  .bar-btn.shop {
+    padding: 0 10px 0 6px;
+  }
+}
+
+/* Landscape phones: a slim top bar and sheets that use the full height. */
+@media (max-height: 520px) {
+  .overlay {
+    padding: calc(8px + var(--safe-t)) calc(12px + var(--safe-r)) calc(8px + var(--safe-b)) calc(12px + var(--safe-l));
+  }
+  .overlay.has-bar {
+    gap: 6px;
+  }
+  .overlay.has-bar > .screen {
+    max-height: calc(100% - 48px);
+  }
+  .topbar .avatar .marble {
+    width: 32px !important;
+    height: 32px !important;
+  }
+  .avatar .lv {
+    min-width: 18px;
+    height: 18px;
+    font-size: 0.62rem;
+  }
+  .profile {
+    padding: 3px 12px 3px 3px;
+  }
+  .who small,
+  .profile .xp {
+    display: none;
+  }
+  .coin-bank,
+  .bar-btn {
+    height: 40px;
+  }
+  .bar-btn {
+    width: 40px;
+  }
+  .bar-btn.shop {
+    width: auto;
+  }
+  .coin-bank .plus {
+    width: 26px;
+    height: 26px;
+  }
+  .screen,
+  .screen.wide {
+    width: min(920px, 100%);
+    padding: 12px 18px 18px;
+    gap: 12px;
+  }
+  .screen-head h2 {
+    font-size: var(--t-2xl);
+  }
+  .screen-head .btn.icon {
+    min-height: 40px;
+    width: 40px;
+    height: 40px;
+  }
+  .screen-foot {
+    bottom: -18px;
+    margin: 0 -18px -18px;
+  }
+  .screen-foot.has-action {
+    padding: 8px 18px 12px;
+  }
+  .screen-foot.has-action > .btn {
+    min-height: 44px;
+    padding: 10px 20px;
+  }
+  .menu {
+    margin: auto auto 0 0;
+    width: min(440px, 60%);
+  }
+  .logo {
+    font-size: clamp(2rem, 13vh, 3.4rem);
+    margin: 0;
+  }
+  .logo small {
+    display: none;
+  }
+  .menu {
+    gap: 6px;
+  }
+  .menu-card,
+  .menu-card.hero {
+    grid-template-columns: 34px 1fr auto;
+    padding: 6px 12px 6px 8px;
+  }
+  .menu-card .marble {
+    width: 34px !important;
+    height: 34px !important;
+  }
+  .menu-card h3,
+  .menu-card.hero h3 {
+    font-size: var(--t-lg);
+  }
+  .menu-card p {
+    font-size: var(--t-xs);
+  }
+  .menu-foot .btn {
+    min-height: 36px;
+    padding: 6px 14px;
+  }
+}
+@media (max-height: 400px) {
+  .menu .logo {
+    display: none;
+  }
+}
+
+/* Phones: the bag offer stays short, so the coin packs show without a long scroll. */
+@media (max-width: 480px) {
+  .bag-card {
+    grid-template-columns: 60px 1fr;
+    gap: 12px;
+    padding: 12px;
+  }
+  .bag-card .bag {
+    width: 58px;
+    height: 64px;
+  }
+  .bag-card > div > p:not(.odds) {
+    display: none;
+  }
+  .bag-card h3 {
+    margin: 0 0 6px;
+  }
+  .bag-card .odds {
+    gap: 2px 10px;
+    font-size: var(--t-xs);
+    margin: 0 0 10px;
+  }
+  .bag-card .btn {
+    width: 100%;
+    min-height: 46px;
+  }
+}
