@@ -1,30 +1,7 @@
 import { collectibleFromId, isCollectibleId } from '../core/collectible';
 import { marbleLook } from '../core/marbleGen';
-/** Visual identity of a marble. Purely cosmetic: every marble plays identically (fairness). */
-export type MarbleCore = 'catseye' | 'swirl' | 'solid' | 'galaxy' | 'steelie' | 'onyx' | 'opal' | 'neon' | 'onionskin' | 'clearie';
-
-export interface MarbleLook {
-  id: string;
-  name: string;
-  core: MarbleCore;
-  /** Glass/body colour. */
-  base: string;
-  /** Inner feature colours. */
-  accent: string;
-  accent2: string;
-  /** 0 = opaque, 1 = clear glass. */
-  clarity: number;
-  /** Emissive glow for inner features (0..1). */
-  glow: number;
-  /** A vivid colour that stands for this marble in the interface and the in-match cues. */
-  ui?: string;
-  /** Generated collectibles (core/marbleGen.ts): the glass finish and glitter flecks 0..1. */
-  finish?: 'glass' | 'frosted' | 'pearl' | 'metallic' | 'glitter' | 'holo' | 'prism';
-  sparkle?: number;
-  /** Collectibles (core/collectible.ts): wear float 0..1 (scratches, scuffs, chips) and the Shiny sheen. */
-  wear?: number;
-  shiny?: boolean;
-}
+export type { MarbleCore, MarbleLook } from '../../packages/marble-forge/src/look';
+import type { MarbleLook } from '../../packages/marble-forge/src/look';
 
 /** The interface colour for a marble: its own, or the brighter of its feature colours. */
 export function uiColor(look: MarbleLook | undefined): string {
