@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { MarbleLook } from '../look';
+import type { MarbleBody } from '../body';
 import type { Quality } from './marble';
 
 /**
@@ -340,4 +341,132 @@ export function buildEffect(look: MarbleLook, r: number, quality: Quality): THRE
     o.userData.noInk = true;
   });
   return group;
+}
+
+/** Where the scenes' key light and back (rim) light come from, for lighting the glass body. */
+const KEY_DIR = new THREE.Vector3(2, 4, 3).normalize();
+const BACK_DIR = new THREE.Vector3(-2.5, 1.2, -2).normalize();
+
+/**
+ * The glass body (body.ts) as a volume: milky scattering and little clouds suspended in the
+ * glass. Unlike the phenomena it is real matter, not light: it is alpha-blended over the glass
+ * (premultiplied, front to back), so a cloud hides what is behind it. Clouds are lit by the key
+ * light and shade themselves (one step toward the light per sample); milk brightens toward the
+ * key and glows when the light is behind the marble, warm through opal glass, blue off it.
+ * Null when there is nothing to draw, and on low quality.
+ */
+export function buildBodyVolume(look: MarbleLook, body: MarbleBody, r: number, quality: Quality, seed: number): THREE.Mesh | null {
+  if (quality === 'low' || (body.milk < 0.02 && body.clouds === 0)) return null;
+  const steps = quality === 'medium' ? 14 : 24;
+  const white = new THREE.Color('#ffffff');
+  const base = new THREE.Color(look.base);
+  const cloudSrc = body.cloudColour === 'white' ? white : new THREE.Color(look[body.cloudColour]);
+  const cloudCol = white.clone().lerp(cloudSrc, body.cloudColour === 'white' ? 0 : body.cloudTint);
+  // Milk takes the glass colour, lifted toward white; opal glass scatters a cool blue-white.
+  const milkCol = body.opalescent ? new THREE.Color(0.72, 0.84, 1.0) : base.clone().lerp(white, 0.55);
+  const fireCol = body.opalescent ? new THREE.Color(1.0, 0.72, 0.42) : base.clone().lerp(white, 0.3);
+  const offset = new THREE.Vector3(((seed % 1000) / 1000) * 50, ((seed >>> 10) % 1000) / 20, ((seed >>> 20) % 1000) / 20);
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: forgeClock,
+      uR: { value: r * 0.97 },
+      uMilk: { value: body.milk },
+      uClouds: { value: body.clouds },
+      uScale: { value: body.cloudScale },
+      uSoft: { value: body.cloudSoft },
+      uStretch: { value: body.cloudStretch },
+      uAxis: { value: new THREE.Vector3(...body.cloudAxis) },
+      uDrift: { value: body.drift },
+      uSeed: { value: offset },
+      uCloudCol: { value: cloudCol },
+      uMilkCol: { value: milkCol },
+      uFireCol: { value: fireCol },
+      uKey: { value: KEY_DIR },
+      uBack: { value: BACK_DIR },
+    },
+    defines: { STEPS: steps },
+    transparent: true,
+    premultipliedAlpha: true,
+    depthWrite: false,
+    vertexShader: /* glsl */ `
+      uniform vec3 uKey;
+      uniform vec3 uBack;
+      varying vec3 vPos;
+      varying vec3 vCam;
+      varying vec3 vKey;
+      varying vec3 vBack;
+      void main() {
+        vPos = position;
+        mat4 inv = inverse(modelMatrix);
+        vCam = (inv * vec4(cameraPosition, 1.0)).xyz;
+        vKey = normalize((inv * vec4(uKey, 0.0)).xyz);
+        vBack = normalize((inv * vec4(uBack, 0.0)).xyz);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: /* glsl */ `
+      uniform float uTime;
+      uniform float uR;
+      uniform float uMilk;
+      uniform float uClouds;
+      uniform float uScale;
+      uniform float uSoft;
+      uniform float uStretch;
+      uniform vec3 uAxis;
+      uniform float uDrift;
+      uniform vec3 uSeed;
+      uniform vec3 uCloudCol;
+      uniform vec3 uMilkCol;
+      uniform vec3 uFireCol;
+      varying vec3 vPos;
+      varying vec3 vCam;
+      varying vec3 vKey;
+      varying vec3 vBack;
+      ${NOISE}
+      float cloud(vec3 q) {
+        if (uClouds <= 0.0) return 0.0;
+        // Squash space along the wisp axis, so the clouds stretch out along it.
+        vec3 p = q - uAxis * dot(q, uAxis) * (1.0 - 1.0 / uStretch);
+        p = p * uScale + uSeed + vec3(uTime * uDrift, uTime * uDrift * 0.4, -uTime * uDrift * 0.7);
+        float n = fbm(p);
+        float th = 0.7 - uClouds * 0.3;
+        return smoothstep(th - uSoft * 0.5, th + uSoft * 0.5, n) * smoothstep(1.0, 0.72, length(q));
+      }
+      void main() {
+        vec3 rd = normalize(vPos - vCam);
+        float b = dot(vPos, rd);
+        float h = b * b - (dot(vPos, vPos) - uR * uR);
+        if (h <= 0.0) discard;
+        float t0 = max(0.0, -b - sqrt(h));
+        float t1 = -b + sqrt(h);
+        float dt = (t1 - t0) / float(STEPS);
+        // Light the milk sends on toward the eye when the light is behind the marble.
+        float fwd = pow(max(dot(rd, vBack), 0.0), 4.0) * 1.2 + pow(max(dot(rd, vKey), 0.0), 6.0) * 0.6;
+        vec3 acc = vec3(0.0);
+        float a = 0.0;
+        for (int i = 0; i < STEPS; i++) {
+          vec3 q = (vPos + rd * (t0 + dt * (float(i) + 0.5))) / uR;
+          float c = cloud(q);
+          float m = uMilk * 0.75 * smoothstep(1.0, 0.8, length(q));
+          float dens = m + c * 3.2;
+          if (dens < 0.001) continue;
+          // Clouds shade themselves: how much cloud lies a little way toward the key light.
+          float shade = c > 0.01 ? exp(-cloud(q + vKey * 0.22) * 2.2) : 1.0;
+          float lam = 0.55 + 0.45 * dot(normalize(q + 1e-4), vKey);
+          vec3 cc = uCloudCol * mix(0.42, 1.08, shade) * (0.75 + 0.25 * lam);
+          vec3 mc = uMilkCol * (0.55 + 0.45 * lam) + uFireCol * fwd;
+          vec3 col = (cc * c * 3.2 + mc * m) / dens;
+          float k = clamp(dens * dt / uR, 0.0, 1.0);
+          acc += (1.0 - a) * col * k;
+          a += (1.0 - a) * k;
+          if (a > 0.97) break;
+        }
+        gl_FragColor = vec4(acc, a);
+        #include <colorspace_fragment>
+      }`,
+  });
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(r * 1.03, 64, 44), material);
+  mesh.renderOrder = 2.4;
+  mesh.userData.noInk = true;
+  mesh.name = 'glass-body';
+  return mesh;
 }

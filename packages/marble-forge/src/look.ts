@@ -26,6 +26,8 @@ export interface MarbleLook {
   shiny?: boolean;
   /** Surface flaws from the furnace (flaws.ts): on unless false. */
   flaws?: boolean;
+  /** The glass body, milk and clouds (body.ts): on unless false. */
+  body?: boolean;
   /** Generated marbles: a phenomenon inside the glass, its colour, and the interior's shape. */
   effect?: Effect;
   effectColor?: string;

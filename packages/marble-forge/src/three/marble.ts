@@ -2,10 +2,11 @@ import * as THREE from 'three';
 import { hashString, Rng } from '../rng';
 import type { MarbleLook } from '../look';
 import { marbleTexture } from './textures';
-import { buildCoreVolume, buildEffect } from './effects';
+import { buildBodyVolume, buildCoreVolume, buildEffect } from './effects';
 import { inkMaterial } from './ink';
 import { scratchOverlay, surfaceMaps } from './surface';
 import { surfaceFlaws } from '../flaws';
+import { marbleBody, type MarbleBody } from '../body';
 
 /**
  * Marbles. A glass marble is a transmissive shell (real refraction, a touch of dispersion,
@@ -448,6 +449,16 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
   if (effect) group.add(effect);
   if (deep) group.add(buildCoreVolume(deep, look, r, quality));
 
+  // The glass body: milk and little clouds in the glass, and the glass's own optics (body.ts).
+  // A phenomenon needs to be seen, so its glass stays nearly clear and lightly clouded.
+  const hasFxBody = !!look.effect && look.effect !== 'none';
+  const body: MarbleBody | null = look.body === false ? null : marbleBody(look.id);
+  if (body) {
+    const veil = hasFxBody ? { ...body, milk: Math.min(body.milk, 0.1), clouds: body.clouds * 0.35 } : deep ? { ...body, milk: body.milk * 0.4, clouds: body.clouds * 0.6 } : body;
+    const vol = buildBodyVolume(look, veil, r, quality, hashString(`cloud:${look.id}`));
+    if (vol) group.add(vol);
+  }
+
   // ---- Glass shell --------------------------------------------------------------------------
   const tint = new THREE.Color(look.base);
   // Near-black glass (galaxies, neon, onyx) would swallow its own interior: let more light
@@ -483,12 +494,12 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
           // three's transmission is screen-space: thickness sets how far the refracted image
           // shifts. A full diameter smears the interior to the rim; ~0.6r gives a real
           // marble's gentle magnification.
-          thickness: r * 0.6,
-          ior: 1.5,
+          thickness: r * (body?.thickness ?? 0.6),
+          ior: body?.ior ?? 1.5,
           attenuationColor: absorb,
           // Tinted glass deepens its colour quickly; clear glass barely at all.
-          attenuationDistance: look.core === 'clearie' ? r * 2.6 : dark ? r * 4.5 : clarity < 0.5 ? r * 2.2 : r * 7,
-          dispersion: quality === 'high' ? (look.finish === 'prism' ? 1.2 : 0.35) : 0,
+          attenuationDistance: (look.core === 'clearie' ? r * 2.6 : dark ? r * 4.5 : clarity < 0.5 ? r * 2.2 : r * 7) * (body?.depth ?? 1),
+          dispersion: quality === 'high' ? (look.finish === 'prism' ? 1.2 : body?.dispersion ?? 0.35) : 0,
           specularIntensity: 1,
           envMapIntensity: 1.15,
           iridescence: look.finish === 'holo' || look.finish === 'prism' || look.core === 'opal' ? 1 : look.finish === 'pearl' ? 0.6 : look.core === 'galaxy' ? 0.4 : 0,

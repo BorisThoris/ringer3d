@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BOOK, bookProgress, describeFlaws, mintCollectible, surfaceFlaws, EFFECT_IDS, EFFECT_ODDS, EFFECTS, generateMarble, RARITY, type GeneratedMarble } from '../packages/marble-forge/src';
+import { BOOK, bookProgress, describeBody, describeFlaws, marbleBody, mintCollectible, surfaceFlaws, EFFECT_IDS, EFFECT_ODDS, EFFECTS, generateMarble, RARITY, type GeneratedMarble } from '../packages/marble-forge/src';
 import { meltValue } from '../src/core/economy';
 
 const fnv = (s: string) => {
@@ -103,5 +103,23 @@ describe('Marble Forge', () => {
     }
     expect(flawless / N).toBeGreaterThan(0.025);
     expect(flawless / N).toBeLessThan(0.055);
+  });
+
+  it('gives every marble its own glass body: milk, clouds and optics, in range', () => {
+    const kinds = new Set<string>();
+    for (let i = 0; i < 3000; i++) {
+      const id = `g${i * 7919 + 1}`;
+      const b = marbleBody(id);
+      expect(marbleBody(id)).toEqual(b);
+      expect(b.milk).toBeGreaterThanOrEqual(0);
+      expect(b.milk).toBeLessThanOrEqual(0.8);
+      expect(b.clouds).toBeLessThanOrEqual(0.85);
+      expect(b.ior).toBeGreaterThanOrEqual(1.44);
+      expect(b.ior).toBeLessThanOrEqual(1.62);
+      expect(Math.hypot(...b.cloudAxis)).toBeCloseTo(1, 2);
+      if (b.opalescent) expect(b.milk).toBeGreaterThan(0.3);
+      kinds.add(describeBody(b).split(',')[0]);
+    }
+    expect([...kinds].sort()).toEqual(['clear glass', 'hazy glass', 'milk glass', 'opal glass']);
   });
 });

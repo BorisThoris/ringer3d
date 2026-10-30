@@ -1,6 +1,6 @@
 // Marble Forge: the three.js renderer.
 export * from './marble';
-export { advanceMarbles, buildEffect, forgeClock } from './effects';
+export { advanceMarbles, buildBodyVolume, buildEffect, forgeClock } from './effects';
 export { INK, inkMaterial } from './ink';
 export { marbleTexture } from './textures';
 export { MarblePreview } from './preview';

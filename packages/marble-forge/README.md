@@ -20,6 +20,12 @@ and then an unmelted stone, and one in 25 comes out Flawless. The renderer draws
 map (so they bend the light through the glass) and a roughness map, with the wear marks on top;
 both export in the GLB. Pass `flaws: false` in the look to turn them off.
 
+The glass body varies too (`marbleBody(id)`): water-clear, hazy, milk or opal glass that glows
+when backlit, little clouds suspended inside (puffs or long wisps, white or in the marble's own
+colours, drifting slowly), and the glass's refractive index, magnification, colour depth and
+rainbow edges. Milk and clouds are a lit, self-shadowing volume (medium and high quality); they
+are shader effects, so the GLB carries only the glass optics. Pass `body: false` to turn it off.
+
 Made for and used in Ringer 3D, a marble game: the Marble Bags, Marble Book and Steam
 inventory there all run on this package.
 
