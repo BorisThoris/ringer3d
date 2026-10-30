@@ -15,7 +15,7 @@ import type { OnlineRoom } from '../net/room';
 import { sound } from '../render/audio';
 import { engine } from './engine';
 import { Hud } from './Hud';
-import { listenForSteamInvites, OnlineHub, RoomLobby } from './online';
+import { listenForInviteLinks, listenForSteamInvites, OnlineHub, RoomLobby } from './online';
 import type { MapChoice } from './components';
 import { HowTo, LocalPlay, MainMenu, QuickPlay, Results, SettingsScreen, type ResultsInfo } from './screens';
 import { Ending, StorySelect, Tower, Versus } from './story';
@@ -85,6 +85,27 @@ export function App() {
       }),
     [],
   );
+
+  // An invite link (web, or an Android App Link) drops you into that room; a dead one says why.
+  const [linkError, setLinkError] = useState<string | null>(null);
+  useEffect(
+    () =>
+      listenForInviteLinks(
+        (room) => {
+          roomRef.current?.leave();
+          roomRef.current = room;
+          setLinkError(null);
+          setScreen({ name: 'room', room });
+        },
+        (why) => setLinkError(why),
+      ),
+    [],
+  );
+  useEffect(() => {
+    if (!linkError) return;
+    const t = setTimeout(() => setLinkError(null), 6000);
+    return () => clearTimeout(t);
+  }, [linkError]);
 
   // Every panel is tinted with the player's own marble.
   useEffect(() => {
@@ -379,6 +400,11 @@ export function App() {
     <>
       {screen.name === 'game' && <Hud online={screen.online} onQuit={toMenu} />}
       <AchievementToast />
+      {linkError && (
+        <div className="ach-toast link-error" role="alert">
+          <span>{linkError}</span>
+        </div>
+      )}
       {body && (
         <div className={BAR_SCREENS.has(screen.name) ? 'overlay has-bar' : 'overlay'}>
           {BAR_SCREENS.has(screen.name) && <TopBar on={screen.name} go={(t) => (screen.name === 'results' ? leaveTo(t) : setScreen({ name: t }))} />}

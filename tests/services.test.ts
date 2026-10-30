@@ -155,12 +155,30 @@ describe('Play services (the Android adapter, against a fake plugin)', () => {
       loadSnapshot: async () => ({ data: '{"at":1}' }),
       saveSnapshot: async () => ({ ok: true }),
     };
-    const svc = createPlayServices(plugin);
-    await svc.unlock('FIRST_WIN'); // no Play id yet: skipped
+    const svc = createPlayServices(plugin, createLocalServices(memoryKV(), () => 'Bobby'));
+    await svc.unlock('FIRST_WIN'); // no Play id yet: kept on the device only
     await svc.submitScore('wins', 4);
     expect(seen).toEqual([]);
+    expect(await svc.unlocked()).toEqual(['FIRST_WIN']);
     expect(await svc.cloud!.read('wallet.json')).toBe('{"at":1}');
     expect((await svc.identity())!.name).toBe('Bobby');
-    expect(await svc.scores('wins', 'global')).toEqual([]); // no Play leaderboard id yet
+    // No Play leaderboard id yet: the personal best, as on the web.
+    expect(await svc.scores('wins', 'global')).toEqual([{ playerId: 'local', name: 'Bobby', rank: 1, score: 4 }]);
+    expect(await svc.scores('wins', 'friends')).toEqual([]);
+  });
+
+  it('falls back to the device when Play Games sign-in fails', async () => {
+    const plugin = {
+      signIn: async () => {
+        throw new Error('not signed in');
+      },
+      unlockedAchievements: async () => {
+        throw new Error('not signed in');
+      },
+    } as unknown as PlayGamesPlugin;
+    const svc = createPlayServices(plugin, createLocalServices(memoryKV(), () => 'Bobby'));
+    expect((await svc.identity())!.name).toBe('Bobby');
+    await svc.unlock('FIRST_BAG');
+    expect(await svc.unlocked()).toEqual(['FIRST_BAG']);
   });
 });

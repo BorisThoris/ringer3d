@@ -22,7 +22,21 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Invite links (src/invite.ts): https://ringer3d.modaxxx009.workers.dev/join?room=ABCD opens the app.
+                 Verified by the site's /.well-known/assetlinks.json (public/.well-known). -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="ringer3d.modaxxx009.workers.dev" android:path="/join" />
+            </intent-filter>
+
         </activity>
+
+        <!-- Play Games Services: the project id comes from the build (RINGER_PLAY_GAMES_ID). -->
+        <meta-data
+            android:name="com.google.android.gms.games.APP_ID"
+            android:value="@string/game_services_project_id" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
