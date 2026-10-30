@@ -4,6 +4,8 @@ import type { MarbleLook } from '../look';
 import { marbleTexture } from './textures';
 import { buildCoreVolume, buildEffect } from './effects';
 import { inkMaterial } from './ink';
+import { scratchOverlay, surfaceMaps } from './surface';
+import { surfaceFlaws } from '../flaws';
 
 /**
  * Marbles. A glass marble is a transmissive shell (real refraction, a touch of dispersion,
@@ -200,117 +202,32 @@ function causticTexture(): THREE.Texture {
   return causticTex;
 }
 
-const wearMaps = new Map<string, THREE.Texture>();
-const scratchMaps = new Map<string, THREE.Texture>();
-
-/** The same marks as pale lines with alpha, laid just over the glass so wear shows in any light. */
-function scratchOverlay(look: MarbleLook): THREE.Texture | null {
-  const wear = look.wear ?? 0;
-  if (wear < 0.1) return null;
-  const hit = scratchMaps.get(look.id);
-  if (hit) return hit;
-  const rng = new Rng(hashString(`wear:${look.id}`));
-  const c = document.createElement('canvas');
-  c.width = 512;
-  c.height = 256;
-  const g = c.getContext('2d')!;
-  g.lineCap = 'round';
-  for (let i = 0, n = Math.round(wear * 160); i < n; i++) {
-    const x = rng.next() * c.width;
-    const y = c.height * (0.12 + rng.next() * 0.76);
-    const a = rng.next() * Math.PI;
-    const len = 6 + rng.next() * (16 + wear * 40);
-    g.strokeStyle = `rgba(255,255,255,${0.25 + rng.next() * 0.5})`;
-    g.lineWidth = 0.5 + rng.next() * 1.1;
-    g.beginPath();
-    g.moveTo(x, y);
-    g.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len);
-    g.stroke();
-  }
-  if (wear > 0.45) {
-    for (let i = 0, n = Math.round((wear - 0.45) * 50); i < n; i++) {
-      const x = rng.next() * c.width;
-      const y = c.height * (0.15 + rng.next() * 0.7);
-      const rad = 1.5 + rng.next() * 4;
-      g.fillStyle = 'rgba(255,255,255,0.75)';
-      g.beginPath();
-      // a chip: a little irregular flake
-      for (let k = 0; k < 6; k++) {
-        const t = (k / 6) * Math.PI * 2;
-        const rr = rad * (0.6 + rng.next() * 0.6);
-        g[k ? 'lineTo' : 'moveTo'](x + Math.cos(t) * rr, y + Math.sin(t) * rr);
-      }
-      g.fill();
-    }
-  }
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = THREE.RepeatWrapping;
-  scratchMaps.set(look.id, tex);
-  return tex;
-}
-
 /**
- * A collectible's wear as a roughness map over the glass (green channel = roughness): fine
- * scratches whose number grows with the float, scuffed patches from Scuffed on, and pale chips
- * on Chipped glass. Seeded by the marble's id, so each instance has its own marks.
+ * The marble's surface on its outer mesh: the normal map (ripple, seam, pits, grooves) and the
+ * roughness map (base roughness plus fingerprints and wear). The mesh turns so the seam runs
+ * where this marble's seam runs; the pale scratch overlay turns with it.
  */
-function wearMap(look: MarbleLook, baseRough: number): THREE.Texture | null {
-  const wear = look.wear ?? 0;
-  if (wear < 0.02) return null;
-  const key = `${look.id}:${baseRough}`;
-  const hit = wearMaps.get(key);
-  if (hit) return hit;
-  const rng = new Rng(hashString(`wear:${look.id}`));
-  const c = document.createElement('canvas');
-  c.width = 512;
-  c.height = 256;
-  const g = c.getContext('2d')!;
-  const v = (x: number) => Math.round(Math.min(1, x) * 255);
-  g.fillStyle = `rgb(0,${v(baseRough)},0)`;
-  g.fillRect(0, 0, c.width, c.height);
-  // Scuffs: soft hazy patches where the marble has rubbed on concrete.
-  if (wear > 0.3) {
-    for (let i = 0, n = Math.round((wear - 0.3) * 30); i < n; i++) {
-      const x = rng.next() * c.width;
-      const y = c.height * (0.2 + rng.next() * 0.6);
-      const rad = 18 + rng.next() * 50;
-      const grad = g.createRadialGradient(x, y, 0, x, y, rad);
-      grad.addColorStop(0, `rgba(0,${v(baseRough + 0.25 + wear * 0.3)},0,0.8)`);
-      grad.addColorStop(1, 'rgba(0,0,0,0)');
-      g.fillStyle = grad;
-      g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+function applySurface(mesh: THREE.Mesh, look: MarbleLook, quality: Quality, bump = 1): [number, number] {
+  const mat = mesh.material as THREE.MeshPhysicalMaterial;
+  const maps = surfaceMaps(look, mat.roughness, quality === 'high');
+  if (maps.normal) {
+    mat.normalMap = maps.normal;
+    mat.normalScale.set(bump, bump);
+    if (mat.clearcoat > 0) {
+      mat.clearcoatNormalMap = maps.normal;
+      mat.clearcoatNormalScale.set(bump, bump);
     }
   }
-  // Scratches: thin straight-ish strokes.
-  g.lineCap = 'round';
-  for (let i = 0, n = Math.round(wear * 220); i < n; i++) {
-    const x = rng.next() * c.width;
-    const y = c.height * (0.1 + rng.next() * 0.8);
-    const a = rng.next() * Math.PI;
-    const len = 6 + rng.next() * (20 + wear * 50);
-    g.strokeStyle = `rgba(0,${v(baseRough + 0.3 + rng.next() * 0.4)},0,${0.5 + rng.next() * 0.5})`;
-    g.lineWidth = 0.6 + rng.next() * 1.4;
-    g.beginPath();
-    g.moveTo(x, y);
-    g.quadraticCurveTo(x + Math.cos(a) * len * 0.5 + rng.range(-3, 3), y + Math.sin(a) * len * 0.5 + rng.range(-3, 3), x + Math.cos(a) * len, y + Math.sin(a) * len);
-    g.stroke();
+  if (maps.roughness) {
+    mat.roughnessMap = maps.roughness;
+    mat.roughness = 1;
+    if (quality === 'low' && mat.clearcoat > 0) mat.clearcoatRoughnessMap = maps.roughness;
   }
-  // Chips: little rough craters.
-  if (wear > 0.45) {
-    for (let i = 0, n = Math.round((wear - 0.45) * 40); i < n; i++) {
-      g.fillStyle = `rgb(0,${v(0.85)},0)`;
-      g.beginPath();
-      g.arc(rng.next() * c.width, c.height * (0.15 + rng.next() * 0.7), 1.5 + rng.next() * 3.5, 0, Math.PI * 2);
-      g.fill();
-    }
-  }
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = THREE.RepeatWrapping;
-  wearMaps.set(key, tex);
-  return tex;
+  mesh.rotation.set(maps.turn[0], 0, maps.turn[1]);
+  return maps.turn;
 }
 
-function addScratches(group: THREE.Group, look: MarbleLook, r: number, seg: number) {
+function addScratches(group: THREE.Group, look: MarbleLook, r: number, seg: number, turn: [number, number]) {
   const scratches = scratchOverlay(look);
   if (!scratches) return;
   const skin = new THREE.Mesh(
@@ -318,6 +235,7 @@ function addScratches(group: THREE.Group, look: MarbleLook, r: number, seg: numb
     new THREE.MeshBasicMaterial({ map: scratches, transparent: true, opacity: 0.25 + (look.wear ?? 0) * 0.4, depthWrite: false }),
   );
   skin.renderOrder = 3;
+  skin.rotation.set(turn[0], 0, turn[1]);
   group.add(skin);
 }
 
@@ -346,17 +264,13 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
 
   // ---- Opaque marbles ----------------------------------------------------------------------
   if (look.core === 'steelie') {
-    // Chrome is nothing but reflection: push the environment hard. Worn chrome scuffs.
+    // Chrome is nothing but reflection: push the environment hard. Worn chrome scuffs, and
+    // its orange peel reads as hammered metal.
     const chrome = new THREE.MeshPhysicalMaterial({ color: look.base, metalness: 1, roughness: 0.04, clearcoat: 0.6, clearcoatRoughness: 0.05, envMapIntensity: 3 });
-    const scuffs = wearMap(look, 0.04);
-    if (scuffs) {
-      chrome.roughnessMap = scuffs;
-      chrome.roughness = 1;
-    }
     const s = new THREE.Mesh(sphere(r, seg), chrome);
     s.castShadow = true;
     group.add(s, inkHull(r, seg));
-    addScratches(group, look, r, seg);
+    addScratches(group, look, r, seg, applySurface(s, look, quality, 0.7));
     return { group, caustic: null, contact: contactShadow(r) };
   }
   if (look.core === 'solid' || look.clarity < 0.05) {
@@ -366,7 +280,7 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
     );
     s.castShadow = true;
     group.add(s, inkHull(r, seg));
-    addScratches(group, look, r, seg);
+    addScratches(group, look, r, seg, applySurface(s, look, quality, 1.4));
     return { group, caustic: null, contact: contactShadow(r) };
   }
 
@@ -495,6 +409,36 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
     b.scale.setScalar(r * (0.02 + rand() * 0.035));
     group.add(b);
   }
+  // Flaws inside the glass: a trail of seed bubbles, and now and then a grain of sand that
+  // never melted (a "stone").
+  const flaws = look.flaws === false ? null : surfaceFlaws(look.id);
+  if (flaws && (flaws.seeds || flaws.stone)) {
+    const fr = new Rng(hashString(`seeds:${look.id}`));
+    const at = () => new THREE.Vector3(fr.range(-1, 1), fr.range(-1, 1), fr.range(-1, 1)).normalize();
+    if (flaws.seeds) {
+      const p = at().multiplyScalar(r * fr.range(0.3, 0.7));
+      const dir = at();
+      const bend = at().multiplyScalar(0.25);
+      for (let i = 0; i < flaws.seeds; i++) {
+        const b = new THREE.Mesh(cached('bubble', () => new THREE.SphereGeometry(1, 10, 8)), bubbleMat);
+        b.position.copy(p);
+        b.scale.setScalar(r * fr.range(0.006, 0.014));
+        group.add(b);
+        p.addScaledVector(dir.add(bend).normalize(), r * fr.range(0.025, 0.05));
+        if (p.length() > r * 0.88) break;
+      }
+    }
+    if (flaws.stone) {
+      const grain = new THREE.Mesh(
+        cached('stone', () => new THREE.IcosahedronGeometry(1, 0)),
+        new THREE.MeshStandardMaterial({ color: fr.next() < 0.5 ? '#efe6d2' : '#8a7458', roughness: 0.95, flatShading: true }),
+      );
+      grain.position.copy(at().multiplyScalar(r * fr.range(0.35, 0.75)));
+      grain.scale.set(r * fr.range(0.02, 0.035), r * fr.range(0.015, 0.03), r * fr.range(0.02, 0.035));
+      grain.rotation.set(fr.next() * 6, fr.next() * 6, 0);
+      group.add(grain);
+    }
+  }
   group.traverse((o) => {
     if ((o as THREE.Mesh).isMesh) o.renderOrder = 1;
   });
@@ -553,18 +497,12 @@ export function buildMarble(look: MarbleLook, radius: number, quality: Quality, 
           metalness: look.finish === 'metallic' ? 0.35 : 0,
           iridescenceIOR: 1.6,
         });
-  // Collectible wear: the roughness map carries the base roughness plus the marks.
-  const marks = wearMap(look, glass.roughness);
-  if (marks) {
-    glass.roughnessMap = marks;
-    glass.roughness = 1;
-    if (quality === 'low') glass.clearcoatRoughnessMap = marks;
-  }
+  // Flaws and wear: the maps carry the base roughness plus the marks.
   const shell = new THREE.Mesh(sphere(r, seg), glass);
   shell.castShadow = true;
   shell.renderOrder = 2;
   group.add(shell);
-  addScratches(group, look, r, seg);
+  addScratches(group, look, r, seg, applySurface(shell, look, quality));
   // The ink line round the glass, like every solid thing in the cel-shaded world.
   group.add(inkHull(r, seg));
 

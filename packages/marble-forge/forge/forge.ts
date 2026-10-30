@@ -1,6 +1,7 @@
 import {
   collectibleFromId,
   collectibleId,
+  describeFlaws,
   EFFECT_IDS,
   EFFECTS,
   generateMarble,
@@ -8,6 +9,7 @@ import {
   mintCollectible,
   phenomenonOdds,
   RARITY,
+  surfaceFlaws,
   type Collectible,
   type Effect,
   type GeneratedMarble,
@@ -99,6 +101,7 @@ function show(r: Rolled) {
   const facts: [string, string][] = [];
   if (r.collectible) facts.push(['Wear', r.collectible.wear], ['Float', r.collectible.float.toFixed(6)], ['Pattern', `#${r.collectible.pattern}`]);
   facts.push(['Clarity', m.clarity.toFixed(2)], ['Glow', m.glow.toFixed(2)], ['Sparkle', m.sparkle.toFixed(2)]);
+  facts.push(['Surface', describeFlaws(surfaceFlaws(m.id), m.pattern === 'solid' || m.pattern === 'steelie')]);
   if (m.effect !== 'none') facts.push(['Phenomenon', EFFECTS[m.effect].desc]);
   $('facts').innerHTML = facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
 }

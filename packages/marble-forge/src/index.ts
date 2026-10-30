@@ -2,4 +2,5 @@
 export * from './rng';
 export * from './generate';
 export * from './collectible';
+export * from './flaws';
 export type { MarbleCore, MarbleLook } from './look';

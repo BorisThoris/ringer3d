@@ -24,6 +24,8 @@ export interface MarbleLook {
   /** Collectibles (core/collectible.ts): wear float 0..1 (scratches, scuffs, chips) and the Shiny sheen. */
   wear?: number;
   shiny?: boolean;
+  /** Surface flaws from the furnace (flaws.ts): on unless false. */
+  flaws?: boolean;
   /** Generated marbles: a phenomenon inside the glass, its colour, and the interior's shape. */
   effect?: Effect;
   effectColor?: string;

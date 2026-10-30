@@ -14,6 +14,12 @@ you mint) gives a marble its own wear float (Mint to Chipped, shown as real scra
 chips on the glass), a pattern number 0-999 and a one-in-fifty Shiny roll. The same id always
 gives the same marble, on any machine, so you store and trade ids, never images.
 
+Every marble also has surface flaws from the furnace, from its id alone (`surfaceFlaws(id)`):
+orange peel, the shear seam, burst-bubble pits, fingerprints, a trail of seed bubbles inside, now
+and then an unmelted stone, and one in 25 comes out Flawless. The renderer draws them as a normal
+map (so they bend the light through the glass) and a roughness map, with the wear marks on top;
+both export in the GLB. Pass `flaws: false` in the look to turn them off.
+
 Made for and used in Ringer 3D, a marble game: the Marble Bags, Marble Book and Steam
 inventory there all run on this package.
 

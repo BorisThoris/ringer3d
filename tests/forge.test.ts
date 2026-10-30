@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BOOK, bookProgress, mintCollectible, EFFECT_IDS, EFFECT_ODDS, EFFECTS, generateMarble, RARITY, type GeneratedMarble } from '../packages/marble-forge/src';
+import { BOOK, bookProgress, describeFlaws, mintCollectible, surfaceFlaws, EFFECT_IDS, EFFECT_ODDS, EFFECTS, generateMarble, RARITY, type GeneratedMarble } from '../packages/marble-forge/src';
 import { meltValue } from '../src/core/economy';
 
 const fnv = (s: string) => {
@@ -80,5 +80,28 @@ describe('Marble Forge', () => {
       expect(s.bubbles).toBeGreaterThanOrEqual(1);
       expect(Math.abs(s.tilt)).toBeLessThanOrEqual(0.4);
     }
+  });
+
+  it('gives every marble its own surface flaws, from its id alone', () => {
+    let flawless = 0;
+    const N = 5000;
+    for (let i = 0; i < N; i++) {
+      const id = mintCollectible(`L${i.toString(16).padStart(16, '0')}`).id;
+      const f = surfaceFlaws(id);
+      expect(surfaceFlaws(id)).toEqual(f);
+      if (f.flawless) {
+        flawless++;
+        expect(f.ripple + f.seam + f.pits + f.smudge + f.seeds).toBe(0);
+        expect(describeFlaws(f)).toBe('Flawless');
+      } else {
+        expect(f.ripple).toBeGreaterThanOrEqual(0.15);
+        expect(f.ripple).toBeLessThanOrEqual(0.75);
+        expect(f.pits).toBeLessThanOrEqual(7);
+        expect(f.seeds).toBeLessThanOrEqual(14);
+        expect(describeFlaws(f)).toMatch(/orange peel/);
+      }
+    }
+    expect(flawless / N).toBeGreaterThan(0.025);
+    expect(flawless / N).toBeLessThan(0.055);
   });
 });
