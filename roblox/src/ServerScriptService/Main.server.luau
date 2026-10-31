@@ -363,11 +363,13 @@ local function pay(tbl, result: Table.Result)
 	end
 end
 
-local function startTable(seats: { Table.Seat }, arena: string, mode: string, floor: number?)
+local function startTable(seats: { Table.Seat }, arena: string, mode: string, floor: number?, difficulty: string?, mapSeed: number?)
 	local slot = freeSlot()
 	local tbl = Table.new({
 		seats = seats,
 		arena = arena,
+		difficulty = difficulty,
+		mapSeed = mapSeed,
 		origin = slotOrigin(slot),
 		mode = mode,
 		floor = floor,
@@ -500,12 +502,13 @@ function handlers.play(player: Player, args)
 	elseif mode == "bot" then
 		local bot = Config.BOTS[args.bot] and args.bot or "casual"
 		local arena = Config.ARENAS[args.arena] and args.arena or randomArena(rng)
-		startTable({ seatFor(player), botSeat(bot) }, arena, "bot")
+		local difficulty = (args.difficulty == "easy" or args.difficulty == "medium" or args.difficulty == "hard") and args.difficulty or "medium"
+		startTable({ seatFor(player), botSeat(bot) }, arena, "bot", nil, difficulty)
 		return true
 	elseif mode == "tower" then
 		local floor = math.clamp(p.tower, 1, #Config.TOWER)
 		local stage = Config.TOWER[floor]
-		startTable({ seatFor(player), botSeat(stage.bot, stage.name, stage.marble) }, stage.arena, "tower", floor)
+		startTable({ seatFor(player), botSeat(stage.bot, stage.name, stage.marble) }, stage.arena, "tower", floor, stage.difficulty, stage.mapSeed)
 		Economy.progression(player, floor, Enum.AnalyticsProgressionType.Start)
 		return true
 	end
@@ -613,10 +616,10 @@ Request.OnServerInvoke = function(player: Player, action: string, args: any)
 	return a, b
 end
 
-Shoot.OnServerEvent:Connect(function(player: Player, tableId, placeAngle, aimAngle, power)
+Shoot.OnServerEvent:Connect(function(player: Player, tableId, placeAngle, aimAngle, power, spin)
 	local tbl = active[player]
 	if tbl and tbl.id == tableId then
-		if tbl:submit(player, placeAngle, aimAngle, power) then
+		if tbl:submit(player, placeAngle, aimAngle, power, spin) then
 			Economy.funnel(player, 3, "Took a shot")
 		end
 	end

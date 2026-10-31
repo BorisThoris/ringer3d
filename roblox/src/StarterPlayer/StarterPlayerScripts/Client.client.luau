@@ -129,23 +129,38 @@ Kit.button("Find a match", Kit.GREEN, function()
 	play({ mode = "duel" })
 end, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -16), Size = UDim2.new(0.85, 0, 0, 56), Parent = duel })
 
-local botCard = card(playBody, "Vs Bot", "Practice against a bot. Pick how good it is.", Kit.BLUE)
-local botChoice = "casual"
-local botLabel = Kit.label("Casual", 24, { Position = UDim2.new(0, 0, 0, 150), Size = UDim2.new(1, 0, 0, 30), Parent = botCard })
-local ladder = { "rookie", "novice", "casual", "regular", "skilled", "expert", "master", "legend" }
-local function stepBot(d: number)
-	local i = table.find(ladder, botChoice) or 3
-	botChoice = ladder[math.clamp(i + d, 1, #ladder)]
-	botLabel.Text = Config.BOTS[botChoice].label
+local botCard = card(playBody, "Vs Bot", "Pick the bot, the field and how wild the map is.", Kit.BLUE)
+-- A row with < and > around a value: the bot's skill, the field, the map's difficulty.
+local function stepper(y: number, values: { string }, start: number, label: (string) -> string)
+	local i = start
+	local text = Kit.label(label(values[i]), 20, { Position = UDim2.new(0, 56, 0, y), Size = UDim2.new(1, -112, 0, 36), Parent = botCard })
+	local function step(d: number)
+		i = (i - 1 + d) % #values + 1
+		text.Text = label(values[i])
+	end
+	Kit.button("<", Kit.PURPLE, function()
+		step(-1)
+	end, { Position = UDim2.new(0, 10, 0, y), Size = UDim2.fromOffset(42, 36), Parent = botCard })
+	Kit.button(">", Kit.PURPLE, function()
+		step(1)
+	end, { Position = UDim2.new(1, -52, 0, y), Size = UDim2.fromOffset(42, 36), Parent = botCard })
+	return function()
+		return values[i]
+	end
 end
-Kit.button("<", Kit.PURPLE, function()
-	stepBot(-1)
-end, { Position = UDim2.new(0, 14, 0, 146), Size = UDim2.fromOffset(44, 40), Parent = botCard })
-Kit.button(">", Kit.PURPLE, function()
-	stepBot(1)
-end, { Position = UDim2.new(1, -58, 0, 146), Size = UDim2.fromOffset(44, 40), Parent = botCard })
+local ladder = { "rookie", "novice", "casual", "regular", "skilled", "expert", "master", "legend" }
+local botPick = stepper(104, ladder, 3, function(v)
+	return "Bot: " .. Config.BOTS[v].label
+end)
+local fieldPick = stepper(146, Config.ARENA_ORDER, 1, function(v)
+	return Config.ARENAS[v].name
+end)
+local difficulties = { "easy", "medium", "hard" }
+local diffPick = stepper(188, difficulties, 2, function(v)
+	return "Map: " .. string.upper(string.sub(v, 1, 1)) .. string.sub(v, 2)
+end)
 Kit.button("Play", Kit.GREEN, function()
-	play({ mode = "bot", bot = botChoice })
+	play({ mode = "bot", bot = botPick(), arena = fieldPick(), difficulty = diffPick() })
 end, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -16), Size = UDim2.new(0.85, 0, 0, 56), Parent = botCard })
 
 local towerCard = card(playBody, "The Tower", "Eight floors, each foe tougher. The Black Taw waits at the top.", Kit.PURPLE)
@@ -585,6 +600,40 @@ Kit.button("View", Kit.BLUE, function()
 	Aim.topView = not Aim.topView
 end, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -146, 1, -16), Size = UDim2.fromOffset(110, 48), Parent = match })
 
+-- The spin pad: touch the top of the marble for topspin (follow through), the bottom for
+-- backspin (stop near the hit). Q/E on a keyboard. A button, so a touch on it never starts a shot.
+local spinPad = Kit.new("TextButton", { Text = "", AutoButtonColor = false, AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 16, 1, -70), Size = UDim2.fromOffset(96, 96), BackgroundColor3 = Kit.CREAM, Visible = false, Parent = match })
+Kit.round(spinPad, 48)
+Kit.stroke(spinPad, Kit.INK, 3)
+local spinDot = Kit.new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(22, 22), BackgroundColor3 = Kit.RED, Parent = spinPad })
+Kit.round(spinDot, 11)
+local spinLabel = Kit.label("Spin", 16, { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 8, 1, -46), Size = UDim2.fromOffset(160, 22), Visible = false, Parent = match })
+Aim.onSpin = function(v)
+	spinDot.Position = UDim2.fromScale(0.5, 0.5 - v * 0.38)
+	spinLabel.Text = if v > 0.1 then "Topspin · follow" elseif v < -0.1 then "Backspin · stick" else "Spin"
+end
+local function spinFrom(y: number)
+	local rel = (y - spinPad.AbsolutePosition.Y) / math.max(1, spinPad.AbsoluteSize.Y)
+	Aim.setSpin((0.5 - rel) * 2.4)
+end
+local spinHeld = false
+spinPad.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		spinHeld = true
+		spinFrom(input.Position.Y)
+	end
+end)
+spinPad.InputChanged:Connect(function(input)
+	if spinHeld and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+		spinFrom(input.Position.Y)
+	end
+end)
+spinPad.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		spinHeld = false
+	end
+end)
+
 Aim.onPower = function(power)
 	meterBack.Visible = power ~= nil
 	if power then
@@ -621,6 +670,8 @@ local function onState(state)
 		seatCard(seat, i == state.current and state.phase ~= "over")
 	end
 	local mine = Aim.mySeat == state.current
+	spinPad.Visible = state.phase == "aim" and mine
+	spinLabel.Visible = spinPad.Visible
 	if state.phase == "aim" then
 		banner.Text = mine and (state.firstShot and "Your turn!" or "Shoot again!") or (state.seats[state.current].name .. "'s turn")
 		hint.Text = mine and (state.firstShot and "Move to pick your spot on the line, then press, pull back and let go" or "Press, pull back and let go") or ""

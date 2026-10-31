@@ -7,6 +7,7 @@ local Forge = require(script.Parent.Forge)
 
 -- ---- The ring (studs). The web game's units times 4. ---------------------------------------
 Config.RING_R = 22 -- the chalk ring
+Config.MAP_SCALE = 4 -- studs per web-game unit (its ring radius is 5.5): generated maps scale by this
 Config.MIB_R = 0.7 -- target marbles
 Config.SHOOTER_R = 0.95 -- the taw
 Config.SPACING = 2.2 -- between marbles in the starting cross
@@ -82,8 +83,14 @@ Config.ARENAS = {
 		backstop = { name = "Slab", size = Vector3.new(4.8, 1, 1.2), colors = TOY, material = Enum.Material.SmoothPlastic },
 		trees = rgb(255, 190, 70),
 	},
+	minigolf = {
+		id = "minigolf", name = "The Mini-Golf Course", material = Enum.Material.SmoothPlastic, color = rgb(60, 185, 95), inner = rgb(85, 205, 115),
+		rollDecel = 40, friction = 0.7, elasticity = 0.85, kerb = { rgb(255, 80, 80), rgb(255, 255, 255) }, line = rgb(255, 255, 255),
+		backstop = { name = "Rail", size = Vector3.new(6, 1.4, 0.7), colors = { rgb(255, 255, 255) }, material = Enum.Material.SmoothPlastic },
+		trees = rgb(255, 120, 200),
+	},
 } :: { [string]: Arena }
-Config.ARENA_ORDER = { "desk", "culdesac", "grass", "sand", "ice", "gravel" }
+Config.ARENA_ORDER = { "desk", "culdesac", "grass", "sand", "ice", "gravel", "minigolf" }
 
 -- ---- Bots: the web game's ladder ---------------------------------------------------------
 export type Bot = { id: string, label: string, aimErrorDeg: number, powerError: number, blunder: number, careful: boolean }
@@ -100,14 +107,14 @@ Config.BOTS = {
 
 -- The Tower: eight floors, one step up the ladder each, the Black Taw on top.
 Config.TOWER = {
-	{ name = "Pip", marble = "pip", arena = "grass", bot = "rookie", reward = 60 },
-	{ name = "Tide", marble = "tide", arena = "sand", bot = "novice", reward = 80 },
-	{ name = "Jade", marble = "jade", arena = "grass", bot = "casual", reward = 100 },
-	{ name = "Volt", marble = "volt", arena = "desk", bot = "regular", reward = 130 },
-	{ name = "Ironside", marble = "ironside", arena = "gravel", bot = "skilled", reward = 160 },
-	{ name = "Rime", marble = "rime", arena = "ice", bot = "expert", reward = 200 },
-	{ name = "Nova", marble = "nova", arena = "sand", bot = "master", reward = 260 },
-	{ name = "Obsidian", marble = "obsidian", arena = "ice", bot = "legend", reward = 500, boss = true },
+	{ name = "Pip", marble = "pip", arena = "grass", bot = "rookie", reward = 60, difficulty = "easy", mapSeed = 101 },
+	{ name = "Tide", marble = "tide", arena = "sand", bot = "novice", reward = 80, difficulty = "easy", mapSeed = 202 },
+	{ name = "Jade", marble = "jade", arena = "grass", bot = "casual", reward = 100, difficulty = "medium", mapSeed = 303 },
+	{ name = "Volt", marble = "volt", arena = "desk", bot = "regular", reward = 130, difficulty = "medium", mapSeed = 404 },
+	{ name = "Ironside", marble = "ironside", arena = "gravel", bot = "skilled", reward = 160, difficulty = "medium", mapSeed = 505 },
+	{ name = "Rime", marble = "rime", arena = "ice", bot = "expert", reward = 200, difficulty = "hard", mapSeed = 606 },
+	{ name = "Nova", marble = "nova", arena = "minigolf", bot = "master", reward = 260, difficulty = "hard", mapSeed = 707 },
+	{ name = "Obsidian", marble = "obsidian", arena = "ice", bot = "legend", reward = 500, boss = true, difficulty = "hard", mapSeed = 808 },
 }
 
 -- ---- Marbles -------------------------------------------------------------------------------

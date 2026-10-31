@@ -20,6 +20,13 @@ Aim.mySeat = nil :: number?
 Aim.topView = false
 Aim.onPower = function(_power: number?) end -- the HUD's power meter
 Aim.onShot = function() end
+-- Spin for the next shot, -1 (backspin: stick) .. 1 (topspin: follow). The HUD's pad and Q/E set it.
+Aim.spin = 0
+Aim.onSpin = function(_spin: number) end
+function Aim.setSpin(v: number)
+	Aim.spin = math.clamp(math.floor(v * 4 + 0.5) / 4, -1, 1)
+	Aim.onSpin(Aim.spin)
+end
 
 local PULL_FULL = 16 -- studs of pull for full power
 
@@ -175,7 +182,7 @@ local function release(screen: Vector2)
 	end
 	sent = true
 	local dir = pull.Unit
-	ReplicatedStorage.Ringer.Remotes.Shoot:FireServer(s.id, placeAngle, math.atan2(dir.Y, dir.X), power)
+	ReplicatedStorage.Ringer.Remotes.Shoot:FireServer(s.id, placeAngle, math.atan2(dir.Y, dir.X), power, Aim.spin)
 	clearAim()
 	Aim.onShot()
 end
@@ -185,6 +192,11 @@ function Aim.start()
 	UserInputService.InputBegan:Connect(function(input, processed)
 		if processed or not myTurn() then
 			return
+		end
+		if input.KeyCode == Enum.KeyCode.Q then
+			Aim.setSpin(Aim.spin - 0.25)
+		elseif input.KeyCode == Enum.KeyCode.E then
+			Aim.setSpin(Aim.spin + 0.25)
 		end
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			local s = Aim.state

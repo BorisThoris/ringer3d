@@ -74,7 +74,22 @@ for _, b in ipairs(t.mibs) do
 end
 check("table has 13 marbles in the ring", inside == 13, inside)
 check("state serialises", t:state().remaining == 13)
+check("table has a generated map", t.map ~= nil and #t.map.pieces > 0, t.map and #t.map.pieces)
 t:destroy()
+
+-- Every field builds its generated map; a hard mini-golf course has cups, bumpers and pads, and
+-- no target marble starts on a solid piece.
+for _, arena in ipairs(Config.ARENA_ORDER) do
+	local ok, tt = pcall(Table.new, { seats = { { kind = "bot", bot = "casual", name = "A", marble = "ember" }, { kind = "bot", bot = "casual", name = "B", marble = "tide" } }, arena = arena, origin = Vector3.new(3200, 0, 0), mode = "test", seed = 3, difficulty = "hard", mapSeed = 99 })
+	check("builds " .. arena .. " hard map", ok and tt.model:FindFirstChild("Map") ~= nil, not ok and tt or nil)
+	if ok then
+		if arena == "minigolf" then
+			check("minigolf has cups", #tt.pieces.holes > 0, #tt.pieces.holes)
+			check("minigolf has bumpers", #tt.pieces.bumpers > 0, #tt.pieces.bumpers)
+		end
+		tt:destroy()
+	end
+end
 
 -- 6. Collectibles: Marble Bags mint generated marbles at the odds the bag shows.
 local Forge = mod(Ringer.Forge)

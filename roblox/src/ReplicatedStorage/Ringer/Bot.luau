@@ -117,6 +117,8 @@ function Bot.plan(from: Vector2?, mibs: { Vector2 }, decel: number, profile: Con
 		placeAngle = pick.placeAngle,
 		aimAngle = pick.aimAngle + math.rad(gauss(rng) * profile.aimErrorDeg),
 		power = math.clamp(pick.power * (1 + gauss(rng) * profile.powerError), 0.08, 1),
+		-- Careful bots put backspin on, so the shooter stops near the hit and stays in the ring.
+		spin = if profile.careful then -0.5 else 0,
 	}
 end
 

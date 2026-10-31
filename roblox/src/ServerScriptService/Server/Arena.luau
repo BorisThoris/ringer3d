@@ -21,7 +21,7 @@ end
 
 export type Built = { folder: Folder, origin: Vector3, stands: { CFrame } }
 
-function Arena.build(origin: Vector3, arena: Config.Arena, seats: number, rng: Random, parent: Instance): Built
+function Arena.build(origin: Vector3, arena: Config.Arena, seats: number, rng: Random, parent: Instance, hasMap: boolean?): Built
 	local folder = Instance.new("Folder")
 	folder.Name = "Field"
 	local R, B = Config.RING_R, Config.BOUND_R
@@ -99,8 +99,9 @@ function Arena.build(origin: Vector3, arena: Config.Arena, seats: number, rng: R
 		})
 	end
 
-	-- Backstops just outside the ring, lying across the way out, the same at every seat.
-	local count = rng:NextInteger(1, 2) * 2
+	-- Backstops just outside the ring, lying across the way out, the same at every seat. A
+	-- generated map brings its own.
+	local count = if hasMap then 0 else rng:NextInteger(1, 2) * 2
 	local base = rng:NextNumber() * math.pi * 2
 	local r = R + 6 + rng:NextNumber() * 7
 	for k = 0, count - 1 do

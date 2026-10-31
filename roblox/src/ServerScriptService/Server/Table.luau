@@ -15,6 +15,8 @@ local Rules = require(ReplicatedStorage.Ringer.Rules)
 local Bot = require(ReplicatedStorage.Ringer.Bot)
 local MarbleLook = require(ReplicatedStorage.Ringer.MarbleLook)
 local Arena = require(script.Parent.Arena)
+local Pieces = require(script.Parent.Pieces)
+local Maps = require(ReplicatedStorage.Ringer.Maps)
 
 export type Seat = {
 	kind: "player" | "bot",
@@ -45,6 +47,8 @@ function Table.new(opts: {
 	mode: string,
 	floor: number?,
 	seed: number?,
+	difficulty: string?, -- the generated map's: easy, medium, hard
+	mapSeed: number?,
 	send: ((tbl: any, kind: string, data: any) -> ())?,
 	finished: ((tbl: any, result: Result) -> ())?,
 	parent: Instance?,
@@ -76,8 +80,12 @@ function Table.new(opts: {
 	model.Name = "Table" .. self.id
 	model.Parent = opts.parent or workspace
 	self.model = model
-	self.built = Arena.build(opts.origin, self.arena, #opts.seats, self.rng, model)
+	self.built = Arena.build(opts.origin, self.arena, #opts.seats, self.rng, model, true)
 	self.origin = opts.origin
+	-- The field's generated map, exactly as the web game lays it out for the same spec.
+	local difficulty = if opts.difficulty and table.find(Maps.DIFFICULTIES, opts.difficulty) then opts.difficulty else "medium"
+	self.map = Maps.generate(self.arena.id, difficulty, opts.mapSeed or self.rng:NextInteger(1, 2 ^ 31 - 1))
+	self.pieces = Pieces.build(self.map, opts.origin, model)
 
 	-- The thirteen marbles, in the cross.
 	local marbles = Instance.new("Folder")
@@ -142,6 +150,8 @@ function Table:state()
 		floor = self.floor,
 		arena = self.arena.id,
 		arenaName = self.arena.name,
+		mapName = self.map.name,
+		difficulty = self.map.difficulty,
 		origin = self.origin,
 		seats = seats,
 		current = self.current,
@@ -159,7 +169,7 @@ function Table:broadcast(kind: string, data: any)
 end
 
 --- A player's shot arrives. Ignored unless it is that player's turn and the numbers are sane.
-function Table:submit(player: Player, placeAngle: number, aimAngle: number, power: number): boolean
+function Table:submit(player: Player, placeAngle: number, aimAngle: number, power: number, spin: number?): boolean
 	local seat = self:seatOf(player)
 	if self.phase ~= "aim" or seat ~= self.current or self.pending then
 		return false
@@ -169,7 +179,8 @@ function Table:submit(player: Player, placeAngle: number, aimAngle: number, powe
 			return false
 		end
 	end
-	self.pending = { placeAngle = placeAngle, aimAngle = aimAngle, power = math.clamp(power, 0.05, 1) }
+	local s = if typeof(spin) == "number" and spin == spin then math.clamp(spin, -1, 1) else 0
+	self.pending = { placeAngle = placeAngle, aimAngle = aimAngle, power = math.clamp(power, 0.05, 1), spin = s }
 	return true
 end
 
@@ -196,11 +207,12 @@ function Table:launch(shot)
 	local v = dir * shot.power * Config.MAX_SPEED
 	local shooter = self.shooter :: BasePart
 	shooter.AssemblyLinearVelocity = v
-	-- Rolling, not sliding, from the start: spin to match the speed.
-	shooter.AssemblyAngularVelocity = Vector3.new(v.Z, 0, -v.X) / Config.SHOOTER_R
+	-- Spin as in the web game: angular velocity is the rolling rate times spin. 1 rolls true
+	-- (topspin: follows through after a hit), 0 slides, -1 is backspin (stops near the hit).
+	shooter.AssemblyAngularVelocity = Vector3.new(v.Z, 0, -v.X) / Config.SHOOTER_R * (shot.spin or 0)
 	self.shots += 1
 	self.phase = "rolling"
-	self:broadcast("shot", { seat = self.current, aimAngle = shot.aimAngle, power = shot.power })
+	self:broadcast("shot", { seat = self.current, aimAngle = shot.aimAngle, power = shot.power, spin = shot.spin or 0 })
 end
 
 function Table:bodies(): { BasePart }
@@ -211,8 +223,21 @@ function Table:bodies(): { BasePart }
 	return out
 end
 
+--- A marble drops into a cup and leaves the table: it is set down in a pocket just beyond the
+--- ring, where the rules count it as knocked out (or the shooter as gone), as in the web game.
+function Table:drop(b: BasePart, cup)
+	local d = cup.pos.Magnitude > 1e-3 and cup.pos.Unit or Vector2.new(1, 0)
+	b.AssemblyLinearVelocity = Vector3.zero
+	b.AssemblyAngularVelocity = Vector3.zero
+	b.Anchored = true
+	b.CanCollide = false
+	b.CFrame = CFrame.new(self:world(d * (Config.RING_R + 4), b.Size.X / 2))
+	self:broadcast("cup", { pos = self:world(cup.pos, 0) })
+end
+
 --- Step the rolling resistance and the safety net until everything rests (or the cap).
 function Table:roll()
+	self.kicked = self.kicked or {}
 	local started = os.clock()
 	local still = 0
 	local decel = self.arena.rollDecel
@@ -232,15 +257,57 @@ function Table:roll()
 				b.CFrame = CFrame.new(self:world(d * (Config.BOUND_R - 3), r))
 				continue
 			end
+			if b.Anchored then
+				continue -- in a cup
+			end
 			local v = b.AssemblyLinearVelocity
 			local grounded = p.Y < floorY + r + 0.25
 			if grounded then
+				-- Mini-golf cups take a slow enough marble (it counts as knocked out).
+				local holed = false
+				for _, h in ipairs(self.pieces.holes) do
+					local lip = h.r - r * 0.3
+					if (flat - h.pos).Magnitude < lip and Vector3.new(v.X, 0, v.Z).Magnitude < Pieces.HOLE_SPEED then
+						self:drop(b, h)
+						holed = true
+						break
+					end
+				end
+				if holed then
+					continue
+				end
+				-- Patches of different ground: sticky and slick scale the rolling resistance,
+				-- speed pads push along their arrow.
+				local here = decel
+				for _, z in ipairs(self.pieces.zones) do
+					if (flat - z.pos).Magnitude <= z.r then
+						if z.effect == "boost" then
+							v += Vector3.new(z.dir.X, 0, z.dir.Y) * Pieces.BOOST * dt
+						else
+							here *= z.k
+						end
+					end
+				end
 				local h = Vector3.new(v.X, 0, v.Z)
 				local sp = h.Magnitude
 				if sp > 0 then
-					local f = math.max(0, sp - decel * dt) / sp
+					local f = math.max(0, sp - here * dt) / sp
 					b.AssemblyLinearVelocity = Vector3.new(v.X * f, v.Y, v.Z * f)
 					b.AssemblyAngularVelocity = b.AssemblyAngularVelocity * f
+				end
+			end
+			-- Bumpers kick a marble back harder than it came.
+			for _, bm in ipairs(self.pieces.bumpers) do
+				local off = flat - bm.pos
+				if off.Magnitude < bm.r + r + 0.15 and off.Magnitude > 1e-3 and (self.kicked[b] or 0) < os.clock() then
+					local n = off.Unit
+					local lv = b.AssemblyLinearVelocity
+					local out = lv.X * n.X + lv.Z * n.Y
+					if out > 1 then
+						local add = out * (Pieces.BUMPER_KICK - 1)
+						b.AssemblyLinearVelocity = lv + Vector3.new(n.X * add, 0, n.Y * add)
+						self.kicked[b] = os.clock() + 0.25
+					end
 				end
 			end
 			if b.AssemblyLinearVelocity.Magnitude > Config.REST_SPEED then
