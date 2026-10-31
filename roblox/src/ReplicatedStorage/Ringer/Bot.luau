@@ -145,6 +145,10 @@ function Bot.plan(from: Vector2?, mibs: { Vector2 }, decel: number, profile: Con
 	if #options > 1 and rng:NextNumber() < profile.blunder then
 		pick = options[rng:NextInteger(1, #options)]
 	end
+	if not pick and obstacles and #obstacles > 0 then
+		-- Every line is blocked by the map: plan as if it were clear and take the best of those.
+		return Bot.plan(from, mibs, decel, profile, rng, nil)
+	end
 	if not pick then
 		-- Nothing clean: a firm shot at the middle of the cross.
 		local spot = spots[rng:NextInteger(1, #spots)]
