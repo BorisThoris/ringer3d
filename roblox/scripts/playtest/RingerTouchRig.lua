@@ -91,25 +91,28 @@ while not me do
 	task.wait(0.5)
 	me = Players.LocalPlayer
 end
-local emu = game:GetService("StudioDeviceEmulatorService")
-for _, prop in ipairs({ "IsMultiTouchEmulationOn", "IsMultiTouchEnabled" }) do
-	local okp, e = pcall(function()
-		(emu :: any)[prop] = true
-	end)
-	log("set", prop, okp, okp and "" or tostring(e))
-end
+-- Touches go in through VirtualInputManager (the device emulator is not reachable in the play client).
+local vim = game:GetService("VirtualInputManager")
+local inset = game:GetService("GuiService"):GetGuiInset()
+log("VirtualInputManager", vim ~= nil, "touch enabled", game:GetService("UserInputService").TouchEnabled)
 local id = 0
 local function touch(path: { Vector2 })
 	id += 1
 	local okt, e = pcall(function()
-		emu:EmitMultiTouchStartedEvent(id, path[1])
+		-- Screen points are GUI points plus the top bar inset.
+		local function at(i)
+			return path[i].X + inset.X, path[i].Y + inset.Y
+		end
+		local x, y = at(1)
+		vim:SendTouchEvent(id, 0, x, y)
 		task.wait(0.08)
 		for i = 2, #path do
-			emu:EmitMultiTouchMovedEvent(id, path[i])
+			x, y = at(i)
+			vim:SendTouchEvent(id, 1, x, y)
 			task.wait(0.05)
 		end
 		task.wait(0.08)
-		emu:EmitMultiTouchEndedEvent(id, path[#path])
+		vim:SendTouchEvent(id, 2, x, y)
 	end)
 	if not okt then
 		log("touch emit failed", tostring(e))
