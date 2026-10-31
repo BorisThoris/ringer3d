@@ -86,6 +86,7 @@ function Table.new(opts: {
 	local difficulty = if opts.difficulty and table.find(Maps.DIFFICULTIES, opts.difficulty) then opts.difficulty else "medium"
 	self.map = Maps.generate(self.arena.id, difficulty, opts.mapSeed or self.rng:NextInteger(1, 2 ^ 31 - 1))
 	self.pieces = Pieces.build(self.map, opts.origin, model)
+	self.obstacles = Pieces.obstacles(self.map)
 
 	-- The thirteen marbles, in the cross.
 	local marbles = Instance.new("Folder")
@@ -207,9 +208,13 @@ function Table:launch(shot)
 	local v = dir * shot.power * Config.MAX_SPEED
 	local shooter = self.shooter :: BasePart
 	shooter.AssemblyLinearVelocity = v
-	-- Spin as in the web game: angular velocity is the rolling rate times spin. 1 rolls true
-	-- (topspin: follows through after a hit), 0 slides, -1 is backspin (stops near the hit).
-	shooter.AssemblyAngularVelocity = Vector3.new(v.Z, 0, -v.X) / Config.SHOOTER_R * (shot.spin or 0)
+	-- Spin. Neutral is a natural roll: on Roblox's friction a sliding launch (the web game's
+	-- neutral) loses a big share of its speed before it rolls, and the bots' power model assumes
+	-- a rolling shooter. -1 spins backwards at the rolling rate (backspin: stops near the hit),
+	-- +1 at twice it (topspin: follows through).
+	local spin = shot.spin or 0
+	local w = if spin >= 0 then 1 + spin else 1 + 2 * spin
+	shooter.AssemblyAngularVelocity = Vector3.new(v.Z, 0, -v.X) / Config.SHOOTER_R * w
 	self.shots += 1
 	self.phase = "rolling"
 	self:broadcast("shot", { seat = self.current, aimAngle = shot.aimAngle, power = shot.power, spin = shot.spin or 0 })
@@ -401,7 +406,7 @@ function Table:run(): Result
 			for _, b in ipairs(self.mibs) do
 				table.insert(mibs, self:flat(b.Position))
 			end
-			self.pending = Bot.plan(from, mibs, self.arena.rollDecel, Config.BOTS[seat.bot or "casual"], self.rng)
+			self.pending = Bot.plan(from, mibs, self.arena.rollDecel, Config.BOTS[seat.bot or "casual"], self.rng, self.obstacles)
 		else
 			-- A player has TURN_TIME to shoot; then a weak shot is taken for them.
 			while not self.pending and not self.closed do

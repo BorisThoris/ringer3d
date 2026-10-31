@@ -183,7 +183,7 @@ RunService.Heartbeat:Connect(function()
 end)
 local sign = lobbyPart({ Name = "Sign", Size = Vector3.new(1, 1, 1), CFrame = CFrame.new(0, 31, 0), Transparency = 1, CanCollide = false, CanQuery = false, CanTouch = false })
 bigText(sign, "MARBLE DUELS", { rgb(255, 240, 90), rgb(255, 140, 40) }, Vector2.new(46, 8))
-bigText(sign, "🎃 HALLOWEEN LIMITED 🎃", { rgb(255, 200, 120), rgb(255, 110, 30) }, Vector2.new(30, 3.4), Vector3.new(0, -5.2, 0))
+bigText(sign, "✨ ONE-OF-A-KIND MARBLES ✨", { rgb(200, 240, 255), rgb(150, 110, 255) }, Vector2.new(34, 3.4), Vector3.new(0, -5.2, 0))
 
 -- Round toy trees round the lawn.
 local treeColors = { rgb(120, 225, 90), rgb(255, 160, 205), rgb(255, 200, 80), rgb(90, 210, 150) }
@@ -201,29 +201,15 @@ for i = 0, 21 do
 	lobbyPart({ Name = "Crown", Shape = Enum.PartType.Ball, Size = Vector3.new(c, c, c), CFrame = CFrame.new(at + Vector3.new(0, h + c * 0.35, 0)), Color = treeColors[i % #treeColors + 1] })
 end
 
--- Halloween: carved pumpkins glowing round the plaza's edge.
+-- Generated marbles round the plaza's edge, each one a Legendary or Mythic a bag could hold.
 for i = 0, 11 do
 	local a = i / 12 * math.pi * 2 + 0.26
-	local pos = Vector3.new(math.cos(a) * 56, 2.2, math.sin(a) * 56)
-	local pumpkin = lobbyPart({ Name = "Pumpkin", Shape = Enum.PartType.Ball, Size = Vector3.new(5, 4.4, 5), CFrame = CFrame.lookAt(pos, Vector3.new(0, 2.2, 0)), Color = rgb(255, 120, 20) })
-	local glow = Instance.new("PointLight")
-	glow.Color = rgb(255, 170, 60)
-	glow.Range = 14
-	glow.Brightness = 1.6
-	glow.Parent = pumpkin
-	lobbyPart({ Name = "Stem", Size = Vector3.new(0.6, 1.2, 0.6), CFrame = CFrame.new(pos + Vector3.new(0, 2.6, 0)), Color = rgb(70, 150, 50) })
-	local face = Instance.new("SurfaceGui")
-	face.Face = Enum.NormalId.Front
-	face.LightInfluence = 0
-	face.Parent = pumpkin
-	local eyes = Instance.new("TextLabel")
-	eyes.Size = UDim2.fromScale(1, 1)
-	eyes.BackgroundTransparency = 1
-	eyes.Text = "▲ ▲\n◡◡◡"
-	eyes.TextScaled = true
-	eyes.Font = Enum.Font.FredokaOne
-	eyes.TextColor3 = rgb(255, 230, 120)
-	eyes.Parent = face
+	local pos = Vector3.new(math.cos(a) * 56, 0, math.sin(a) * 56)
+	lobbyPart({ Name = "Post", Shape = Enum.PartType.Cylinder, Size = Vector3.new(2.4, 3, 3), CFrame = CFrame.new(pos + Vector3.new(0, 1.2, 0)) * CFrame.Angles(0, 0, math.pi / 2), Color = rgb(255, 255, 255) })
+	local ball = MarbleLook.make(MarbleLook.lookFor(Forge.collectibleId(if i % 3 == 0 then "Mythic" else "Legendary", "Rplaza" .. i)), 1.8)
+	ball.Anchored = true
+	ball.CFrame = CFrame.new(pos + Vector3.new(0, 4.3, 0))
+	ball.Parent = lobby
 end
 
 local spawn = Instance.new("SpawnLocation")

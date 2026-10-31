@@ -11,12 +11,12 @@ local Rules = require(script.Parent.Rules)
 
 local Bot = {}
 
--- Head-on hit between the shooter and a marble (masses go as radius cubed).
-local M1 = Config.SHOOTER_R ^ 3
-local M2 = Config.MIB_R ^ 3
-local E = 0.88
-local GIVE = (1 + E) * M1 / (M1 + M2) -- marble speed / shooter speed at contact
-local KEEP = (M1 - E * M2) / (M1 + M2) -- shooter speed after / before
+-- A hit between the shooter and a marble, as measured on Roblox physics (Studio playtest,
+-- 2026-10-31): the marble leaves at about the shooter's speed and the shooter keeps under half.
+-- (The textbook head-on numbers, 1.34 and 0.37, left every bot shot a quarter short.)
+local GIVE = 1.0 -- marble speed / shooter speed at contact
+local KEEP = 0.45 -- shooter speed after / before
+local PAST = 6 -- studs past the ring the marble should have speed for
 
 local function gauss(rng: Random): number
 	local u = math.max(1e-9, rng:NextNumber())
@@ -42,11 +42,44 @@ local function exitDistance(p: Vector2, d: Vector2): number
 	return -b + math.sqrt(disc)
 end
 
-export type Plan = { placeAngle: number, aimAngle: number, power: number }
+export type Plan = { placeAngle: number, aimAngle: number, power: number, spin: number? }
+-- Solid map pieces a shot must go round: circles (posts, bumpers) and segments (walls).
+export type Obstacle = { kind: "circle", pos: Vector2, r: number } | { kind: "seg", a: Vector2, b: Vector2, r: number }
+
+-- Shortest distance between segments a-b and c-d.
+local function segSeg(a: Vector2, b: Vector2, c: Vector2, d: Vector2): number
+	local function cross(u: Vector2, v: Vector2)
+		return u.X * v.Y - u.Y * v.X
+	end
+	local r, s = b - a, d - c
+	local denom = cross(r, s)
+	if math.abs(denom) > 1e-9 then
+		local t = cross(c - a, s) / denom
+		local u = cross(c - a, r) / denom
+		if t >= 0 and t <= 1 and u >= 0 and u <= 1 then
+			return 0
+		end
+	end
+	return math.min(segDist(a, b, c), segDist(a, b, d), segDist(c, d, a), segDist(c, d, b))
+end
+
+--- Does a ball of radius `rad` going from a to b clear every obstacle?
+local function clearOf(obstacles: { Obstacle }?, a: Vector2, b: Vector2, rad: number): boolean
+	for _, o in ipairs(obstacles or {}) do
+		if o.kind == "circle" then
+			if segDist(a, b, o.pos) < o.r + rad then
+				return false
+			end
+		elseif segSeg(a, b, o.a, o.b) < o.r + rad then
+			return false
+		end
+	end
+	return true
+end
 
 --- Plan a shot. `from` is the shooter's spot for a shoot-again (nil on a first shot);
 --- `mibs` are the marbles still in the ring; `decel` the field's rolling resistance.
-function Bot.plan(from: Vector2?, mibs: { Vector2 }, decel: number, profile: Config.Bot, rng: Random): Plan
+function Bot.plan(from: Vector2?, mibs: { Vector2 }, decel: number, profile: Config.Bot, rng: Random, obstacles: { Obstacle }?): Plan
 	local spots = {}
 	if from then
 		table.insert(spots, { pos = from, angle = math.atan2(from.Y, from.X) })
@@ -74,10 +107,15 @@ function Bot.plan(from: Vector2?, mibs: { Vector2 }, decel: number, profile: Con
 						break
 					end
 				end
+				-- The shooter's way to the marble, and the marble's way out, must miss the map's pieces.
+				if clear then
+					clear = clearOf(obstacles, spot.pos, contact, Config.SHOOTER_R)
+						and clearOf(obstacles, t, t + d * (exitDistance(t, d) + 2), Config.MIB_R)
+				end
 				if clear then
 					local out = exitDistance(t, d)
 					-- Speed the marble needs to roll out (and a little past), then the shooter's.
-					local need = math.sqrt(2 * decel * (out + 2.5))
+					local need = math.sqrt(2 * decel * (out + PAST))
 					local atContact = need / GIVE
 					local travel = math.max(0, (contact - spot.pos).Magnitude)
 					local v0 = math.sqrt(atContact * atContact + 2 * decel * travel)
@@ -117,8 +155,7 @@ function Bot.plan(from: Vector2?, mibs: { Vector2 }, decel: number, profile: Con
 		placeAngle = pick.placeAngle,
 		aimAngle = pick.aimAngle + math.rad(gauss(rng) * profile.aimErrorDeg),
 		power = math.clamp(pick.power * (1 + gauss(rng) * profile.powerError), 0.08, 1),
-		-- Careful bots put backspin on, so the shooter stops near the hit and stays in the ring.
-		spin = if profile.careful then -0.5 else 0,
+		spin = 0, -- a natural roll, which the power model above assumes
 	}
 end
 

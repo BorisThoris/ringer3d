@@ -182,6 +182,22 @@ function Pieces.build(map, origin: Vector3, parent: Instance): Built
 	return out
 end
 
+--- The solid pieces as the bot sees them: posts and bumpers as circles, walls as segments
+--- (ring-relative studs). Bumps and lying ridges are low enough to roll over.
+function Pieces.obstacles(map)
+	local out = {}
+	for _, p in ipairs(map.pieces) do
+		if p.kind == "post" or p.kind == "bumper" then
+			table.insert(out, { kind = "circle", pos = Vector2.new(p.x * S, p.z * S), r = p.r * S })
+		elseif p.kind == "wall" then
+			local half = Vector2.new(math.cos(p.a), math.sin(p.a)) * (p.len * S / 2)
+			local c = Vector2.new(p.x * S, p.z * S)
+			table.insert(out, { kind = "seg", a = c - half, b = c + half, r = p.thick * S / 2 })
+		end
+	end
+	return out
+end
+
 -- Web physics constants, in Roblox studs (web units x MAP_SCALE).
 Pieces.BOOST = 22 * S -- a speed pad's push, per second
 Pieces.HOLE_SPEED = 7 * S -- a cup takes marbles slower than this
