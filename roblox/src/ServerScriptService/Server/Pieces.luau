@@ -73,6 +73,9 @@ local function part(props: { [string]: any }): Part
 end
 
 local SOLID = PhysicalProperties.new(3, 0.4, 0.55, 1, 1)
+-- Lumps and lying things as the web game's physics has them (friction 0.2, restitution 0.6 / 0.5).
+local LUMP = PhysicalProperties.new(3, 0.2, 0.6, 1, 1)
+local LYING = PhysicalProperties.new(3, 0.2, 0.5, 1, 1)
 local BOUNCY = PhysicalProperties.new(3, 0.2, 1, 1, 100)
 
 export type Built = {
@@ -126,7 +129,7 @@ function Pieces.build(map, origin: Vector3, parent: Instance): Built
 				CFrame = CFrame.new(origin + Vector3.new(p.x * S, r * (1 - 2 * p.sink), p.z * S)),
 				Color = colorOf(skin, i),
 				Material = if skin == "coin" or skin == "coin-silver" then Enum.Material.Metal else Enum.Material.SmoothPlastic,
-				CustomPhysicalProperties = SOLID,
+				CustomPhysicalProperties = LUMP,
 				Parent = folder,
 			})
 		elseif p.kind == "ridge" then
@@ -135,14 +138,15 @@ function Pieces.build(map, origin: Vector3, parent: Instance): Built
 			local len = (b - a).Magnitude
 			if len > 0.01 then
 				local r = p.r * S
-				local mid = origin + (a + b) / 2 + Vector3.new(0, r * 0.6, 0)
+				-- Sunk like the web game's capsule: centre 0.35 r below the ground, a sliver stands proud.
+				local mid = origin + (a + b) / 2 - Vector3.new(0, r * 0.35, 0)
 				part({
 					Name = skin or "Ridge",
 					Shape = Enum.PartType.Cylinder,
 					Size = Vector3.new(len, r * 2, r * 2),
 					CFrame = CFrame.lookAt(mid, mid + (b - a)) * CFrame.Angles(0, math.pi / 2, 0),
 					Color = colorOf(skin, i),
-					CustomPhysicalProperties = SOLID,
+					CustomPhysicalProperties = LYING,
 					Parent = folder,
 				})
 			end
@@ -183,12 +187,15 @@ function Pieces.build(map, origin: Vector3, parent: Instance): Built
 end
 
 --- The solid pieces as the bot sees them: posts and bumpers as circles, walls as segments
---- (ring-relative studs). Bumps and lying ridges are low enough to roll over.
+--- (ring-relative studs). Low lumps and lying ridges can be rolled over.
 function Pieces.obstacles(map)
 	local out = {}
 	for _, p in ipairs(map.pieces) do
 		if p.kind == "post" or p.kind == "bumper" then
 			table.insert(out, { kind = "circle", pos = Vector2.new(p.x * S, p.z * S), r = p.r * S })
+		elseif p.kind == "bump" and p.r * 2 * (1 - p.sink) * S > Config.SHOOTER_R * 0.3 then
+			-- A lump whose cap stands over a third of a shooter's radius throws a fast shot back.
+			table.insert(out, { kind = "circle", pos = Vector2.new(p.x * S, p.z * S), r = p.r * 0.8 * S })
 		elseif p.kind == "wall" then
 			local half = Vector2.new(math.cos(p.a), math.sin(p.a)) * (p.len * S / 2)
 			local c = Vector2.new(p.x * S, p.z * S)
