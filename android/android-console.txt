@@ -1,7 +1,8 @@
-10-31 13:46:25.642  2613  2613 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
-10-31 13:46:27.379  2613  2613 W Capacitor/Console: File: https://localhost/assets/index-DC-pgxxA.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
-10-31 13:46:48.932  2613  2613 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-10-31 13:46:48.941  2613  2613 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-10-31 13:46:54.670  2613  2613 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-10-31 13:46:57.240  2613  2613 I Capacitor/Console: File:  - Line 333 - Msg: {}
-10-31 13:46:57.241  2613  2613 I Capacitor/Console: File:  - Line 333 - Msg: undefined
+10-31 14:36:45.430  3137  3137 W Capacitor/Console: File: https://localhost/assets/index-DC-pgxxA.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+10-31 14:37:06.562  3137  3137 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+10-31 14:37:06.565  3137  3137 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+10-31 14:37:07.304  3137  3137 I Capacitor/Console: File:  - Line 333 - Msg: {}
+10-31 14:37:07.445  3137  3137 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+10-31 14:37:09.378  3137  3137 I Capacitor/Console: File:  - Line 333 - Msg: undefined
+10-31 14:37:29.006  1041  1067 E JavaBinder: *** Uncaught remote exception! Exceptions are not yet supported across processes. Client PID 3986 UID 10118.
+10-31 14:37:29.680  1041  4183 E JavaBinder: *** Uncaught remote exception! Exceptions are not yet supported across processes. Client PID 3986 UID 10118.
