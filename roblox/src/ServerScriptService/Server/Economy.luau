@@ -47,7 +47,7 @@ function Economy.give(player: Player, amount: number, sku: string, raw: boolean?
 		p.coins += n
 		balance = p.coins
 	end)
-	economyEvent(player, Enum.AnalyticsEconomyFlowType.Source, n, balance, raw and Enum.AnalyticsEconomyTransactionType.IAP.Name or Enum.AnalyticsEconomyTransactionType.Gameplay.Name, sku)
+	economyEvent(player, Enum.AnalyticsEconomyFlowType.Source, n, balance, string.sub(sku, 1, 8) == "product:" and Enum.AnalyticsEconomyTransactionType.IAP.Name or Enum.AnalyticsEconomyTransactionType.Gameplay.Name, sku)
 	return n
 end
 

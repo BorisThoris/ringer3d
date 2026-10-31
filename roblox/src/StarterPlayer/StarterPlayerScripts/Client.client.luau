@@ -10,6 +10,8 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local Config = require(ReplicatedStorage.Ringer.Config)
+local Forge = require(ReplicatedStorage.Ringer.Forge)
+local MarbleLook = require(ReplicatedStorage.Ringer.MarbleLook)
 local Modules = script.Parent:WaitForChild("ClientModules")
 local Kit = require(Modules.Kit)
 local Aim = require(Modules.Aim)
@@ -74,7 +76,7 @@ local function setCoins(n: number)
 end
 
 -- The live event, under the coins.
-local event = Kit.label("🎃 HALLOWEEN: the Jack-o'-Marble Limited is in Marble Bags!", 20, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 62), Size = UDim2.fromOffset(620, 28), TextColor3 = Color3.fromRGB(255, 170, 60), Parent = hud })
+local event = Kit.label(string.format("✨ NEW: every Marble Bag mints a one-of-a-kind marble · %.1f%% hold a phenomenon", Forge.phenomenonOdds()), 20, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 62), Size = UDim2.fromOffset(620, 28), TextColor3 = Color3.fromRGB(255, 170, 60), Parent = hud })
 event.TextWrapped = false
 
 local side = Kit.new("Frame", { Position = UDim2.new(0, 12, 0.5, -170), Size = UDim2.fromOffset(150, 340), BackgroundTransparency = 1, Parent = hud })
@@ -231,8 +233,9 @@ local function refreshShop()
 	else
 		local odds = {}
 		for _, t in ipairs(Config.BAG_ODDS) do
-			table.insert(odds, string.format("%s %d%%", t.rarity, t.weight))
+			table.insert(odds, string.format("%s %g%%", t.rarity, t.weight))
 		end
+		table.insert(odds, string.format("✦ Phenomenon %.1f%% · Shiny %g%%", Forge.phenomenonOdds(), 100 / Forge.SHINY_ODDS))
 		local c = itemCard(bagsPage, "Marble Bag", table.concat(odds, " · "), Kit.GOLD)
 		local bag = Kit.new("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 14), Size = UDim2.fromOffset(90, 100), BackgroundColor3 = Color3.fromRGB(150, 100, 60), Parent = c })
 		Kit.round(bag, 30)
@@ -253,7 +256,7 @@ local function refreshShop()
 		for _, look in ipairs(Config.MARBLES) do
 			if look.supply then
 				local left = look.supply - (shopInfo.minted[look.id] or 0)
-				local lc = itemCard(bagsPage, look.name, string.format("Limited · %d of %d left", math.max(0, left), look.supply), Config.RARITY_COLOR.Limited)
+				local lc = itemCard(bagsPage, look.name, string.format("Marble Book reward · %d of %d left", math.max(0, left), look.supply), Config.RARITY_COLOR.Limited)
 				Kit.preview(look.id, lc, UDim2.new(1, 0, 0, 116))
 			end
 		end
@@ -293,20 +296,168 @@ end
 -- =============================================================================================
 -- Collection panel
 -- =============================================================================================
+-- What melting a generated marble pays (the server's Collectibles.meltValue, the web's meltValue).
+local function meltValue(c): number
+	local wear = if c.wear == "Mint" then 2 elseif c.wear == "Polished" then 1.25 else 1
+	local fx = if c.effect ~= "none" then 4 else 1
+	return math.floor(Config.MELT[c.tier] * wear * (if c.shiny then 5 else 1) * fx + 0.5)
+end
+local onBag -- the bag reveal, defined further down
+
 local colPanel, colBody = Kit.panel(screen, "Your Marbles", UDim2.fromScale(0.8, 0.8))
 panels.marbles = colPanel
-local colGrid = Kit.new("ScrollingFrame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ScrollBarThickness = 8, AutomaticCanvasSize = Enum.AutomaticSize.Y, CanvasSize = UDim2.new(), Parent = colBody })
-Kit.new("UIGridLayout", { CellSize = UDim2.fromOffset(170, 230), CellPadding = UDim2.fromOffset(12, 12), Parent = colGrid })
+local colTabs = Kit.new("Frame", { Size = UDim2.new(1, 0, 0, 50), BackgroundTransparency = 1, Parent = colBody })
+Kit.new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 10), Parent = colTabs })
+local colPages = Kit.new("Frame", { Position = UDim2.fromOffset(0, 60), Size = UDim2.new(1, 0, 1, -60), BackgroundTransparency = 1, Parent = colBody })
+local colPageOf = {}
+local colTab = "Collection"
+local refreshCollection
+local function colPage(name: string, cell: Vector2)
+	local f = Kit.new("ScrollingFrame", { Name = name, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ScrollBarThickness = 8, AutomaticCanvasSize = Enum.AutomaticSize.Y, CanvasSize = UDim2.new(), Visible = name == colTab, Parent = colPages })
+	Kit.new("UIGridLayout", { CellSize = UDim2.fromOffset(cell.X, cell.Y), CellPadding = UDim2.fromOffset(12, 12), SortOrder = Enum.SortOrder.LayoutOrder, Parent = f })
+	colPageOf[name] = f
+	Kit.button(name, Kit.BLUE, function()
+		colTab = name
+		for n, p in pairs(colPageOf) do
+			p.Visible = n == name
+		end
+	end, { Size = UDim2.fromOffset(170, 46), Parent = colTabs })
+	return f
+end
+local forgedGrid = colPage("Collection", Vector2.new(180, 300))
+local namedGrid = colPage("Named", Vector2.new(170, 230))
+local bookGrid = colPage("Marble Book", Vector2.new(340, 150))
 
-local function refreshCollection()
-	for _, c in ipairs(colGrid:GetChildren()) do
-		if c:IsA("Frame") then
+-- Collection tools: sort order and trade-up mode.
+local sortBy = "new"
+local picking = false
+local picked: { string } = {}
+local function clear(f: Instance)
+	for _, c in ipairs(f:GetChildren()) do
+		if c:IsA("GuiObject") then
 			c:Destroy()
 		end
+	end
+end
+local function rarityIndex(t: string): number
+	return table.find(Forge.TIERS, t) or 0
+end
+
+local function forgedCard(o, c, order: number)
+	local look = MarbleLook.lookFor(c.id)
+	local color = Config.RARITY_COLOR[c.tier] or Kit.CREAM
+	local isOn = profile.equipped == c.id
+	local sel = table.find(picked, c.id) ~= nil
+	local card = Kit.new("Frame", { LayoutOrder = order, BackgroundColor3 = sel and Color3.fromRGB(90, 70, 40) or Color3.fromRGB(56, 44, 80), Parent = forgedGrid })
+	Kit.round(card, 16)
+	Kit.stroke(card, color, c.effect ~= "none" and 4 or 3)
+	Kit.preview(c.id, card, UDim2.new(1, 0, 0, 110))
+	Kit.label(c.marble.name, 17, { Position = UDim2.fromOffset(4, 110), Size = UDim2.new(1, -8, 0, 40), TextWrapped = true, Parent = card })
+	local traits = #c.traits > 0 and ("✦ " .. table.concat(c.traits, " · ")) or ""
+	Kit.label(c.tier .. (traits ~= "" and ("\n" .. traits) or ""), 15, { Position = UDim2.fromOffset(4, 150), Size = UDim2.new(1, -8, 0, 36), TextColor3 = color, TextWrapped = true, Parent = card })
+	Kit.label(string.format("%s %.4f · #%d · %d✕", c.wear, c.float, c.pattern, o.tally or 0), 13, { Position = UDim2.fromOffset(4, 188), Size = UDim2.new(1, -8, 0, 18), TextColor3 = Kit.CREAM, Parent = card })
+	if picking then
+		Kit.button(sel and "Picked" or "Pick", sel and Kit.GOLD or Kit.PURPLE, function()
+			local i = table.find(picked, c.id)
+			if i then
+				table.remove(picked, i)
+			elseif #picked < Forge.TRADE_UP_COUNT and not isOn then
+				table.insert(picked, c.id)
+			end
+			refreshCollection()
+		end, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -10), Size = UDim2.new(0.86, 0, 0, 40), Parent = card })
+		return
+	end
+	Kit.button(isOn and "Equipped" or "Equip", isOn and Color3.fromRGB(110, 110, 120) or Kit.GREEN, function()
+		ask("equip", c.id)
+	end, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -56), Size = UDim2.new(0.86, 0, 0, 38), Parent = card })
+	local melt = Kit.button("Melt " .. Kit.comma(meltValue(c)), Kit.RED, function()
+		local ok, got = ask("melt", c.id)
+		toast(ok and string.format("Melted %s: +%s coins", c.marble.name, Kit.comma(got)) or (typeof(got) == "string" and got or "Couldn't melt it."), ok and "good" or "bad")
+	end, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -10), Size = UDim2.new(0.86, 0, 0, 38), Parent = card })
+	melt.Visible = not isOn
+end
+
+refreshCollection = function()
+	for _, f in ipairs({ forgedGrid, namedGrid, bookGrid }) do
+		clear(f)
 	end
 	if not profile then
 		return
 	end
+
+	-- ---- Collection: the generated marbles ----
+	local list = {}
+	for _, o in ipairs(profile.forged or {}) do
+		local c = Forge.fromId(o.id)
+		if c then
+			table.insert(list, { o = o, c = c })
+		end
+	end
+	table.sort(list, function(a, b)
+		if sortBy == "rarity" then
+			local ra, rb = rarityIndex(a.c.tier), rarityIndex(b.c.tier)
+			if ra ~= rb then
+				return ra > rb
+			end
+			return a.c.float < b.c.float
+		elseif sortBy == "float" then
+			return a.c.float < b.c.float
+		end
+		return (a.o.at or 0) > (b.o.at or 0)
+	end)
+	-- The tool row: sorting, and trade-ups (five of one rarity make one of the next).
+	local bar = Kit.new("Frame", { LayoutOrder = -1, BackgroundColor3 = Color3.fromRGB(40, 30, 60), Parent = forgedGrid })
+	Kit.round(bar, 16)
+	Kit.new("UIListLayout", { Padding = UDim.new(0, 6), HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Center, Parent = bar })
+	Kit.label(string.format("%d marbles", #list), 18, { Size = UDim2.new(1, 0, 0, 24), Parent = bar })
+	for _, s in ipairs({ { "new", "Newest" }, { "rarity", "Rarity" }, { "float", "Best float" } }) do
+		Kit.button(s[2], sortBy == s[1] and Kit.GOLD or Kit.BLUE, function()
+			sortBy = s[1]
+			refreshCollection()
+		end, { Size = UDim2.new(0.86, 0, 0, 34), Parent = bar })
+	end
+	Kit.button(picking and "Cancel trade-up" or "Trade up", Kit.PURPLE, function()
+		picking = not picking
+		picked = {}
+		refreshCollection()
+	end, { Size = UDim2.new(0.86, 0, 0, 34), Parent = bar })
+	if picking then
+		local tier = nil
+		local same = true
+		for _, id in ipairs(picked) do
+			local c = Forge.fromId(id)
+			if tier and c and c.tier ~= tier then
+				same = false
+			end
+			tier = tier or (c and c.tier)
+		end
+		local up = tier and Forge.nextTier(tier)
+		local ready = #picked == Forge.TRADE_UP_COUNT and same and up ~= nil
+		Kit.button(ready and ("Make a " .. up) or string.format("%d of %d picked", #picked, Forge.TRADE_UP_COUNT), ready and Kit.GREEN or Color3.fromRGB(110, 110, 120), function()
+			if not ready then
+				toast(not same and "They all need to be the same rarity." or tier == "Mythic" and "Mythic is the top." or "Pick five of one rarity.", "bad")
+				return
+			end
+			local ok, got = ask("tradeup", picked)
+			picking = false
+			picked = {}
+			if ok then
+				onBag(got)
+			else
+				toast(typeof(got) == "string" and got or "Couldn't trade up.", "bad")
+			end
+			refreshCollection()
+		end, { Size = UDim2.new(0.86, 0, 0, 34), Parent = bar })
+	end
+	if #list == 0 then
+		Kit.label("Open a Marble Bag in the Shop to start your collection. Every match pays coins.", 18, { LayoutOrder = 0, TextWrapped = true, Parent = forgedGrid })
+	end
+	for i, it in ipairs(list) do
+		forgedCard(it.o, it.c, i)
+	end
+
+	-- ---- Named marbles: the catalogue ----
 	local serials = {}
 	for _, l in ipairs(profile.limiteds) do
 		serials[l.id] = serials[l.id] or {}
@@ -322,9 +473,10 @@ local function refreshCollection()
 				or look.source == "tower" and "Beat the Tower"
 				or look.source == "vip" and "VIP pass"
 				or look.source == "premium" and "Roblox Premium"
+				or look.supply and "Marble Book reward"
 				or "Marble Bags"
 		end
-		local c = itemCard(colGrid, owned and look.name or "???", sub, owned and Config.RARITY_COLOR[look.rarity] or Color3.fromRGB(120, 120, 130))
+		local c = itemCard(namedGrid, owned and look.name or "???", sub, owned and Config.RARITY_COLOR[look.rarity] or Color3.fromRGB(120, 120, 130))
 		local vp = Kit.preview(look.id, c, UDim2.new(1, 0, 0, 116))
 		if not owned then
 			vp.ImageColor3 = Color3.fromRGB(20, 20, 25)
@@ -335,6 +487,39 @@ local function refreshCollection()
 				ask("equip", look.id)
 			end, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -10), Size = UDim2.new(0.86, 0, 0, 40), Parent = c })
 		end
+	end
+
+	-- ---- The Marble Book ----
+	local owned = {}
+	for _, it in ipairs(list) do
+		table.insert(owned, it.c)
+	end
+	for i, row in ipairs(Forge.bookProgress(owned)) do
+		local paid = profile.book and profile.book[row.set.id]
+		local card = Kit.new("Frame", { LayoutOrder = i, BackgroundColor3 = Color3.fromRGB(56, 44, 80), Parent = bookGrid })
+		Kit.round(card, 16)
+		Kit.stroke(card, row.done and Kit.GOLD or Color3.fromRGB(120, 110, 150), 3)
+		local limited = Config.BOOK_LIMITED[row.set.id]
+		Kit.label(string.format("%s  %d/%d", row.set.name, #row.got, #row.set.needs), 20, { Position = UDim2.fromOffset(10, 6), Size = UDim2.new(1, -20, 0, 26), Parent = card })
+		local missing = {}
+		for _, n in ipairs(row.set.needs) do
+			if not table.find(row.got, n) then
+				table.insert(missing, n)
+			end
+		end
+		Kit.label(#missing == 0 and "Complete!" or ("Still to find: " .. table.concat(missing, ", ")), 14, { Position = UDim2.fromOffset(10, 34), Size = UDim2.new(1, -20, 0, 50), TextWrapped = true, TextColor3 = Kit.CREAM, Parent = card })
+		local reward = Kit.comma(row.set.reward) .. " coins" .. (limited and (" + " .. Config.MARBLE[limited].name .. " Limited") or "")
+		Kit.button(paid and "Claimed" or (row.done and ("Claim " .. reward) or reward), paid and Color3.fromRGB(110, 110, 120) or row.done and Kit.GREEN or Color3.fromRGB(80, 70, 110), function()
+			if paid or not row.done then
+				return
+			end
+			local ok, got = ask("book", row.set.id)
+			if ok then
+				toast(string.format("%s: +%s coins%s", row.set.name, Kit.comma(got.coins), got.limited and got.limited.serial and string.format(" and %s #%d", Config.MARBLE[got.limited.id].name, got.limited.serial) or ""), "good")
+			else
+				toast(typeof(got) == "string" and got or "Couldn't claim it.", "bad")
+			end
+		end, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -10), Size = UDim2.new(0.92, 0, 0, 40), Parent = card })
 	end
 end
 
@@ -509,12 +694,21 @@ local revealPanel, revealBody = Kit.panel(screen, "Marble Bag", UDim2.fromOffset
 local revealHolder = Kit.new("Frame", { Size = UDim2.new(1, 0, 0, 220), BackgroundTransparency = 1, Parent = revealBody })
 local revealText = Kit.label("", 30, { Position = UDim2.fromOffset(0, 230), Size = UDim2.new(1, 0, 0, 90), Parent = revealBody })
 
-local function onBag(got)
+onBag = function(got)
 	for _, c in ipairs(revealHolder:GetChildren()) do
 		c:Destroy()
 	end
-	local look = Config.MARBLE[got.id]
 	Kit.preview(got.id, revealHolder)
+	local c = Forge.fromId(got.id)
+	if c then
+		-- A generated marble: its rarity, wear and anything special about it.
+		local extra = #c.traits > 0 and ("\n✦ " .. table.concat(c.traits, " · ")) or ""
+		revealText.Text = string.format("%s\n%s · %s %.4f%s", c.marble.name, c.tier, c.wear, c.float, extra)
+		revealText.TextColor3 = Config.RARITY_COLOR[c.tier] or Kit.CREAM
+		Kit.open(revealPanel)
+		return
+	end
+	local look = Config.MARBLE[got.id]
 	local line = look.name .. "\n" .. look.rarity
 	if got.serial then
 		line = string.format("%s\nLimited #%d of %d", look.name, got.serial, look.supply)

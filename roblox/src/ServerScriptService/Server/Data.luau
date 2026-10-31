@@ -23,6 +23,10 @@ export type Profile = {
 	captured: number,
 	owned: { [string]: boolean },
 	limiteds: { { id: string, serial: number } },
+	-- Generated marbles from Marble Bags and trade-ups: their ids ("cR-R0123..."), when they
+	-- arrived, and the captures made with each.
+	forged: { { id: string, at: number, tally: number } },
+	book: { [string]: boolean }, -- Marble Book sets already paid out
 	equipped: string,
 	tower: number, -- next floor to play (9 = cleared)
 	towerBest: number,
@@ -40,6 +44,8 @@ local function fresh(): Profile
 		captured = 0,
 		owned = { ember = true },
 		limiteds = {},
+		forged = {},
+		book = {},
 		equipped = "ember",
 		tower = 1,
 		towerBest = 0,

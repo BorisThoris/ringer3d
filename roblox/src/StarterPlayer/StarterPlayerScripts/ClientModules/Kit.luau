@@ -144,7 +144,7 @@ end
 
 --- A slowly turning marble in a ViewportFrame.
 function Kit.preview(id: string, parent: Instance, size: UDim2?): ViewportFrame
-	local look = Config.MARBLE[id] or Config.MARBLE.ember
+	local look = MarbleLook.lookFor(id)
 	local vp = Kit.new("ViewportFrame", {
 		BackgroundTransparency = 1,
 		Size = size or UDim2.fromScale(1, 1),

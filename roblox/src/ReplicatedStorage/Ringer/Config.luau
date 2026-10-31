@@ -3,6 +3,7 @@
 -- catalogue, the economy, and the ids of passes, products and badges made on the Creator Hub.
 
 local Config = {}
+local Forge = require(script.Parent.Forge)
 
 -- ---- The ring (studs). The web game's units times 4. ---------------------------------------
 Config.RING_R = 22 -- the chalk ring
@@ -147,8 +148,6 @@ Config.MARBLES = {
 	m("prism", "Prism", "Exclusive", rgb(240, 240, 255), rgb(255, 90, 220), Enum.Material.Glass, 0.15, 0.9, { source = "premium" }),
 	m("aurora", "Aurora", "Limited", rgb(20, 40, 60), rgb(80, 255, 170), Enum.Material.Glass, 0.2, 1, { supply = 500 }),
 	m("comet", "Comet", "Limited", rgb(250, 250, 255), rgb(90, 160, 255), Enum.Material.Glass, 0.25, 0.9, { supply = 1500 }),
-	-- Halloween 2026: a numbered pumpkin marble, only in Marble Bags while the event lasts.
-	m("pumpkin", "Jack-o'-Marble", "Limited", rgb(255, 120, 20), rgb(255, 230, 90), Enum.Material.Glass, 0.2, 1, { supply = 1000, event = "halloween" }),
 	m("ruby", "Ruby Heart", "Legendary", rgb(150, 0, 30), rgb(255, 60, 90), Enum.Material.Glass, 0.2, 0.7, {}),
 	m("moss", "Moss Agate", "Rare", rgb(80, 120, 70), rgb(200, 230, 150), Enum.Material.Glass, 0.3, 0.1, {}),
 	m("sunset", "Sunset", "Epic", rgb(255, 150, 70), rgb(255, 60, 120), Enum.Material.Glass, 0.25, 0.6, {}),
@@ -176,20 +175,25 @@ Config.RARITY_COLOR = {
 	Rare = rgb(80, 160, 255),
 	Epic = rgb(190, 90, 255),
 	Legendary = rgb(255, 170, 30),
+	Mythic = rgb(255, 70, 190),
 	Limited = rgb(80, 255, 170),
 	Exclusive = rgb(255, 215, 80),
 }
 
--- ---- Marble Bag: what a bag can hold, and the odds, shown to the player before they buy --
+-- ---- Marble Bags: each one mints a brand-new generated marble (Ringer.Forge), exactly as in
+-- the web game. The odds shown before buying are the generator's own tier odds.
 Config.BAG_PRICE = 300
-Config.BAG_ODDS = {
-	{ rarity = "Common", weight = 60, pool = { "tide", "pip", "jade" } },
-	{ rarity = "Rare", weight = 27, pool = { "rime", "ironside", "moss" } },
-	{ rarity = "Epic", weight = 9, pool = { "volt", "sunset" } },
-	{ rarity = "Legendary", weight = 3, pool = { "ruby" } },
-	{ rarity = "Limited", weight = 1, pool = { "aurora", "comet", "pumpkin" } },
-}
--- A duplicate is worth this share of its rarity's value back in coins.
+Config.BAG_ODDS = {}
+for _, r in ipairs(Forge.RARITY) do
+	table.insert(Config.BAG_ODDS, { rarity = r.tier, weight = r.odds })
+end
+Config.MAX_COLLECTION = 500
+-- Melting a generated marble pays this by tier, times 2 for Mint (1.25 Polished), 5 for a
+-- Shiny and 4 for a phenomenon: the web game's meltValue.
+Config.MELT = { Common = 40, Rare = 120, Epic = 300, Legendary = 800, Mythic = 2500 }
+-- Finishing these Marble Book sets also mints a serial-numbered Limited.
+Config.BOOK_LIMITED = { phenomena = "aurora", tiers = "comet" }
+-- A named marble you already own is worth this back in coins.
 Config.DUPLICATE_COINS = { Common = 40, Rare = 120, Epic = 300, Legendary = 800, Limited = 0, Exclusive = 0 }
 
 -- ---- Economy ----------------------------------------------------------------------------

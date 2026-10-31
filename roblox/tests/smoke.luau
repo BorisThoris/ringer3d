@@ -76,16 +76,72 @@ check("table has 13 marbles in the ring", inside == 13, inside)
 check("state serialises", t:state().remaining == 13)
 t:destroy()
 
--- 6. Collectibles: bag odds add up and every pool id exists.
-local total, ok = 0, true
+-- 6. Collectibles: Marble Bags mint generated marbles at the odds the bag shows.
+local Forge = mod(Ringer.Forge)
+local total = 0
 for _, tier in ipairs(Config.BAG_ODDS) do
 	total += tier.weight
-	for _, id in ipairs(tier.pool) do
-		ok = ok and Config.MARBLE[id] ~= nil
+end
+check("bag odds total 100", math.abs(total - 100) < 1e-9, total)
+local counts, fx, shiny = {}, 0, 0
+local N = 20000
+local r = Random.new(7)
+for _ = 1, N do
+	local c = Forge.mint(Forge.robloxUid(r))
+	counts[c.tier] = (counts[c.tier] or 0) + 1
+	if c.effect ~= "none" then
+		fx += 1
+	end
+	if c.shiny then
+		shiny += 1
 	end
 end
-check("bag odds total 100", total == 100, total)
-check("bag pools are real marbles", ok)
+for _, tier in ipairs(Config.BAG_ODDS) do
+	local got = (counts[tier.rarity] or 0) / N * 100
+	-- Within five standard errors of the published odds.
+	local p = tier.weight / 100
+	local tol = 5 * math.sqrt(p * (1 - p) / N) * 100 + 0.05
+	check(string.format("bag %s near %g%%", tier.rarity, tier.weight), math.abs(got - tier.weight) <= tol, string.format("%.2f%%", got))
+end
+check("phenomena near the shown odds", math.abs(fx / N * 100 - Forge.phenomenonOdds()) < 0.5, string.format("%.2f%% vs %.2f%%", fx / N * 100, Forge.phenomenonOdds()))
+check("shiny near 2%", math.abs(shiny / N * 100 - 2) < 0.6, string.format("%.2f%%", shiny / N * 100))
+
+-- Generated marbles build into balls with their phenomena, and named ones still do.
+local MarbleLook = require(Ringer.MarbleLook)
+local built = 0
+for _, e in ipairs(Forge.EFFECT_IDS) do
+	for i = 1, 3000 do
+		local id = Forge.collectibleId("Mythic", "Rsmoke" .. i)
+		local c = Forge.fromId(id)
+		if c and c.effect == e then
+			local okb, ball = pcall(MarbleLook.make, MarbleLook.lookFor(id), 1)
+			check("builds a " .. e .. " marble", okb and ball:IsA("BasePart"), not okb and ball or nil)
+			if okb then
+				built += 1
+				ball:Destroy()
+			end
+			break
+		end
+	end
+end
+check("every phenomenon builds", built == #Forge.EFFECT_IDS, built)
+check("named marbles still resolve", MarbleLook.lookFor("volt").name == "Volt")
+check("unknown ids fall back to Ember", MarbleLook.lookFor("nope").id == "ember")
+
+-- Melt values follow the web formula; trade-ups go up one tier; the Book reads a collection.
+local Collectibles = require(game.ServerScriptService.Server.Collectibles)
+local c = Forge.mint("Rdeadbeef0000beef", "Rare")
+local want = math.floor(Config.MELT.Rare * (c.wear == "Mint" and 2 or c.wear == "Polished" and 1.25 or 1) * (c.shiny and 5 or 1) * (c.effect ~= "none" and 4 or 1) + 0.5)
+check("melt value", Collectibles.meltValue(c) == want, Collectibles.meltValue(c))
+check("trade up Rare -> Epic", Forge.nextTier("Rare") == "Epic")
+check("no trade up past Mythic", Forge.nextTier("Mythic") == nil)
+local some = {}
+for i = 1, 200 do
+	table.insert(some, Forge.mint("Rbook" .. i))
+end
+local rows = Forge.bookProgress(some)
+check("book has 6 sets", #rows == 6, #rows)
+check("200 marbles cover every rarity but maybe Mythic", #rows[3].got >= 4, #rows[3].got)
 
 local fails = 0
 for _, l in ipairs(out) do

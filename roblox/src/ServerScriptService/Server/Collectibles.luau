@@ -1,4 +1,5 @@
--- Owning marbles: buying them, opening Marble Bags, and Limited marbles with serial numbers.
+-- Owning marbles: buying named ones, opening Marble Bags (generated marbles, as in the web
+-- game), melting and trading them up, the Marble Book, and Limited marbles with serial numbers.
 --
 -- Limiteds are Roblox's own kind of "only so many exist": each edition has a fixed supply, and
 -- every copy is stamped with its serial (#1, #2, ...) from a global counter in a DataStore, so no
@@ -14,6 +15,7 @@ local PolicyService = game:GetService("PolicyService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Ringer.Config)
+local Forge = require(ReplicatedStorage.Ringer.Forge)
 local Data = require(script.Parent.Data)
 local Economy = require(script.Parent.Economy)
 
@@ -104,35 +106,153 @@ function Collectibles.grant(player: Player, id: string)
 	return { id = id }
 end
 
---- Roll a bag. `paid` bags (with coins) check the policy; a bag bought for Robux is checked
---- by the client before it prompts and again here.
+--- Open a Marble Bag: a brand-new generated marble, its tier rolled by the generator with the
+--- odds shown on the bag (the web game's own). Refused where paid random items are restricted.
 function Collectibles.openBag(player: Player, rng: Random)
 	if Collectibles.bagsRestricted(player) then
 		return nil, "Marble Bags aren't available where you are."
 	end
-	for _ = 1, 4 do
-		local total = 0
-		for _, tier in ipairs(Config.BAG_ODDS) do
-			total += tier.weight
-		end
-		local roll = rng:NextNumber() * total
-		local tier = Config.BAG_ODDS[#Config.BAG_ODDS]
-		for _, t in ipairs(Config.BAG_ODDS) do
-			roll -= t.weight
-			if roll <= 0 then
-				tier = t
-				break
-			end
-		end
-		local id = tier.pool[rng:NextInteger(1, #tier.pool)]
-		local got = Collectibles.grant(player, id)
-		if got then
-			got.rarity = tier.rarity
-			return got
-		end
-		-- A sold-out Limited: roll again.
+	local p = Data.get(player)
+	if not p then
+		return nil, "Your profile is still loading."
 	end
-	return Collectibles.grant(player, "rime")
+	if #p.forged >= Config.MAX_COLLECTION then
+		return nil, "Your collection is full: melt a few marbles first."
+	end
+	local c = Forge.mint(Forge.robloxUid(rng))
+	Data.update(player, function(pp)
+		table.insert(pp.forged, { id = c.id, at = os.time(), tally = 0 })
+	end)
+	return { id = c.id, rarity = c.tier, forged = true }
+end
+
+--- The generated marbles a player holds.
+function Collectibles.forged(player: Player): { Forge.Collectible }
+	local out = {}
+	local p = Data.get(player)
+	for _, o in ipairs(p and p.forged or {}) do
+		local c = Forge.fromId(o.id)
+		if c then
+			table.insert(out, c)
+		end
+	end
+	return out
+end
+
+function Collectibles.holds(player: Player, id: string): boolean
+	local p = Data.get(player)
+	if not p then
+		return false
+	end
+	if p.owned[id] then
+		return true
+	end
+	for _, o in ipairs(p.forged) do
+		if o.id == id then
+			return true
+		end
+	end
+	return false
+end
+
+--- What melting a generated marble pays (the web game's meltValue).
+function Collectibles.meltValue(c: Forge.Collectible): number
+	local wear = if c.wear == "Mint" then 2 elseif c.wear == "Polished" then 1.25 else 1
+	local fx = if c.effect ~= "none" then 4 else 1
+	return math.floor(Config.MELT[c.tier] * wear * (if c.shiny then 5 else 1) * fx + 0.5)
+end
+
+local function removeForged(p, ids: { [string]: boolean })
+	local kept = {}
+	for _, o in ipairs(p.forged) do
+		if not ids[o.id] then
+			table.insert(kept, o)
+		end
+	end
+	p.forged = kept
+end
+
+--- Melt a generated marble back into coins.
+function Collectibles.melt(player: Player, id: string)
+	local p = Data.get(player)
+	local c = Forge.fromId(id)
+	if not p or not c or not Collectibles.holds(player, id) then
+		return false, "You don't own that marble."
+	end
+	if p.equipped == id then
+		return false, "Equip another marble first."
+	end
+	local coins = Collectibles.meltValue(c)
+	Data.update(player, function(pp)
+		removeForged(pp, { [id] = true })
+	end)
+	Economy.give(player, coins, "melt:" .. id, true)
+	return true, coins
+end
+
+--- Five generated marbles of one rarity become one brand-new marble of the next.
+function Collectibles.tradeUp(player: Player, ids: { string }, rng: Random)
+	local p = Data.get(player)
+	if not p or typeof(ids) ~= "table" then
+		return false, "Pick five of your marbles."
+	end
+	local set, tier = {}, nil
+	for _, id in ipairs(ids) do
+		if typeof(id) ~= "string" or set[id] then
+			return false, "Pick five different marbles."
+		end
+		local c = Forge.fromId(id)
+		if not c or not Collectibles.holds(player, id) then
+			return false, "You don't own one of those."
+		end
+		if id == p.equipped then
+			return false, "Your equipped marble can't be traded up."
+		end
+		if tier and c.tier ~= tier then
+			return false, "They all need to be the same rarity."
+		end
+		tier = c.tier
+		set[id] = true
+	end
+	if #ids ~= Forge.TRADE_UP_COUNT or not tier then
+		return false, "Pick five of your marbles."
+	end
+	local up = Forge.nextTier(tier)
+	if not up then
+		return false, "Mythic is the top: nothing to trade up to."
+	end
+	local c = Forge.mint(Forge.robloxUid(rng), up)
+	Data.update(player, function(pp)
+		removeForged(pp, set)
+		table.insert(pp.forged, { id = c.id, at = os.time(), tally = 0 })
+	end)
+	return true, { id = c.id, rarity = c.tier, forged = true }
+end
+
+--- Claim a finished Marble Book set: its coins, and for some sets a numbered Limited.
+function Collectibles.claimBook(player: Player, setId: string)
+	local p = Data.get(player)
+	if not p or typeof(setId) ~= "string" then
+		return false, "No such set."
+	end
+	if p.book[setId] then
+		return false, "Already claimed."
+	end
+	for _, row in ipairs(Forge.bookProgress(Collectibles.forged(player))) do
+		if row.set.id == setId then
+			if not row.done then
+				return false, "Not finished yet."
+			end
+			Data.update(player, function(pp)
+				pp.book[setId] = true
+			end)
+			Economy.give(player, row.set.reward, "book:" .. setId, true)
+			local limited = Config.BOOK_LIMITED[setId]
+			local got = limited and Collectibles.grant(player, limited) or nil
+			return true, { coins = row.set.reward, limited = got }
+		end
+	end
+	return false, "No such set."
 end
 
 function Collectibles.buy(player: Player, id: string)

@@ -180,7 +180,7 @@ function Table:launch(shot)
 		if self.shooter then
 			self.shooter:Destroy()
 		end
-		local look = Config.MARBLE[seat.marble] or Config.MARBLE.ember
+		local look = MarbleLook.lookFor(seat.marble)
 		local ball = MarbleLook.make(look, Config.SHOOTER_R, { density = 2.6, friction = 0.3, elasticity = self.arena.elasticity })
 		ball.Name = "Shooter"
 		ball.Anchored = false

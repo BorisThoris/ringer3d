@@ -136,7 +136,7 @@ local function update()
 	if s.firstShot then
 		if not ghost then
 			local seat = s.seats[Aim.mySeat]
-			ghost = MarbleLook.make(Config.MARBLE[seat.marble] or Config.MARBLE.ember, Config.SHOOTER_R)
+			ghost = MarbleLook.make(MarbleLook.lookFor(seat.marble), Config.SHOOTER_R)
 			ghost.Anchored = true
 			ghost.CanCollide = false
 			ghost.CanQuery = false

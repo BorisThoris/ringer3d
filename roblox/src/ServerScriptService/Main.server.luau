@@ -7,6 +7,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local Config = require(ReplicatedStorage.Ringer.Config)
 local MarbleLook = require(ReplicatedStorage.Ringer.MarbleLook)
+local Forge = require(ReplicatedStorage.Ringer.Forge)
 local Server = ServerScriptService.Server
 local Table = require(Server.Table)
 local Data = require(Server.Data)
@@ -115,10 +116,24 @@ for i = 0, 39 do
 	lobbyPart({ Name = "Tile", Size = Vector3.new(6.6, 0.3, 4), CFrame = CFrame.lookAt(Vector3.new(math.cos(a) * 44, 0, math.sin(a) * 44), Vector3.new(0, 0, 0)), Color = tileColors[i % #tileColors + 1] })
 end
 
+-- Generated Mythics with a phenomenon inside, found by walking fixed uids, so every server
+-- shows the same ones: what a Marble Bag can hold.
+local function mythicWith(effect: string): string
+	for i = 1, 5000 do
+		local id = Forge.collectibleId("Mythic", "Rlobby" .. i)
+		local c = Forge.fromId(id)
+		if c and c.effect == effect then
+			return id
+		end
+	end
+	return "obsidian"
+end
+local mythicVoid, mythicAurora, mythicInferno = mythicWith("void"), mythicWith("aurora"), mythicWith("inferno")
+
 -- The collectibles on pedestals, each labelled with its rarity in the rarity's colour.
-local showcase = { "obsidian", "aurora", "pumpkin", "volt", "nova", "rime", "ember", "tide", "comet" }
+local showcase = { "obsidian", mythicAurora, mythicInferno, "volt", "nova", "rime", "ember", "tide", "comet" }
 for i, id in ipairs(showcase) do
-	local look = Config.MARBLE[id]
+	local look = MarbleLook.lookFor(id)
 	local a = i / #showcase * math.pi * 2
 	local at = Vector3.new(math.cos(a) * 12, 0, math.sin(a) * 12)
 	local rc = Config.RARITY_COLOR[look.rarity] or rgb(255, 255, 255)
@@ -133,11 +148,11 @@ for i, id in ipairs(showcase) do
 	bigText(holder, string.upper(look.rarity), { rc:Lerp(rgb(255, 255, 255), 0.35), rc }, Vector2.new(4.5, 0.9), Vector3.new(0, -1, 0)).Parent.MaxDistance = 45
 end
 
--- The mascot: a giant Jack-o'-Marble with a face, bobbing and turning over the ring.
+-- The mascot: a giant Void marble with a face, bobbing and turning over the ring.
 local mascot = Instance.new("Model")
 mascot.Name = "Mascot"
 mascot.Parent = lobby
-local body = MarbleLook.make(Config.MARBLE.pumpkin, 7)
+local body = MarbleLook.make(MarbleLook.lookFor(mythicVoid), 7)
 body.Anchored = true
 body.CFrame = CFrame.new()
 body.Parent = mascot
@@ -292,6 +307,12 @@ local function pay(tbl, result: Table.Result)
 		Data.update(player, function(p)
 			p.played += 1
 			p.captured += score
+			-- A generated marble keeps the tally of what it captured, as in the web game.
+			for _, o in ipairs(p.forged) do
+				if o.id == p.equipped then
+					o.tally += score
+				end
+			end
 			if won then
 				p.wins += 1
 			end
@@ -433,6 +454,8 @@ local function publicProfile(player: Player)
 		captured = p.captured,
 		owned = p.owned,
 		limiteds = p.limiteds,
+		forged = p.forged,
+		book = p.book,
 		equipped = p.equipped,
 		tower = p.tower,
 		towerBest = p.towerBest,
@@ -511,8 +534,7 @@ function handlers.leave(player: Player)
 end
 
 function handlers.equip(player: Player, id)
-	local p = Data.get(player)
-	if not (p and typeof(id) == "string" and p.owned[id]) then
+	if not (typeof(id) == "string" and Collectibles.holds(player, id)) then
 		return false
 	end
 	Data.update(player, function(pp)
@@ -532,11 +554,34 @@ function handlers.bag(player: Player)
 	if Collectibles.bagsRestricted(player) then
 		return false, "Marble Bags aren't available where you are."
 	end
+	local p = Data.get(player)
+	if p and #p.forged >= Config.MAX_COLLECTION then
+		return false, "Your collection is full: melt a few marbles first."
+	end
 	if not Economy.spend(player, Config.BAG_PRICE, "bag") then
 		return false, "Not enough coins."
 	end
-	local got = Collectibles.openBag(player, rng)
-	return got ~= nil, got
+	local got, why = Collectibles.openBag(player, rng)
+	if not got then
+		Economy.give(player, Config.BAG_PRICE, "bag refund", true)
+		return false, why
+	end
+	return true, got
+end
+
+function handlers.melt(player: Player, id)
+	if typeof(id) ~= "string" then
+		return false
+	end
+	return Collectibles.melt(player, id)
+end
+
+function handlers.tradeup(player: Player, ids)
+	return Collectibles.tradeUp(player, ids, rng)
+end
+
+function handlers.book(player: Player, setId)
+	return Collectibles.claimBook(player, setId)
 end
 
 function handlers.daily(player: Player)
