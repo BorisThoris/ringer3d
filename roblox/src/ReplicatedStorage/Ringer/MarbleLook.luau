@@ -19,21 +19,37 @@ local FINISH_MATERIAL = {
 }
 local FINISH_REFLECT = { glass = 0.15, frosted = 0.03, pearl = 0.25, metallic = 0.35, glitter = 0.2, holo = 0.4, prism = 0.3 }
 
+local function lift(body: Color3, accent: Color3): Color3
+	local h, sat, v = body:ToHSV()
+	local mixed = body:Lerp(accent, if v < 0.35 then 0.55 else 0.2)
+	local mh, ms, mv = mixed:ToHSV()
+	return Color3.fromHSV(mh, math.max(ms, sat * 0.8), math.max(mv, 0.55))
+end
+
 local function forgedLook(c: Forge.Collectible)
 	local m = c.marble
 	local opaque = m.pattern == "solid" or m.pattern == "steelie"
 	local material = if m.pattern == "steelie" then Enum.Material.Metal elseif m.pattern == "solid" then (if m.finish == "metallic" then Enum.Material.Metal else Enum.Material.SmoothPlastic) else FINISH_MATERIAL[m.finish]
+	-- A phenomenon needs to be seen inside: Roblox draws no fire, smoke or inner parts through
+	-- Glass, so these rare marbles get a smooth translucent shell (and a glow, in decorate).
+	local phenomenon = m.effect ~= "none"
+	if phenomenon then
+		material = Enum.Material.SmoothPlastic
+	end
 	return {
 		id = c.id,
 		name = m.name,
 		rarity = c.tier,
-		shell = Color3.fromHex(m.base),
+		-- Roblox glass multiplies what is behind it by its colour, so the web's near-black bodies
+		-- (galaxy, neon, onyx) would read as black: lift the body toward its accent.
+		shell = lift(Color3.fromHex(m.base), Color3.fromHex(m.accent)),
 		core = Color3.fromHex(m.accent),
 		accent2 = Color3.fromHex(m.accent2),
 		material = material,
-		-- Roblox glass reads clearer than the web's, so clarity maps to a little less see-through.
-		transparency = if opaque then 0 else math.clamp(m.clarity * 0.6, 0.05, 0.6),
-		reflect = FINISH_REFLECT[m.finish],
+		-- Low, like the named glass marbles: clearer Roblox glass shows the sky, not the marble.
+		-- Low, like the named glass marbles: clearer Roblox glass shows the sky, not the marble.
+		transparency = if opaque then 0 elseif phenomenon then 0.45 else math.clamp(0.2 + m.clarity * 0.2, 0.2, 0.38),
+		reflect = if phenomenon then 0.1 else FINISH_REFLECT[m.finish],
 		glow = m.glow,
 		sparkle = m.sparkle,
 		effect = m.effect,
@@ -75,10 +91,10 @@ function MarbleLook.make(look: any, radius: number, physics: { density: number, 
 		local core = Instance.new("Part")
 		core.Name = "Core"
 		core.Shape = Enum.PartType.Ball
-		local r = radius * 1.1
+		local r = radius * (if look.collectible then 1.25 else 1.1)
 		core.Size = Vector3.new(r, r, r)
 		core.Color = look.core
-		core.Material = look.glow > 0.5 and Enum.Material.Neon or Enum.Material.SmoothPlastic
+		core.Material = (look.glow > 0.5 or look.collectible) and Enum.Material.Neon or Enum.Material.SmoothPlastic
 		core.CanCollide = false
 		core.CanQuery = false
 		core.CanTouch = false
@@ -115,20 +131,28 @@ function MarbleLook.decorate(ball: BasePart, look: any, radius: number)
 		light.Brightness = 2
 		light.Shadows = false
 		light.Parent = holder
+		-- A glow in the phenomenon's colour, drawn over everything.
+		local hl = Instance.new("Highlight")
+		hl.FillColor = c
+		hl.FillTransparency = 0.7
+		hl.OutlineColor = c
+		hl.OutlineTransparency = 0.15
+		hl.DepthMode = Enum.HighlightDepthMode.Occluded
+		hl.Parent = ball
 		if fx == "inferno" then
 			local f = Instance.new("Fire")
 			f.Color = c
 			f.SecondaryColor = look.core
-			f.Size = radius * 1.4
-			f.Heat = 0
-			f.Parent = holder
+			f.Size = math.max(2, radius * 1.3)
+			f.Heat = 2
+			f.Parent = ball
 		elseif fx == "storm" then
 			local sm = Instance.new("Smoke")
 			sm.Color = c
-			sm.Opacity = 0.25
-			sm.Size = radius * 0.8
-			sm.RiseVelocity = 0
-			sm.Parent = holder
+			sm.Opacity = 0.35
+			sm.Size = math.max(0.5, radius * 0.9)
+			sm.RiseVelocity = 0.5
+			sm.Parent = ball
 			local sp = Instance.new("Sparkles")
 			sp.SparkleColor = Color3.new(1, 1, 1)
 			sp.Parent = holder

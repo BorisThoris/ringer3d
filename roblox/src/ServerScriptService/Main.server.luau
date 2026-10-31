@@ -143,7 +143,7 @@ for i, id in ipairs(showcase) do
 	ball.Anchored = true
 	ball.CFrame = CFrame.new(at + Vector3.new(0, 4.1, 0))
 	ball.Parent = lobby
-	local holder = lobbyPart({ Name = "Label", Size = Vector3.new(1, 1, 1), CFrame = CFrame.new(at + Vector3.new(0, 7.8, 0)), Transparency = 1, CanCollide = false, CanQuery = false, CanTouch = false })
+	local holder = lobbyPart({ Name = "Label", Size = Vector3.new(1, 1, 1), CFrame = CFrame.new(at + Vector3.new(0, 7.8 + (i % 2) * 2.4, 0)), Transparency = 1, CanCollide = false, CanQuery = false, CanTouch = false })
 	bigText(holder, look.name, { rgb(255, 255, 255), rgb(255, 235, 190) }, Vector2.new(6.5, 1.2)).Parent.MaxDistance = 45
 	bigText(holder, string.upper(look.rarity), { rc:Lerp(rgb(255, 255, 255), 0.35), rc }, Vector2.new(4.5, 0.9), Vector3.new(0, -1, 0)).Parent.MaxDistance = 45
 end
@@ -153,6 +153,14 @@ local mascot = Instance.new("Model")
 mascot.Name = "Mascot"
 mascot.Parent = lobby
 local body = MarbleLook.make(MarbleLook.lookFor(mythicVoid), 7)
+-- The mascot wears its Void's colours as plain glass: a face reads better than a phenomenon.
+body.Material = Enum.Material.Glass
+body.Transparency = 0.3
+for _, d in ipairs(body:GetChildren()) do
+	if d:IsA("Highlight") or d:IsA("Sparkles") or d:IsA("Part") then
+		d:Destroy()
+	end
+end
 body.Anchored = true
 body.CFrame = CFrame.new()
 body.Parent = mascot
