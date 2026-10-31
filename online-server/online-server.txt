@@ -1,4 +1,5 @@
-[server] room code JJDG
+[server] room code ZNLV
 [server] room listed in browser: true
 [server] host roster: Room code | Host | Connected peer to peer
-FAIL [server]: match did not start on guest
+[server] shot logs identical: true (6 shots compared)
+PASS [server]
