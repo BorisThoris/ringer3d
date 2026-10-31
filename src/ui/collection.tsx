@@ -261,6 +261,8 @@ export function Collection({ onBack, tab: initial = 'shop', onTab }: { onBack: (
             <h3>Coins</h3>
             <small>Every match pays coins too</small>
           </div>
+          {/* Where nothing can be bought (itch.io, the website) the packs stay out of sight. */}
+          {!store.unavailable && (
           <div className="packs">
             {PRODUCTS.map((p, i) => (
               <button
@@ -291,6 +293,7 @@ export function Collection({ onBack, tab: initial = 'shop', onTab }: { onBack: (
               </button>
             ))}
           </div>
+          )}
           {store.unavailable && <p className="fine">{store.unavailable}</p>}
         </section>
 

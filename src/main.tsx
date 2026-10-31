@@ -53,6 +53,7 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 );
 
-if ('serviceWorker' in navigator && import.meta.env.PROD && location.protocol === 'https:') {
+// Not on itch.io: its frame serves each upload from its own path, and a cached copy would outlive it.
+if ('serviceWorker' in navigator && import.meta.env.PROD && location.protocol === 'https:' && import.meta.env.VITE_STORE !== 'itch') {
   void navigator.serviceWorker.register('./sw.js');
 }
