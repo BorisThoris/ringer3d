@@ -141,6 +141,20 @@ function Bot.plan(from: Vector2?, mibs: { Vector2 }, decel: number, profile: Con
 		end
 	end
 
+	-- How many shots the bot notices at all (the web profile's candidates): a Rookie sees a
+	-- handful of the open lines, a Legend sees them all, and each takes the best it saw.
+	if #options > profile.candidates then
+		for i = #options, 2, -1 do
+			local j = rng:NextInteger(1, i)
+			options[i], options[j] = options[j], options[i]
+		end
+		best, bestScore = nil, math.huge
+		for i = 1, profile.candidates do
+			if options[i].score < bestScore then
+				best, bestScore = options[i], options[i].score
+			end
+		end
+	end
 	local pick = best
 	if #options > 1 and rng:NextNumber() < profile.blunder then
 		pick = options[rng:NextInteger(1, #options)]

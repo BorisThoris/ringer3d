@@ -93,16 +93,16 @@ Config.ARENAS = {
 Config.ARENA_ORDER = { "desk", "culdesac", "grass", "sand", "ice", "gravel", "minigolf" }
 
 -- ---- Bots: the web game's ladder ---------------------------------------------------------
-export type Bot = { id: string, label: string, aimErrorDeg: number, powerError: number, blunder: number, careful: boolean }
+export type Bot = { id: string, label: string, aimErrorDeg: number, powerError: number, blunder: number, careful: boolean, candidates: number }
 Config.BOTS = {
-	rookie = { id = "rookie", label = "Rookie", aimErrorDeg = 10, powerError = 0.26, blunder = 0.55, careful = false },
-	novice = { id = "novice", label = "Novice", aimErrorDeg = 6.5, powerError = 0.17, blunder = 0.38, careful = false },
-	casual = { id = "casual", label = "Casual", aimErrorDeg = 4.2, powerError = 0.11, blunder = 0.2, careful = false },
-	regular = { id = "regular", label = "Regular", aimErrorDeg = 3.4, powerError = 0.095, blunder = 0.15, careful = true },
-	skilled = { id = "skilled", label = "Skilled", aimErrorDeg = 2.8, powerError = 0.08, blunder = 0.1, careful = true },
-	expert = { id = "expert", label = "Expert", aimErrorDeg = 1.8, powerError = 0.05, blunder = 0.04, careful = true },
-	master = { id = "master", label = "Master", aimErrorDeg = 1.75, powerError = 0.049, blunder = 0.04, careful = true },
-	legend = { id = "legend", label = "Legend", aimErrorDeg = 0.55, powerError = 0.016, blunder = 0, careful = true },
+	rookie = { id = "rookie", label = "Rookie", aimErrorDeg = 10, powerError = 0.26, blunder = 0.55, careful = false, candidates = 6 },
+	novice = { id = "novice", label = "Novice", aimErrorDeg = 6.5, powerError = 0.17, blunder = 0.38, careful = false, candidates = 11 },
+	casual = { id = "casual", label = "Casual", aimErrorDeg = 4.2, powerError = 0.11, blunder = 0.2, careful = false, candidates = 18 },
+	regular = { id = "regular", label = "Regular", aimErrorDeg = 3.4, powerError = 0.095, blunder = 0.15, careful = true, candidates = 24 },
+	skilled = { id = "skilled", label = "Skilled", aimErrorDeg = 2.8, powerError = 0.08, blunder = 0.1, careful = true, candidates = 30 },
+	expert = { id = "expert", label = "Expert", aimErrorDeg = 1.8, powerError = 0.05, blunder = 0.04, careful = true, candidates = 56 },
+	master = { id = "master", label = "Master", aimErrorDeg = 1.75, powerError = 0.049, blunder = 0.04, careful = true, candidates = 64 },
+	legend = { id = "legend", label = "Legend", aimErrorDeg = 0.55, powerError = 0.016, blunder = 0, careful = true, candidates = 160 },
 } :: { [string]: Bot }
 
 -- The Tower: eight floors, one step up the ladder each, the Black Taw on top.
