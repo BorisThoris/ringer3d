@@ -7,7 +7,7 @@ import { wallet } from '../game/wallet';
 import { achieved, achievementShown } from '../platformFeatures';
 import { sound } from '../render/audio';
 import { ACHIEVEMENTS, type AchievementId } from '../services';
-import { MarbleChip, Screen } from './components';
+import { MarbleChip, PickRow, Screen } from './components';
 import { useItems } from './useItems';
 
 /** Progress toward the countable achievements: [have, need]. */
@@ -19,7 +19,7 @@ function progressOf(id: AchievementId, n: { owned: number; daily: number; streak
 }
 
 /** Who you are in Ringer: level, lifetime record and every achievement, earned or not. */
-export function Profile({ onBack }: { onBack: () => void }) {
+export function Profile({ onBack, onLeaderboards }: { onBack: () => void; onLeaderboards?: () => void }) {
   const name = settings.use((s) => s.playerName);
   const marble = settings.use((s) => s.marble);
   const p = progress.use((s) => s);
@@ -62,6 +62,12 @@ export function Profile({ onBack }: { onBack: () => void }) {
           </small>
         </div>
       </div>
+
+      {onLeaderboards && (
+        <div className="pick-list">
+          <PickRow label="How you rank" value="Leaderboards" icon={<span className="pick-glyph">#</span>} onClick={onLeaderboards} />
+        </div>
+      )}
 
       <div className="section-title">Record</div>
       <div className="stat-grid">

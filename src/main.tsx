@@ -8,6 +8,7 @@ import { initServices } from './platformFeatures';
 import { store } from './platformStore';
 import { credit } from './game/wallet';
 import './ui/styles.css';
+import './ui/mobile.css';
 
 // Tells the boot rescue in index.html that the app's script really loaded.
 (window as unknown as { __ringerBooted: boolean }).__ringerBooted = true;

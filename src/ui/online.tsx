@@ -10,7 +10,9 @@ import { ServerMatchmaker } from '../net/serverMatchmaker';
 import { SteamMatchmaker } from '../net/steamMatchmaker';
 import { steam } from '../steam';
 import type { Matchmaker } from '../net/transport';
-import { ArenaPicker, Chips, MapPicker, MapPreview, MarbleChip, Screen, tap } from './components';
+import { ArenaPicker, Chips, Confirm, MapPreview, MarbleChip, Screen, tap } from './components';
+import { MapRow } from './screens';
+import { goBack, useBack } from './nav';
 import { FriendsPanel } from './social';
 import { generateMap, type Difficulty } from '../game/maps';
 import { onInviteLink, shareInvite } from '../invite';
@@ -171,7 +173,7 @@ export function OnlineHub({ onBack, onRoom }: { onBack: () => void; onRoom: (r: 
           >
             <label className="field" style={{ flex: 2 }}>
               Room code
-              <input className="code-input" value={code} maxLength={4} placeholder="ABCD" onChange={(e) => setCode(e.target.value.replace(/[^a-z]/gi, '').toUpperCase())} />
+              <input className="code-input" value={code} maxLength={4} placeholder="ABCD" autoCapitalize="characters" autoComplete="off" autoCorrect="off" spellCheck={false} enterKeyHint="go" onChange={(e) => setCode(e.target.value.replace(/[^a-z]/gi, '').toUpperCase())} />
             </label>
             <button className="btn primary" style={{ alignSelf: 'flex-end' }} disabled={code.length !== 4 || busy}>
               Join
@@ -231,7 +233,7 @@ export function OnlineHub({ onBack, onRoom }: { onBack: () => void; onRoom: (r: 
         <>
           <label className="field">
             Room name
-            <input value={roomName} maxLength={28} onChange={(e) => setRoomName(e.target.value)} />
+            <input value={roomName} maxLength={28} enterKeyHint="done" autoComplete="off" onChange={(e) => setRoomName(e.target.value)} />
           </label>
           <div className="section-title">Players</div>
           <Chips
@@ -283,16 +285,23 @@ export function RoomLobby({ room, onLeave }: { room: OnlineRoom; onLeave: () => 
   const [ready, setReady] = useState(false);
   const [botSkill, setBotSkill] = useState<'casual' | 'skilled' | 'expert'>('skilled');
   const [invited, setInvited] = useState<'shared' | 'copied' | 'failed' | null>(null);
+  const [leaving, setLeaving] = useState(false);
   const myId = room.myId;
+  // Back asks first: leaving closes the room for everyone when you host it.
+  useBack(!leaving, () => setLeaving(true));
 
   return (
-    <Screen
-      title={s.room?.name ?? 'Room'}
-      onBack={() => {
-        room.leave();
-        onLeave();
-      }}
-    >
+    <Screen title={s.room?.name ?? 'Room'} onBack={goBack}>
+      {leaving && (
+        <Confirm
+          title="Leave the room?"
+          text={room.isHost ? 'You host this room: leaving closes it for everyone.' : undefined}
+          yes="Leave"
+          danger
+          onNo={() => setLeaving(false)}
+          onYes={onLeave}
+        />
+      )}
       {s.room && (
         <div className="list-item">
           <span className="grow">
@@ -393,14 +402,15 @@ export function RoomLobby({ room, onLeave }: { room: OnlineRoom; onLeave: () => 
               </button>
             </div>
           )}
-          <div className="section-title">Field &amp; map</div>
-          <MapPicker
-            value={{ arena: s.arena, difficulty: s.difficulty, seed: s.mapSeed }}
-            onChange={(v) => {
-              if (v.arena !== s.arena) room.setArena(v.arena);
-              room.setLevel(v.difficulty, v.seed);
-            }}
-          />
+          <div className="pick-list">
+            <MapRow
+              value={{ arena: s.arena, difficulty: s.difficulty, seed: s.mapSeed }}
+              onChange={(v) => {
+                if (v.arena !== s.arena) room.setArena(v.arena);
+                room.setLevel(v.difficulty, v.seed);
+              }}
+            />
+          </div>
           <button
             className="btn primary"
             disabled={!room.canStart}

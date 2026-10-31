@@ -1,12 +1,12 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { ECONOMY, playerLevel } from '../core/economy';
 import { lookFor } from '../game/marbles';
 import { progress, settings } from '../game/settings';
 import { dailyReady, wallet } from '../game/wallet';
 import { MarbleChip, tap } from './components';
 
-/** `shop` and `coins` open the Collection's shop (`coins` at the coin packs). */
-export type Target = 'shop' | 'coins' | 'settings' | 'profile';
+/** The sections. `shop` and `coins` open the Collection's shop (`coins` at the coin packs). */
+export type Target = 'menu' | 'shop' | 'coins' | 'marbles' | 'settings' | 'profile';
 
 /** A drawstring Marble Bag, like the one in the Collection. */
 const BagIcon = () => (
@@ -81,5 +81,68 @@ export function TopBar({ on, go }: { on: string; go: (t: Target) => void }) {
         </button>
       </div>
     </header>
+  );
+}
+
+const PlayIcon = () => (
+  <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden>
+    <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="3 2.2" />
+    <circle cx="12" cy="12" r="3.6" fill="currentColor" />
+  </svg>
+);
+const MarblesIcon = () => (
+  <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden>
+    <circle cx="7.5" cy="15.5" r="4" fill="currentColor" />
+    <circle cx="16.5" cy="15.5" r="4" fill="none" stroke="currentColor" strokeWidth="2" />
+    <circle cx="12" cy="7.5" r="4" fill="none" stroke="currentColor" strokeWidth="2" />
+  </svg>
+);
+const PersonIcon = () => (
+  <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden>
+    <circle cx="12" cy="8" r="4" fill="currentColor" />
+    <path d="M4 20.5c.8-4.2 4-6.5 8-6.5s7.2 2.3 8 6.5z" fill="currentColor" />
+  </svg>
+);
+
+/**
+ * The sections, where a thumb reaches them: a tab bar along the bottom of a phone held upright,
+ * a rail down the left side of one held sideways (styles.css decides; big screens keep the top bar).
+ */
+export function BottomNav({ on, go }: { on: Target; go: (t: Target) => void }) {
+  const coins = wallet.use((w) => w.coins);
+  const daily = wallet.use((w) => dailyReady(w));
+  const waiting = daily || coins >= ECONOMY.bagPrice;
+  const tabs: { id: Target; label: string; icon: ReactNode; badge?: boolean }[] = [
+    { id: 'menu', label: 'Play', icon: <PlayIcon /> },
+    { id: 'shop', label: 'Shop', icon: <BagIcon />, badge: waiting },
+    { id: 'marbles', label: 'Marbles', icon: <MarblesIcon /> },
+    { id: 'profile', label: 'Profile', icon: <PersonIcon /> },
+    { id: 'settings', label: 'Settings', icon: <GearIcon /> },
+  ];
+  return (
+    <nav className="tabbar" aria-label="Sections">
+      {tabs.map((t) => {
+        const current = on === t.id || (on === 'coins' && t.id === 'shop');
+        return (
+          <button
+            key={t.id}
+            className="tabbar-btn"
+            aria-current={current ? 'page' : undefined}
+            onClick={() => {
+              tap();
+              // Tapping the tab you are on takes you back to its top.
+              if (current) document.querySelector('.overlay .screen, .overlay .menu')?.scrollTo({ top: 0, behavior: 'smooth' });
+              else go(t.id);
+            }}
+          >
+            <span className="tabbar-icon">
+              {t.icon}
+              {t.badge && !current && <span className="badge" aria-label="Something is waiting" />}
+            </span>
+            <span className="tabbar-label">{t.label}</span>
+          </button>
+        );
+      })}
+    </nav>
   );
 }

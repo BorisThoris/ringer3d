@@ -4,6 +4,7 @@ import { lookFor, MIB_LOOKS, uiColor } from '../game/marbles';
 import { hud } from '../game/store';
 import { engine } from './engine';
 import { MarbleChip, tap } from './components';
+import { useBack } from './nav';
 
 const EMOTES = ['Nice shot', 'So close', 'Oops', 'GG'];
 
@@ -22,6 +23,15 @@ export function Hud({ onQuit, online }: { onQuit: () => void; online: boolean })
       }
     }
   }, [s.myTurn, s.power, showHint]);
+
+  // Back in a match opens the pause menu; back again closes it.
+  useBack(true, () => setPaused((p) => !p));
+  // Leaving the app (home, a call, the app switcher) pauses the match.
+  useEffect(() => {
+    const away = () => document.hidden && setPaused(true);
+    document.addEventListener('visibilitychange', away);
+    return () => document.removeEventListener('visibilitychange', away);
+  }, []);
 
   if (!s.active) return null;
   const session = engine.session;

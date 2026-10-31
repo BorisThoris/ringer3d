@@ -9,7 +9,7 @@ import { store } from '../platformStore';
 import { tradedUp } from '../platformFeatures';
 import { services } from '../services';
 import { useItems } from './useItems';
-import { Marble3D, MarbleChip, Screen, tap } from './components';
+import { Marble3D, MarbleChip, Screen, Sheet, tap } from './components';
 
 export const TIER_COLOR: Record<Tier, string> = {
   Common: '#b9c1d0',
@@ -49,7 +49,7 @@ export function FloatBar({ float }: { float: number }) {
 }
 
 /** A big look at one marble: everything a collector checks. */
-function Inspect({ c, equipped, onEquip, onMelt, onClose }: { c: Held; equipped: boolean; onEquip: () => void; onMelt?: () => void; onClose: () => void }) {
+function Inspect({ c, equipped, onEquip, onMelt }: { c: Held; equipped: boolean; onEquip: () => void; onMelt?: () => void }) {
   return (
     <section
       className={`inspect${c.shiny ? ' shiny' : ''}${c.effect !== 'none' ? ' phenomenon' : ''}`}
@@ -117,9 +117,6 @@ function Inspect({ c, equipped, onEquip, onMelt, onClose }: { c: Held; equipped:
               Melt for {meltValue(c)}
             </button>
           )}
-          <button className="btn ghost" onClick={onClose}>
-            Close
-          </button>
         </div>
       </div>
     </section>
@@ -133,10 +130,11 @@ export type CollectionTab = 'shop' | 'coins' | 'marbles';
  * Two tabs. Shop: Marble Bags, coin packs, the daily reward and Steam. My marbles: what you hold
  * (here and on Steam), trade-ups and the Marble Book. A marble you open or pick shows above both.
  */
-export function Collection({ onBack, tab: initial = 'shop' }: { onBack: () => void; tab?: CollectionTab }) {
-  const [tab, setTab] = useState<'shop' | 'marbles'>(initial === 'marbles' ? 'marbles' : 'shop');
+export function Collection({ onBack, tab: initial = 'shop', onTab }: { onBack: () => void; tab?: CollectionTab; onTab: (t: CollectionTab) => void }) {
+  // The tab belongs to the app (a phone switches it from the bottom bar).
+  const tab = initial === 'marbles' ? 'marbles' : 'shop';
+  const setTab = onTab;
   useEffect(() => {
-    setTab(initial === 'marbles' ? 'marbles' : 'shop');
     if (initial === 'coins') requestAnimationFrame(() => document.getElementById('coin-packs')?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
   }, [initial]);
   const w = wallet.use((x) => x);
@@ -171,10 +169,7 @@ export function Collection({ onBack, tab: initial = 'shop' }: { onBack: () => vo
     setNote(s);
     window.setTimeout(() => setNote((n) => (n === s ? null : n)), 3500);
   };
-  const show = (id: string) => {
-    setOpen(id);
-    requestAnimationFrame(() => document.querySelector('.inspect')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
-  };
+  const show = (id: string) => setOpen(id);
 
   const doTradeUp = async () => {
     tap();
@@ -192,7 +187,7 @@ export function Collection({ onBack, tab: initial = 'shop' }: { onBack: () => vo
 
   return (
     <Screen title={tab === 'shop' ? 'Shop' : 'My marbles'} onBack={onBack} wide>
-      <div className="tabs" role="tablist" aria-label="Shop or your marbles">
+      <div className="tabs collection-tabs" role="tablist" aria-label="Shop or your marbles">
         {(['shop', 'marbles'] as const).map((t) => (
           <button
             key={t}
@@ -211,6 +206,7 @@ export function Collection({ onBack, tab: initial = 'shop' }: { onBack: () => vo
       </div>
       <div className="collection">
         {shown && (
+          <Sheet title={shown.source === 'steam' ? 'Steam marble' : 'Marble'} onClose={() => setOpen(null)}>
           <Inspect
             c={shown}
             equipped={equipped === shown.id}
@@ -225,8 +221,8 @@ export function Collection({ onBack, tab: initial = 'shop' }: { onBack: () => vo
                   }
                 : undefined
             }
-            onClose={() => setOpen(null)}
           />
+          </Sheet>
         )}
 
         {tab === 'shop' && (

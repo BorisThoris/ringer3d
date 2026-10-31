@@ -9,7 +9,9 @@ import { useItems } from './useItems';
 import { progress, settings, type GuideMode } from '../game/settings';
 import { fighter, FIGHTERS } from '../game/story';
 import type { Quality } from '../render/marbleMesh';
-import { Chips, MapPicker, Marble3D, MarbleChip, MarblePicker, Screen, tap, type MapChoice } from './components';
+import { ARENAS } from '../game/arenas';
+import { groundSwatch } from '../render/groundArt';
+import { Chips, Confirm, MapPicker, mapLabel, Marble3D, MarbleChip, MarblePicker, PickRow, Screen, Sheet, tap, type MapChoice } from './components';
 
 export const PLAYABLE_MARBLES = Object.keys(MARBLES).filter((m) => m !== 'mib' && m !== 'obsidian');
 
@@ -74,15 +76,6 @@ export function MainMenu({ go }: { go: (s: 'story' | 'quick' | 'local' | 'online
       ))}
       <div className="menu-foot">
         <button
-          className="btn small shop-btn"
-          onClick={() => {
-            tap();
-            go('collection');
-          }}
-        >
-          Shop &amp; marbles
-        </button>
-        <button
           className="btn small ghost"
           onClick={() => {
             tap();
@@ -107,13 +100,69 @@ export function MainMenu({ go }: { go: (s: 'story' | 'quick' | 'local' | 'online
 
 const BOT_SKILLS = ['rookie', 'novice', 'casual', 'regular', 'skilled', 'expert', 'master', 'legend'] as const;
 
+/** The shooter you play: a row on a setup screen, with the whole collection in its sheet. */
+export function ShooterRow({ label = 'Your shooter', value, onChange }: { label?: string; value: string; onChange: (m: string) => void }) {
+  const playable = usePlayable();
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <PickRow label={label} value={lookFor(value).name} icon={<MarbleChip id={value} size={40} />} onClick={() => setOpen(true)} />
+      {open && (
+        <Sheet
+          title={label}
+          onClose={() => setOpen(false)}
+          footer={
+            <button className="btn primary" onClick={() => setOpen(false)}>
+              Done
+            </button>
+          }
+        >
+          <div className="taw-preview">
+            <Marble3D id={value} size={150} />
+          </div>
+          <MarblePicker value={value} onChange={onChange} options={playable} />
+        </Sheet>
+      )}
+    </>
+  );
+}
+
+/** Field, difficulty and map: a row on a setup screen, the full picker in its sheet. */
+export function MapRow({ value, onChange }: { value: MapChoice; onChange: (v: MapChoice) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <PickRow
+        label="Field & map"
+        value={mapLabel(value)}
+        icon={<span className="field-swatch" style={{ background: `center / cover url(${groundSwatch(value.arena)}), ${ARENAS[value.arena].groundColor}` }} />}
+        onClick={() => setOpen(true)}
+      />
+      {open && (
+        <Sheet
+          title="Field & map"
+          onClose={() => setOpen(false)}
+          footer={
+            <button className="btn primary" onClick={() => setOpen(false)}>
+              Done
+            </button>
+          }
+        >
+          <MapPicker value={value} onChange={onChange} />
+        </Sheet>
+      )}
+    </>
+  );
+}
+
 export function QuickPlay({ onBack, onStart }: { onBack: () => void; onStart: (map: MapChoice, players: PlayerInfo[]) => void }) {
   const st = settings.use((s) => s);
-  const playable = usePlayable();
   const [map, setMap] = useState<MapChoice>(() => ({ arena: 'culdesac', difficulty: 'medium', seed: randomSeed() }));
   const [diff, setDiff] = useState<(typeof BOT_SKILLS)[number]>('casual');
   const [opp, setOpp] = useState('tide');
+  const [sheet, setSheet] = useState<'opp' | null>(null);
   const oppOptions = FIGHTERS.filter((f) => f.marble !== st.marble).map((f) => f.id);
+  const f = fighter(opp);
 
   return (
     <Screen
@@ -124,7 +173,6 @@ export function QuickPlay({ onBack, onStart }: { onBack: () => void; onStart: (m
           className="btn primary"
           onClick={() => {
             tap();
-            const f = fighter(opp);
             onStart(map, [
               { id: 'me', name: st.playerName, marble: st.marble, kind: 'human' },
               { id: 'bot', name: f.name, marble: f.marble, kind: 'bot', botProfile: diff },
@@ -135,37 +183,44 @@ export function QuickPlay({ onBack, onStart }: { onBack: () => void; onStart: (m
         </button>
       }
     >
-      <div className="section-title">Opponent</div>
-      <div className="chips">
-        {oppOptions.map((id) => {
-          const f = fighter(id);
-          return (
-            <button
-              key={id}
-              className="chip"
-              aria-pressed={opp === id}
-              onClick={() => {
-                tap();
-                setOpp(id);
-              }}
-            >
-              <MarbleChip id={f.marble} size={22} /> {f.name}
+      <div className="pick-list">
+        <PickRow label="Opponent" value={`${f.name} · ${BOT_PROFILES[diff].label}`} icon={<MarbleChip id={f.marble} size={40} />} onClick={() => setSheet('opp')} />
+        <MapRow value={map} onChange={setMap} />
+        <ShooterRow value={st.marble} onChange={(m) => settings.set({ marble: m })} />
+      </div>
+      <p className="fine">Bots see only what you see and flick with a shaky thumb like anyone else. Higher skill means a steadier hand and better planning.</p>
+      {sheet === 'opp' && (
+        <Sheet
+          title="Opponent"
+          onClose={() => setSheet(null)}
+          footer={
+            <button className="btn primary" onClick={() => setSheet(null)}>
+              Done
             </button>
-          );
-        })}
-      </div>
-      <div className="section-title">Bot skill</div>
-      <Chips label="Bot skill" value={diff} options={BOT_SKILLS.map((d) => ({ id: d, label: BOT_PROFILES[d].label }))} onChange={setDiff} />
-      <p className="lede" style={{ margin: 0 }}>
-        Bots see only what you see and flick with a shaky thumb like anyone else. Higher skill means a steadier hand and better planning.
-      </p>
-      <div className="section-title">Field &amp; map</div>
-      <MapPicker value={map} onChange={setMap} />
-      <div className="section-title">Your shooter</div>
-      <div className="taw-preview">
-        <Marble3D id={st.marble} size={150} />
-      </div>
-      <MarblePicker value={st.marble} onChange={(m) => settings.set({ marble: m })} options={playable} />
+          }
+        >
+          <div className="chips">
+            {oppOptions.map((id) => {
+              const o = fighter(id);
+              return (
+                <button
+                  key={id}
+                  className="chip"
+                  aria-pressed={opp === id}
+                  onClick={() => {
+                    tap();
+                    setOpp(id);
+                  }}
+                >
+                  <MarbleChip id={o.marble} size={22} /> {o.name}
+                </button>
+              );
+            })}
+          </div>
+          <div className="section-title">Skill</div>
+          <Chips label="Bot skill" value={diff} options={BOT_SKILLS.map((d) => ({ id: d, label: BOT_PROFILES[d].label }))} onChange={setDiff} />
+        </Sheet>
+      )}
     </Screen>
   );
 }
@@ -177,6 +232,7 @@ export function LocalPlay({ onBack, onStart }: { onBack: () => void; onStart: (m
     { name: st.playerName, marble: st.marble },
     { name: 'Player 2', marble: st.marble === 'tide' ? 'ember' : 'tide' },
   ]);
+  const [picking, setPicking] = useState<number | null>(null);
   const update = (i: number, p: Partial<{ name: string; marble: string }>) => setPlayers((ps) => ps.map((x, j) => (j === i ? { ...x, ...p } : x)));
 
   return (
@@ -198,63 +254,70 @@ export function LocalPlay({ onBack, onStart }: { onBack: () => void; onStart: (m
         </button>
       }
     >
-      <p className="lede">Take turns on one device. The camera swings to whoever is up.</p>
-      <div className="list">
+      <p className="fine">Take turns on one device. The camera swings to whoever is up.</p>
+      <div className="pick-list">
         {players.map((p, i) => (
-          <div key={i} className="list-item" style={{ flexWrap: 'wrap' }}>
-            <MarbleChip id={p.marble} size={40} />
+          <div key={i} className="player-row">
+            <button className="marble-btn" aria-label={`Player ${i + 1}'s marble: ${lookFor(p.marble).name}`} onClick={() => setPicking(i)}>
+              <MarbleChip id={p.marble} size={40} />
+            </button>
             <label className="field grow">
               <span className="hint">Player {i + 1}</span>
-              <input value={p.name} maxLength={14} onChange={(e) => update(i, { name: e.target.value })} />
+              <input value={p.name} maxLength={14} enterKeyHint="done" autoComplete="off" onChange={(e) => update(i, { name: e.target.value })} />
             </label>
             {players.length > 2 && (
               <button className="btn icon ghost" aria-label={`Remove player ${i + 1}`} onClick={() => setPlayers((ps) => ps.filter((_, j) => j !== i))}>
                 ✕
               </button>
             )}
-            <div style={{ width: '100%' }}>
-              <div className="chips">
-                {PLAYABLE_MARBLES.map((m) => (
-                  <button key={m} className="chip" aria-pressed={p.marble === m} aria-label={lookFor(m).name} onClick={() => update(i, { marble: m })} style={{ padding: 6, minHeight: 40 }}>
-                    <MarbleChip id={m} size={26} />
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
         ))}
+        {players.length < 4 && (
+          <button
+            className="pick-row add"
+            onClick={() => {
+              tap();
+              setPlayers((ps) => [...ps, { name: `Player ${ps.length + 1}`, marble: PLAYABLE_MARBLES[(ps.length * 2) % PLAYABLE_MARBLES.length] }]);
+            }}
+          >
+            <span className="pick-icon">+</span>
+            <span className="pick-text">
+              <b>Add a player</b>
+            </span>
+          </button>
+        )}
+        <MapRow value={map} onChange={setMap} />
       </div>
-      {players.length < 4 && (
-        <button
-          className="btn"
-          onClick={() => {
-            tap();
-            setPlayers((ps) => [...ps, { name: `Player ${ps.length + 1}`, marble: PLAYABLE_MARBLES[(ps.length * 2) % PLAYABLE_MARBLES.length] }]);
-          }}
+      {picking !== null && (
+        <Sheet
+          title={`${players[picking].name.trim() || `Player ${picking + 1}`}'s marble`}
+          onClose={() => setPicking(null)}
+          footer={
+            <button className="btn primary" onClick={() => setPicking(null)}>
+              Done
+            </button>
+          }
         >
-          Add player
-        </button>
+          <MarblePicker value={players[picking].marble} onChange={(m) => update(picking, { marble: m })} options={PLAYABLE_MARBLES} />
+        </Sheet>
       )}
-      <div className="section-title">Field &amp; map</div>
-      <MapPicker value={map} onChange={setMap} />
     </Screen>
   );
 }
 
-export function SettingsScreen({ onBack }: { onBack: () => void }) {
+export function SettingsScreen({ onBack, onHowTo }: { onBack: () => void; onHowTo?: () => void }) {
   const s = settings.use((x) => x);
-  const playable = usePlayable();
+  const [resetting, setResetting] = useState(false);
   return (
     <Screen title="Settings" onBack={onBack}>
       <label className="field">
         Your name
-        <input value={s.playerName} maxLength={14} onChange={(e) => settings.set({ playerName: e.target.value })} />
+        <input value={s.playerName} maxLength={14} enterKeyHint="done" autoComplete="off" onChange={(e) => settings.set({ playerName: e.target.value })} />
       </label>
-      <div className="section-title">Shooter</div>
-      <div className="taw-preview">
-        <Marble3D id={s.marble} size={150} />
+      <div className="pick-list">
+        <ShooterRow label="Shooter" value={s.marble} onChange={(m) => settings.set({ marble: m })} />
+        {onHowTo && <PickRow label="New to Ringer?" value="How to play" icon={<span className="pick-glyph">?</span>} onClick={onHowTo} />}
       </div>
-      <MarblePicker value={s.marble} onChange={(m) => settings.set({ marble: m })} options={playable} />
       <div className="section-title">Aim guide</div>
       <Chips<GuideMode>
         label="Aim guide"
@@ -277,6 +340,7 @@ export function SettingsScreen({ onBack }: { onBack: () => void }) {
         ]}
         onChange={(q) => settings.set({ quality: q })}
       />
+      <div className="section-title">Sound &amp; feel</div>
       <label className="field">
         Effects volume
         <input type="range" min={0} max={1} step={0.05} value={s.sfx} onChange={(e) => settings.set({ sfx: +e.target.value })} />
@@ -289,11 +353,10 @@ export function SettingsScreen({ onBack }: { onBack: () => void }) {
         Aim sensitivity
         <input type="range" min={0.4} max={2} step={0.05} value={s.aimSensitivity} onChange={(e) => settings.set({ aimSensitivity: +e.target.value })} />
       </label>
-      <div className="chips">
-        <button className="chip" aria-pressed={s.haptics} onClick={() => settings.set({ haptics: !s.haptics })}>
-          Vibration {s.haptics ? 'on' : 'off'}
-        </button>
-      </div>
+      <label className="switch-row">
+        <span>Vibration</span>
+        <input type="checkbox" role="switch" checked={s.haptics} onChange={() => settings.set({ haptics: !s.haptics })} />
+      </label>
       <div className="section-title">Online connection</div>
       <Chips<'p2p' | 'server' | 'steam'>
         label="Online connection"
@@ -305,7 +368,7 @@ export function SettingsScreen({ onBack }: { onBack: () => void }) {
         ]}
         onChange={(m) => settings.set({ netMode: m })}
       />
-      <p className="lede" style={{ margin: 0 }}>
+      <p className="fine">
         {s.netMode === 'steam'
           ? 'Steam lobbies and Steam networking: invite friends from Steam, play through Valve\'s relays. Steam players meet Steam players.'
           : s.netMode === 'p2p'
@@ -313,22 +376,28 @@ export function SettingsScreen({ onBack }: { onBack: () => void }) {
           : 'Uses your own Ringer lobby server, which can also relay games for players on very strict networks.'}
       </p>
       {s.netMode === 'server' && (
-      <label className="field">
-        Lobby server
-        <input value={s.lobbyUrl} onChange={(e) => settings.set({ lobbyUrl: e.target.value.trim() })} spellCheck={false} />
-        <span className="hint">Used for the server browser and to connect players. Matches themselves run peer to peer.</span>
-      </label>
+        <label className="field">
+          Lobby server
+          <input value={s.lobbyUrl} inputMode="url" autoComplete="off" onChange={(e) => settings.set({ lobbyUrl: e.target.value.trim() })} spellCheck={false} />
+          <span className="hint">Used for the server browser and to connect players. Matches themselves run peer to peer.</span>
+        </label>
       )}
-      <button
-        className="btn danger small"
-        onClick={() => {
-          if (confirm('Reset Tower progress and unlocked fighters?')) {
-            progress.set({ unlocked: ['ember', 'tide', 'pip', 'jade'], cleared: [], best: {}, run: null });
-          }
-        }}
-      >
+      <button className="btn danger small" onClick={() => setResetting(true)}>
         Reset Tower progress
       </button>
+      {resetting && (
+        <Confirm
+          title="Reset the Tower?"
+          text="Your climb, cleared fighters and unlocked fighters start over. Coins and marbles stay."
+          yes="Reset"
+          danger
+          onNo={() => setResetting(false)}
+          onYes={() => {
+            progress.set({ unlocked: ['ember', 'tide', 'pip', 'jade'], cleared: [], best: {}, run: null });
+            setResetting(false);
+          }}
+        />
+      )}
     </Screen>
   );
 }

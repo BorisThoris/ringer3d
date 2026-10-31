@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { WORLD } from '../core/constants';
 import { ARENA_LIST, ARENAS, type ArenaId } from '../game/arenas';
 import { DIFFICULTIES, generateMap, randomSeed, type Difficulty, type MapDef } from '../game/maps';
@@ -7,6 +8,7 @@ import { sound } from '../render/audio';
 import { groundSwatch } from '../render/groundArt';
 import { MarblePreview } from '../render/preview';
 import { settings } from '../game/settings';
+import { useBack } from './nav';
 
 export function marbleGradient(look: MarbleLook): string {
   switch (look.core) {
@@ -350,4 +352,90 @@ export function Marble3D({ id, size = 120, accent, style }: { id: string; size?:
       style={{ width: size, height: size, flex: 'none', maskImage: feather, WebkitMaskImage: feather, ...style }}
     />
   );
+}
+
+/**
+ * A modal sheet: slides up from the bottom on a phone, a centred card on a big screen. Back
+ * (button, gesture, Esc), the scrim and the handle all close it.
+ */
+export function Sheet({ title, onClose, children, footer }: { title: string; onClose: () => void; children: ReactNode; footer?: ReactNode }) {
+  useBack(true, onClose);
+  // On the body: a blurred panel would otherwise trap a fixed child inside itself.
+  return createPortal(
+    <div className="modal" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal-sheet" role="dialog" aria-modal="true" aria-label={title}>
+        <button className="grab" aria-label="Close" onClick={onClose} />
+        <div className="modal-head">
+          <h3>{title}</h3>
+          <button className="btn icon ghost" aria-label="Close" onClick={onClose}>
+            ✕
+          </button>
+        </div>
+        <div className="modal-body">{children}</div>
+        {footer && <div className="modal-foot">{footer}</div>}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/** Are you sure? The safe choice is the big one; back means no. */
+export function Confirm({ title, text, yes, danger, onYes, onNo }: { title: string; text?: string; yes: string; danger?: boolean; onYes: () => void; onNo: () => void }) {
+  return (
+    <Sheet
+      title={title}
+      onClose={onNo}
+      footer={
+        <>
+          <button
+            className="btn primary"
+            onClick={() => {
+              tap();
+              onNo();
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            className={danger ? 'btn danger' : 'btn'}
+            onClick={() => {
+              tap();
+              onYes();
+            }}
+          >
+            {yes}
+          </button>
+        </>
+      }
+    >
+      {text && <p className="lede">{text}</p>}
+    </Sheet>
+  );
+}
+
+/** One line of a setup screen: what is chosen, and a tap to change it in a sheet. */
+export function PickRow({ label, value, icon, onClick }: { label: string; value: ReactNode; icon?: ReactNode; onClick: () => void }) {
+  return (
+    <button
+      className="pick-row"
+      onClick={() => {
+        tap();
+        onClick();
+      }}
+    >
+      {icon && <span className="pick-icon">{icon}</span>}
+      <span className="pick-text">
+        <small>{label}</small>
+        <b>{value}</b>
+      </span>
+      <span className="chev" aria-hidden>
+        ›
+      </span>
+    </button>
+  );
+}
+
+/** The map choice in a few words: "Cul-de-sac · Medium · Kerbside Run". */
+export function mapLabel(v: MapChoice): string {
+  return `${ARENAS[v.arena].name} · ${DIFF_LABEL[v.difficulty]}`;
 }

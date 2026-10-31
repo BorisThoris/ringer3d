@@ -4,6 +4,7 @@ import type { ArenaId } from '../game/arenas';
 import type { Difficulty, MapDef } from '../game/maps';
 import type { SessionMode, SessionResult } from '../game/session';
 import { lookFor, uiColor } from '../game/marbles';
+import { hud } from '../game/store';
 import { rewardMatch } from '../game/wallet';
 import { matchEnded, presence } from '../platformFeatures';
 import { services } from '../services';
@@ -15,16 +16,19 @@ import type { OnlineRoom } from '../net/room';
 import { sound } from '../render/audio';
 import { engine } from './engine';
 import { Hud } from './Hud';
+import { goBack, installBack, setBaseBack } from './nav';
 import { listenForInviteLinks, listenForSteamInvites, OnlineHub, RoomLobby } from './online';
 import type { MapChoice } from './components';
 import { HowTo, LocalPlay, MainMenu, QuickPlay, Results, SettingsScreen, type ResultsInfo } from './screens';
 import { Ending, StorySelect, Tower, Versus } from './story';
 import { Leaderboards } from './social';
 import { AchievementToast, Profile } from './profile';
-import { TopBar, type Target } from './topbar';
+import { BottomNav, TopBar, type Target } from './topbar';
 
 /** Screens that sit under the top bar (everything but the match and the Tower's cut-scenes). */
 const BAR_SCREENS = new Set<ScreenState['name']>(['menu', 'quick', 'local', 'settings', 'howto', 'story-select', 'online', 'collection', 'leaderboards', 'profile', 'tower', 'results']);
+/** The sections. On a phone they are the bottom tabs; every other screen opens over them. */
+const TAB_SCREENS = new Set<ScreenState['name']>(['menu', 'collection', 'profile', 'settings']);
 
 type ScreenState =
   | { name: 'menu' | 'quick' | 'local' | 'settings' | 'howto' | 'story-select' | 'online' | 'leaderboards' | 'profile' }
@@ -49,10 +53,21 @@ interface PlayArgs {
   results: (r: SessionResult) => ResultsInfo;
 }
 
+const MENU: ScreenState = { name: 'menu' };
+
 export function App() {
-  const [screen, setScreen] = useState<ScreenState>({ name: 'menu' });
+  // The back stack: the last screen is the one showing, and back returns to the one under it.
+  const [stack, setStack] = useState<ScreenState[]>([MENU]);
+  const screen = stack[stack.length - 1];
   const roomRef = useRef<OnlineRoom | null>(null);
   const myMarble = settings.use((s) => s.marble);
+
+  /** Opens a screen over the current one. */
+  const push = (s: ScreenState) => setStack((st) => [...st, s]);
+  /** Swaps the current screen for another (the results for the match). */
+  const replace = (s: ScreenState) => setStack((st) => [...st.slice(0, -1), s]);
+  /** A fresh history on top of the home screen. */
+  const reset = (...s: ScreenState[]) => setStack([MENU, ...s]);
 
   // The main menu is a column on the left: slide the live ring into the space beside it.
   useEffect(() => {
@@ -82,7 +97,7 @@ export function App() {
       listenForSteamInvites((room) => {
         roomRef.current?.leave();
         roomRef.current = room;
-        setScreen({ name: 'room', room });
+        reset({ name: 'online' }, { name: 'room', room });
       }),
     [],
   );
@@ -96,7 +111,7 @@ export function App() {
           roomRef.current?.leave();
           roomRef.current = room;
           setLinkError(null);
-          setScreen({ name: 'room', room });
+          reset({ name: 'online' }, { name: 'room', room });
         },
         (why) => setLinkError(why),
       ),
@@ -113,20 +128,54 @@ export function App() {
     document.documentElement.style.setProperty('--accent', uiColor(lookFor(myMarble)));
   }, [myMarble]);
 
-  const toMenu = () => {
+  const leaveRoom = () => {
     roomRef.current?.leave();
     roomRef.current = null;
-    engine.startDemo();
-    setScreen({ name: 'menu' });
   };
 
-  /** A top-bar button's screen. */
-  const barScreen = (t: Target): ScreenState => (t === 'shop' || t === 'coins' ? { name: 'collection', tab: t } : { name: t });
+  const toMenu = () => {
+    leaveRoom();
+    engine.startDemo();
+    reset();
+  };
 
-  /** Leave a finished match (and its room) for a menu screen. */
-  const leaveTo = (t: Target | 'marbles') => {
-    toMenu();
-    setScreen(t === 'marbles' ? { name: 'collection', tab: 'marbles' } : barScreen(t));
+  // ---- Back ------------------------------------------------------------------------------
+  /** One step back on the stack. A match handles its own back (the pause menu). */
+  const stepBack = (): boolean => {
+    const top = stack[stack.length - 1];
+    if (top.name === 'game') return true;
+    // Back from the results is their second button (Menu, Back to the Tower), else the menu.
+    if (top.name === 'results') {
+      (top.info.secondary?.action ?? toMenu)();
+      return true;
+    }
+    if (top.name === 'ending') {
+      toMenu();
+      return true;
+    }
+    if (stack.length < 2) return false;
+    if (top.name === 'room') leaveRoom();
+    setStack(stack.slice(0, -1));
+    return true;
+  };
+  setBaseBack(() => stack.length > 1 || screen.name !== 'menu', stepBack);
+  useEffect(() => {
+    // Esc is the game's own (it cancels a flick) while one is being charged.
+    installBack(() => hud.get().active && hud.get().power > 0.02);
+  }, []);
+
+  /** A tab's (or top-bar button's) screen. */
+  const tabScreen = (t: Target): ScreenState =>
+    t === 'shop' || t === 'coins' || t === 'marbles' ? { name: 'collection', tab: t } : t === 'menu' ? MENU : { name: t };
+
+  /** Opens a section: its own history, over the home screen. Leaves a finished match's room. */
+  const openTab = (t: Target) => {
+    if (screen.name === 'results') {
+      leaveRoom();
+      engine.startDemo();
+    }
+    if (t === 'menu') reset();
+    else reset(tabScreen(t));
   };
 
   const scoresOf = (players: PlayerInfo[], r: SessionResult) =>
@@ -178,15 +227,21 @@ export function App() {
         const me = r.localSeats.length === 1 ? r.localSeats[0] : -1;
         const coins = recordStats(r, a.players[me]?.marble);
         const info = a.results(r);
-        setScreen({ name: 'results', info: coins === undefined ? info : { ...info, reward: { coins, won: r.winners.length === 1 && r.winners[0] === me } } });
+        replace({ name: 'results', info: coins === undefined ? info : { ...info, reward: { coins, won: r.winners.length === 1 && r.winners[0] === me } } });
         // Playtime drops: Steam decides whether one is due; if one comes, it lands on the results.
         if (coins !== undefined && services.items)
           void services.items?.drop().then((drops) => {
-            if (drops.length) setScreen((s) => (s.name === 'results' ? { ...s, info: { ...s.info, drops: drops.map((d) => d.id) } } : s));
+            if (drops.length) setStack((st) => st.map((s) => (s.name === 'results' ? { ...s, info: { ...s.info, drops: drops.map((d) => d.id) } } : s)));
           });
       },
     });
-    setScreen({ name: 'game', online: !!a.room });
+    // A match takes the place of its cut-scene, an earlier match or its results; otherwise it
+    // opens over its setup screen.
+    setStack((st) => {
+      const top = st[st.length - 1].name;
+      const g: ScreenState = { name: 'game', online: !!a.room };
+      return top === 'versus' || top === 'game' || top === 'results' ? [...st.slice(0, -1), g] : [...st, g];
+    });
   };
 
   // ---- Modes ----------------------------------------------------------------------------
@@ -222,6 +277,12 @@ export function App() {
     });
   };
 
+  /** The Tower at a floor, its field idling behind it; back from there is the menu. */
+  const toTower = (fighterId: string, stage: number) => {
+    engine.startDemo(buildTower(fighterId)[stage].arena);
+    reset({ name: 'tower', fighter: fighterId, stage });
+  };
+
   /** `series`: games won so far by [you, them] on a best-of floor. */
   const storyMatch = (fighterId: string, stage: number, series: [number, number] = [0, 0]) => {
     const st = buildTower(fighterId)[stage];
@@ -250,7 +311,7 @@ export function App() {
             sub: `${bestOf} · you ${tally[0]}, ${opp.name} ${tally[1]}`,
             scores: scoresOf(players, r),
             primary: { label: 'Next game', action: () => storyMatch(fighterId, stage, tally) },
-            secondary: { label: 'Back to the Tower', action: () => { engine.startDemo(st.arena); setScreen({ name: 'tower', fighter: fighterId, stage }); } },
+            secondary: { label: 'Back to the Tower', action: () => toTower(fighterId, stage) },
           };
         }
         const won = need > 1 ? tally[0] >= need : r.winners.length === 1 && r.winners[0] === 0;
@@ -270,9 +331,15 @@ export function App() {
             quote: { who: opp.name, marble: opp.marble, text: opp.defeat },
             scores: scoresOf(players, r),
             primary: last
-              ? { label: 'See the ending', action: () => setScreen({ name: 'ending', fighter: fighterId, unlocked: null }) }
-              : { label: 'Next challenger', action: () => setScreen({ name: 'versus', fighter: fighterId, stage: next }) },
-            secondary: { label: 'Back to the Tower', action: () => { engine.startDemo(st.arena); setScreen({ name: 'tower', fighter: fighterId, stage: next }); } },
+              ? {
+                  label: 'See the ending',
+                  action: () => {
+                    engine.startDemo();
+                    reset({ name: 'ending', fighter: fighterId, unlocked: null });
+                  },
+                }
+              : { label: 'Next challenger', action: () => reset({ name: 'tower', fighter: fighterId, stage: next }, { name: 'versus', fighter: fighterId, stage: next }) },
+            secondary: { label: 'Back to the Tower', action: () => toTower(fighterId, next) },
           };
         }
         return {
@@ -281,7 +348,7 @@ export function App() {
           quote: { who: opp.name, marble: opp.marble, text: opp.taunt },
           scores: scoresOf(players, r),
           primary: { label: 'Try again', action: () => storyMatch(fighterId, stage) },
-          secondary: { label: 'Back to the Tower', action: () => { engine.startDemo(st.arena); setScreen({ name: 'tower', fighter: fighterId, stage }); } },
+          secondary: { label: 'Back to the Tower', action: () => toTower(fighterId, stage) },
         };
       },
     });
@@ -327,7 +394,8 @@ export function App() {
     const stage = run && run.fighter === fighterId ? run.stage : 0;
     if (!run || run.fighter !== fighterId) progress.set({ run: { fighter: fighterId, stage: 0 } });
     engine.startDemo(buildTower(fighterId)[stage].arena);
-    setScreen({ name: 'tower', fighter: fighterId, stage });
+    // The Tower takes the place of the fighter choice: back from it is the menu.
+    reset({ name: 'tower', fighter: fighterId, stage });
   };
 
   // ---- Render ---------------------------------------------------------------------------
@@ -340,45 +408,39 @@ export function App() {
             if (s === 'story') {
               const run = progress.get().run;
               if (run) continueStory(run.fighter);
-              else setScreen({ name: 'story-select' });
-            } else setScreen(s === 'collection' ? { name: s } : { name: s });
+              else push({ name: 'story-select' });
+            } else if (s === 'collection') openTab('shop');
+            else push({ name: s });
           }}
         />
       );
       break;
     case 'quick':
-      body = <QuickPlay onBack={toMenu} onStart={quick} />;
+      body = <QuickPlay onBack={goBack} onStart={quick} />;
       break;
     case 'local':
-      body = <LocalPlay onBack={toMenu} onStart={local} />;
+      body = <LocalPlay onBack={goBack} onStart={local} />;
       break;
     case 'settings':
-      body = <SettingsScreen onBack={toMenu} />;
+      body = <SettingsScreen onBack={goBack} onHowTo={() => push({ name: 'howto' })} />;
       break;
     case 'howto':
-      body = <HowTo onBack={toMenu} />;
+      body = <HowTo onBack={goBack} />;
       break;
     case 'collection':
-      body = <Collection onBack={toMenu} tab={screen.tab} />;
+      body = <Collection onBack={goBack} tab={screen.tab} onTab={(t) => replace({ name: 'collection', tab: t })} />;
       break;
     case 'leaderboards':
-      body = <Leaderboards onBack={toMenu} />;
+      body = <Leaderboards onBack={goBack} />;
       break;
     case 'profile':
-      body = <Profile onBack={toMenu} />;
+      body = <Profile onBack={goBack} onLeaderboards={() => push({ name: 'leaderboards' })} />;
       break;
     case 'story-select':
-      body = <StorySelect onBack={toMenu} onChoose={continueStory} />;
+      body = <StorySelect onBack={goBack} onChoose={continueStory} />;
       break;
     case 'tower':
-      body = (
-        <Tower
-          fighterId={screen.fighter}
-          stage={screen.stage}
-          onBack={() => setScreen({ name: 'story-select' })}
-          onFight={() => setScreen({ name: 'versus', fighter: screen.fighter, stage: screen.stage })}
-        />
-      );
+      body = <Tower fighterId={screen.fighter} stage={screen.stage} onBack={goBack} onFight={() => push({ name: 'versus', fighter: screen.fighter, stage: screen.stage })} />;
       break;
     case 'versus':
       body = <Versus fighterId={screen.fighter} stage={screen.stage} onGo={() => storyMatch(screen.fighter, screen.stage)} />;
@@ -387,18 +449,36 @@ export function App() {
       body = <Ending fighterId={screen.fighter} unlockedName={screen.unlocked} onDone={toMenu} />;
       break;
     case 'online':
-      body = <OnlineHub onBack={toMenu} onRoom={(room) => setScreen({ name: 'room', room })} />;
+      body = <OnlineHub onBack={goBack} onRoom={(room) => push({ name: 'room', room })} />;
       break;
     case 'room':
-      body = <RoomLobby room={screen.room} onLeave={toMenu} />;
+      body = (
+        <RoomLobby
+          room={screen.room}
+          onLeave={() => {
+            leaveRoom();
+            setStack((st) => st.slice(0, -1));
+          }}
+        />
+      );
       break;
     case 'results':
-      body = <Results info={screen.info} onCollection={() => leaveTo('marbles')} />;
+      body = <Results info={screen.info} onCollection={() => openTab('marbles')} />;
       break;
     case 'game':
       body = null;
       break;
   }
+
+  const tab: Target | null = !TAB_SCREENS.has(screen.name)
+    ? null
+    : screen.name === 'collection'
+    ? screen.tab === 'marbles'
+      ? 'marbles'
+      : 'shop'
+    : screen.name === 'menu'
+    ? 'menu'
+    : (screen.name as 'profile' | 'settings');
 
   return (
     <>
@@ -410,9 +490,10 @@ export function App() {
         </div>
       )}
       {body && (
-        <div className={BAR_SCREENS.has(screen.name) ? 'overlay has-bar' : 'overlay'}>
-          {BAR_SCREENS.has(screen.name) && <TopBar on={screen.name} go={(t) => (screen.name === 'results' ? leaveTo(t) : setScreen(barScreen(t)))} />}
+        <div className={`overlay${BAR_SCREENS.has(screen.name) ? ' has-bar' : ''}${tab ? ' is-tab' : ' is-pushed'}`} data-screen={screen.name}>
+          {BAR_SCREENS.has(screen.name) && <TopBar on={screen.name} go={openTab} />}
           {body}
+          {tab && <BottomNav on={tab} go={openTab} />}
         </div>
       )}
     </>
