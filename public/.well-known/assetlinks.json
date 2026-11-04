@@ -1,10 +1,13 @@
 [
   {
-    "relation": ["delegate_permission/common.handle_all_urls"],
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
     "target": {
       "namespace": "android_app",
       "package_name": "com.boristhoris.ringer3d",
       "sha256_cert_fingerprints": [
+        "D1:F6:76:38:5C:1A:C8:07:BB:3C:44:F6:43:FF:BE:78:F3:13:CD:3C:93:ED:D6:B7:2E:0E:BA:7C:9B:9D:13:D1",
         "40:89:28:17:24:32:7A:3F:93:07:05:DD:56:B1:59:C5:F6:9D:D0:84:1A:E3:64:5B:A8:B0:4C:70:58:55:2F:38"
       ]
     }
