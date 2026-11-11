@@ -22,6 +22,9 @@ local Config = mod(Ringer.Config)
 local Rules = mod(Ringer.Rules)
 local Bot = mod(Ringer.Bot)
 mod(Ringer.MarbleLook)
+local Sim = mod(Ringer.Sim)
+local Surfaces = mod(Ringer.Surfaces)
+mod(Ringer.Playback)
 for _, m in ipairs(game.ServerScriptService.Server:GetChildren()) do
 	mod(m)
 end
@@ -29,6 +32,7 @@ local client = game.StarterPlayer.StarterPlayerScripts.ClientModules
 mod(client.Kit)
 
 mod(client.Aim)
+mod(client.Replay)
 
 -- 2. The server script boots (cloud test servers don't run the place's scripts, so run the
 -- compiled copy's body here): remotes and the lobby exist, with no errors.
@@ -48,48 +52,99 @@ check("7 of 13 locks the game", w ~= nil and w[1] == 1)
 check("6-0 with 7 left is not over", Rules.gameOver({ 6, 0 }, 7, 0) == nil)
 check("empty ring ends", Rules.gameOver({ 6, 7 }, 0, 0) ~= nil)
 
--- 4. The bot: a perfect bot's opening shot aims along a clear line at a real marble.
-local plan = Bot.plan(nil, cross, Config.ARENAS.desk.rollDecel, Config.BOTS.legend, Random.new(1))
-local from = Rules.placement(plan.placeAngle)
-local d = Vector2.new(math.cos(plan.aimAngle), math.sin(plan.aimAngle))
+-- 4. The bot (the web game's, imagining shots on Ringer.Sim): a legend's opening shot is aimed
+-- along a clear line at a real marble, and its think fits in a turn.
+local start = Sim.startingLayout()
+local t0 = os.clock()
+local plan = Bot.plan({ layout = start, firstShot = true, seatAngle = Rules.seatAngle(1, 2), surface = Surfaces.desk, pieces = {} }, Config.BOTS.legend, Bot.rng(1, 0, 0), function()
+	task.wait()
+end)
+local thinkSecs = os.clock() - t0
+local fx, fz = Sim.placementPoint(plan.placeAngle)
+local dx, dz = math.cos(plan.aimAngle), math.sin(plan.aimAngle)
 local hits = false
-for _, m in ipairs(cross) do
-	local to = m - from
-	local along = to:Dot(d)
-	if along > 0 and (to - d * along).Magnitude < Config.SHOOTER_R + Config.MIB_R then
+for _, m in ipairs(start.targets) do
+	local tx, tz = m.x - fx, m.z - fz
+	local along = tx * dx + tz * dz
+	if along > 0 and math.sqrt((tx - dx * along) ^ 2 + (tz - dz * along) ^ 2) < Sim.WORLD.shooterRadius + Sim.WORLD.targetRadius then
 		hits = true
 	end
 end
 check("legend bot aims at a marble", hits, string.format("power %.2f", plan.power))
 check("bot power in range", plan.power > 0 and plan.power <= 1)
+check("legend thinks in under 6 s", thinkSecs < 6, string.format("%.2fs", thinkSecs))
+
+-- The Tower is the web game's buildTower for Ember: fields, bots, maps, guide caps, series.
+local WANT_TOWER = {
+	{ "pip", "grass", "rookie", "easy", 43467, "full", 1 },
+	{ "tide", "sand", "novice", "easy", 34241, "full", 1 },
+	{ "jade", "grass", "casual", "medium", 86862, "full", 1 },
+	{ "volt", "desk", "regular", "medium", 58732, "short", 1 },
+	{ "ironside", "gravel", "skilled", "hard", 95235, "short", 1 },
+	{ "rime", "ice", "expert", "hard", 82998, "short", 2 },
+	{ "nova", "sand", "master", "hard", 99046, "off", 1 },
+	{ "obsidian", "ice", "legend", "hard", 90949, "off", 3 },
+}
+for i, w in ipairs(WANT_TOWER) do
+	local st = Config.TOWER[i]
+	local got = { st.marble, st.arena, st.bot, st.difficulty, st.mapSeed, st.guide, st.wins }
+	local same = true
+	for k = 1, 7 do
+		same = same and got[k] == w[k]
+	end
+	check("tower floor " .. i .. " is the web game's", same, table.concat(got :: any, ","))
+end
 
 -- 5. A table builds, holds 13 marbles inside the ring, and tears down.
 local Table = require(game.ServerScriptService.Server.Table)
 local t = Table.new({ seats = { { kind = "bot", bot = "casual", name = "A", marble = "ember" }, { kind = "bot", bot = "casual", name = "B", marble = "tide" } }, arena = "ice", origin = Vector3.new(3000, 0, 0), mode = "test", seed = 1 })
 local inside = 0
-for _, b in ipairs(t.mibs) do
-	if not Rules.isOutside(t:flat(b.Position)) then
+for _, m in ipairs(t.layout.targets) do
+	if not Sim.isOutsideRing(m.x, m.z) then
 		inside += 1
 	end
 end
 check("table has 13 marbles in the ring", inside == 13, inside)
+check("table has 13 marble parts", #t.marbleFolder:GetChildren() == 13, #t.marbleFolder:GetChildren())
 check("state serialises", t:state().remaining == 13)
 check("table has a generated map", t.map ~= nil and #t.map.pieces > 0, t.map and #t.map.pieces)
 t:destroy()
 
--- Every field builds its generated map; a hard mini-golf course has cups, bumpers and pads, and
--- no target marble starts on a solid piece.
+-- Every field builds its generated map; props are named parts the replay can move.
 for _, arena in ipairs(Config.ARENA_ORDER) do
 	local ok, tt = pcall(Table.new, { seats = { { kind = "bot", bot = "casual", name = "A", marble = "ember" }, { kind = "bot", bot = "casual", name = "B", marble = "tide" } }, arena = arena, origin = Vector3.new(3200, 0, 0), mode = "test", seed = 3, difficulty = "hard", mapSeed = 99 })
 	check("builds " .. arena .. " hard map", ok and tt.model:FindFirstChild("Map") ~= nil, not ok and tt or nil)
 	if ok then
-		if arena == "minigolf" then
-			check("minigolf has cups", #tt.pieces.holes > 0, #tt.pieces.holes)
-			check("minigolf has bumpers", #tt.pieces.bumpers > 0, #tt.pieces.bumpers)
+		local props, named = 0, 0
+		for i, p in ipairs(tt.map.pieces) do
+			if Sim.propTraits(p) then
+				props += 1
+				if tt.mapFolder:FindFirstChild("Prop" .. i) then
+					named += 1
+				end
+			end
 		end
+		check(arena .. " props are named parts", props == named, string.format("%d/%d", named, props))
 		tt:destroy()
 	end
 end
+
+-- A whole bot game plays out on the sim to a result (instant: no replays to wait for).
+local events = {}
+local g = Table.new({
+	seats = { { kind = "bot", bot = "skilled", name = "A", marble = "ember" }, { kind = "bot", bot = "casual", name = "B", marble = "tide" } },
+	arena = "minigolf", origin = Vector3.new(3400, 0, 0), mode = "test", seed = 11, difficulty = "hard", mapSeed = 5, instant = true,
+	send = function(_, kind)
+		events[kind] = (events[kind] or 0) + 1
+	end,
+})
+local tg = os.clock()
+local res = g:run()
+local total = res.scores[1] + res.scores[2]
+check("bot game ends with a winner", #res.winners >= 1, table.concat(res.scores, "-"))
+check("bot game captures marbles", total > 0, string.format("%d in %d shots, %.1fs", total, res.shots, os.clock() - tg))
+check("shots were broadcast", (events.shot or 0) == res.shots, events.shot)
+g:destroy()
 
 -- 6. Collectibles: Marble Bags mint generated marbles at the odds the bag shows.
 local Forge = mod(Ringer.Forge)

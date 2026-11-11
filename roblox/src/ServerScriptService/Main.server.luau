@@ -27,6 +27,8 @@ local function remote(class: string, name: string)
 end
 local TableEvent = remote("RemoteEvent", "TableEvent") :: RemoteEvent
 local Shoot = remote("RemoteEvent", "Shoot") :: RemoteEvent
+local Replayed = remote("RemoteEvent", "Replayed") :: RemoteEvent -- a client finished watching a shot
+local Fast = remote("RemoteEvent", "Fast") :: RemoteEvent -- a client's fast-forward
 local Request = remote("RemoteFunction", "Request") :: RemoteFunction
 local ProfileSync = remote("RemoteEvent", "ProfileSync") :: RemoteEvent
 local Notify = remote("RemoteEvent", "Notify") :: RemoteEvent
@@ -278,10 +280,21 @@ local function seatFor(player: Player): Table.Seat
 	}
 end
 
+local towerTally
 local function send(tbl, kind: string, data: any)
 	for _, player in ipairs(tbl:players()) do
 		TableEvent:FireClient(player, kind, data, tbl.id)
 	end
+end
+
+-- Games won so far on a tower floor, [you, them], counting this one.
+towerTally = function(tbl, result: Table.Result): { number }
+	local tally = table.clone(tbl.series or { 0, 0 })
+	if #result.winners == 1 then
+		local i = if result.winners[1] == 1 then 1 else 2
+		tally[i] += 1
+	end
+	return tally
 end
 
 local function pay(tbl, result: Table.Result)
@@ -319,9 +332,14 @@ local function pay(tbl, result: Table.Result)
 		if score >= Config.TARGETS then
 			Economy.badge(player, "sweep")
 		end
-		if tbl.mode == "tower" and p then
+		-- A best-of floor (ice, and the Black Taw) is decided by the series, not one game.
+		local tally = towerTally(tbl, result)
+		local need = tbl.wins or 1
+		local seriesWon = tally[1] >= need
+		local seriesLost = tally[2] >= need or result.abandoned ~= nil
+		if tbl.mode == "tower" and p and (seriesWon or seriesLost) then
 			local floor = tbl.floor
-			if won then
+			if seriesWon then
 				Economy.progression(player, floor, Enum.AnalyticsProgressionType.Complete)
 				if floor == p.tower then
 					local stage = Config.TOWER[floor]
@@ -353,11 +371,14 @@ local function pay(tbl, result: Table.Result)
 			floor = tbl.floor,
 			unlocked = extra.unlocked,
 			abandoned = result.abandoned ~= nil,
+			series = if (tbl.wins or 1) > 1 then tally else nil,
+			wins = tbl.wins,
 		}, tbl.id)
 	end
 end
 
-local function startTable(seats: { Table.Seat }, arena: string, mode: string, floor: number?, difficulty: string?, mapSeed: number?)
+local startTable
+startTable = function(seats: { Table.Seat }, arena: string, mode: string, floor: number?, difficulty: string?, mapSeed: number?, extra: { guide: string?, series: { number }?, wins: number? }?)
 	local slot = freeSlot()
 	local tbl = Table.new({
 		seats = seats,
@@ -367,6 +388,9 @@ local function startTable(seats: { Table.Seat }, arena: string, mode: string, fl
 		origin = slotOrigin(slot),
 		mode = mode,
 		floor = floor,
+		guide = extra and extra.guide,
+		series = extra and extra.series,
+		wins = extra and extra.wins,
 		send = send,
 	})
 	tables[slot] = tbl
@@ -381,6 +405,20 @@ local function startTable(seats: { Table.Seat }, arena: string, mode: string, fl
 		local result = tbl:run()
 		pay(tbl, result)
 		task.wait(4)
+		-- A best-of tower floor still undecided: the next game, same floor, same course.
+		local need = tbl.wins or 1
+		local player = seats[1].player
+		if tbl.mode == "tower" and need > 1 and not result.abandoned and player and player.Parent then
+			local tally = towerTally(tbl, result)
+			if tally[1] < need and tally[2] < need then
+				tables[slot] = nil
+				tbl:destroy()
+				active[player] = nil
+				local stage = Config.TOWER[tbl.floor]
+				startTable({ seatFor(player), botSeat(stage.bot, stage.name, stage.marble) }, stage.arena, "tower", tbl.floor, stage.difficulty, stage.mapSeed, { guide = stage.guide, series = tally, wins = need })
+				return
+			end
+		end
 		for _, seat in ipairs(tbl.seats) do
 			if seat.player and active[seat.player] == tbl then
 				active[seat.player] = nil
@@ -502,7 +540,7 @@ function handlers.play(player: Player, args)
 	elseif mode == "tower" then
 		local floor = math.clamp(p.tower, 1, #Config.TOWER)
 		local stage = Config.TOWER[floor]
-		startTable({ seatFor(player), botSeat(stage.bot, stage.name, stage.marble) }, stage.arena, "tower", floor, stage.difficulty, stage.mapSeed)
+		startTable({ seatFor(player), botSeat(stage.bot, stage.name, stage.marble) }, stage.arena, "tower", floor, stage.difficulty, stage.mapSeed, { guide = stage.guide, series = { 0, 0 }, wins = stage.wins })
 		Economy.progression(player, floor, Enum.AnalyticsProgressionType.Start)
 		return true
 	end
@@ -609,6 +647,20 @@ Request.OnServerInvoke = function(player: Player, action: string, args: any)
 	end
 	return a, b
 end
+
+Replayed.OnServerEvent:Connect(function(player: Player, tableId, n)
+	local tbl = active[player]
+	if tbl and tbl.id == tableId and typeof(n) == "number" then
+		tbl:ack(player, n)
+	end
+end)
+
+Fast.OnServerEvent:Connect(function(player: Player, on)
+	local tbl = active[player]
+	if tbl then
+		tbl:setFast(player, on == true)
+	end
+end)
 
 Shoot.OnServerEvent:Connect(function(player: Player, tableId, placeAngle, aimAngle, power, spin)
 	local tbl = active[player]

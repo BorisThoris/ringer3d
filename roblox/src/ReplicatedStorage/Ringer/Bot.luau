@@ -1,180 +1,301 @@
--- The bot: picks the marble it can knock out most surely, from wherever it may shoot, then
--- misses by as much as its profile says. A geometric planner (the web bot simulates every
--- candidate; here the server's own physics is the only simulator, so the bot reasons):
---  * the line from the shooter to the marble must be clear of other marbles;
---  * the marble, hit head on, travels on along that line: the shorter its way out, the better;
---  * the power is what carries the marble out, given the field's rolling resistance;
---  * careful bots prefer shots after which their shooter stays in the ring (to shoot again).
+-- The bot, the web game's (src/ai/bot.ts) line for line. Bots play fair: they see only what a
+-- player sees (where the marbles are), they produce the same shot a player produces (place,
+-- aim, power, spin), and their hand shakes. Difficulty only changes how carefully they think
+-- and how steady their hand is.
+--
+-- Ghost-ball candidates for every mib, scored by a quick prior; the best `candidates` of them
+-- are played out on Ringer.Sim exactly as the game would play them, and the outcome is scored
+-- (captures, shooting again, the leave, gifts left on the line). Careful bots re-imagine their
+-- favourites with a slipped thumb. Every number here is in web units (Ringer.Sim's).
 
-local Config = require(script.Parent.Config)
-local Rules = require(script.Parent.Rules)
+local Sim = require(script.Parent.Sim)
+local Forge = require(script.Parent.Forge)
 
 local Bot = {}
 
--- A hit between the shooter and a marble, as measured on Roblox physics (Studio playtest,
--- 2026-10-31): the marble leaves at about the shooter's speed and the shooter keeps under half.
--- (The textbook head-on numbers, 1.34 and 0.37, left every bot shot a quarter short.)
-local GIVE = 1.0 -- marble speed / shooter speed at contact
-local KEEP = 0.45 -- shooter speed after / before
-local PAST = 6 -- studs past the ring the marble should have speed for
+local W = Sim.WORLD
+local TAU = math.pi * 2
+local PLACE_R = W.ringRadius + W.shooterRadius + 0.02
 
-local function gauss(rng: Random): number
-	local u = math.max(1e-9, rng:NextNumber())
-	return math.sqrt(-2 * math.log(u)) * math.cos(2 * math.pi * rng:NextNumber())
+export type Context = {
+	layout: any, -- Ringer.Sim layout
+	firstShot: boolean,
+	seatAngle: number,
+	surface: any,
+	pieces: { any },
+}
+
+local function clamp(v: number, a: number, b: number): number
+	return math.min(b, math.max(a, v))
 end
 
--- Distance from point c to the segment a-b.
-local function segDist(a: Vector2, b: Vector2, c: Vector2): number
-	local ab = b - a
-	local t = math.clamp((c - a):Dot(ab) / math.max(ab:Dot(ab), 1e-9), 0, 1)
-	return (a + ab * t - c).Magnitude
+local function wrap(a: number): number
+	while a > math.pi do
+		a -= TAU
+	end
+	while a < -math.pi do
+		a += TAU
+	end
+	return a
 end
 
--- How far a marble at `p` moving along unit `d` goes before its centre crosses the ring line.
-local function exitDistance(p: Vector2, d: Vector2): number
-	local R = Config.RING_R + 0.3
-	local b = p:Dot(d)
-	local c = p:Dot(p) - R * R
-	local disc = b * b - c
-	if disc < 0 then
+local function segPointDist(x0, z0, x1, z1, px, pz)
+	local dx, dz = x1 - x0, z1 - z0
+	local len2 = dx * dx + dz * dz
+	if len2 == 0 then
+		len2 = 1e-9
+	end
+	local t = clamp(((px - x0) * dx + (pz - z0) * dz) / len2, 0, 1)
+	return math.sqrt((x0 + dx * t - px) ^ 2 + (z0 + dz * t - pz) ^ 2)
+end
+
+local function segSegDist(ax, az, bx, bz, cx, cz, dx, dz)
+	local function cross(ux, uz, vx, vz)
+		return ux * vz - uz * vx
+	end
+	local d1 = cross(bx - ax, bz - az, cx - ax, cz - az)
+	local d2 = cross(bx - ax, bz - az, dx - ax, dz - az)
+	local d3 = cross(dx - cx, dz - cz, ax - cx, az - cz)
+	local d4 = cross(dx - cx, dz - cz, bx - cx, bz - cz)
+	if d1 * d2 < 0 and d3 * d4 < 0 then
 		return 0
 	end
-	return -b + math.sqrt(disc)
+	return math.min(segPointDist(ax, az, bx, bz, cx, cz), segPointDist(ax, az, bx, bz, dx, dz), segPointDist(cx, cz, dx, dz, ax, az), segPointDist(cx, cz, dx, dz, bx, bz))
 end
 
-export type Plan = { placeAngle: number, aimAngle: number, power: number, spin: number? }
--- Solid map pieces a shot must go round: circles (posts, bumpers) and segments (walls).
-export type Obstacle = { kind: "circle", pos: Vector2, r: number } | { kind: "seg", a: Vector2, b: Vector2, r: number }
-
--- Shortest distance between segments a-b and c-d.
-local function segSeg(a: Vector2, b: Vector2, c: Vector2, d: Vector2): number
-	local function cross(u: Vector2, v: Vector2)
-		return u.X * v.Y - u.Y * v.X
+--- Does a solid map piece (post, bumper, wall) stand within `clear` of the segment?
+local function obstacleOnPath(x0, z0, x1, z1, pieces, clear: number): boolean
+	if not pieces then
+		return false
 	end
-	local r, s = b - a, d - c
-	local denom = cross(r, s)
-	if math.abs(denom) > 1e-9 then
-		local t = cross(c - a, s) / denom
-		local u = cross(c - a, r) / denom
-		if t >= 0 and t <= 1 and u >= 0 and u <= 1 then
-			return 0
-		end
-	end
-	return math.min(segDist(a, b, c), segDist(a, b, d), segDist(c, d, a), segDist(c, d, b))
-end
-
---- Does a ball of radius `rad` going from a to b clear every obstacle?
-local function clearOf(obstacles: { Obstacle }?, a: Vector2, b: Vector2, rad: number): boolean
-	for _, o in ipairs(obstacles or {}) do
-		if o.kind == "circle" then
-			if segDist(a, b, o.pos) < o.r + rad then
-				return false
+	for _, p in ipairs(pieces) do
+		if p.kind == "post" or p.kind == "bumper" then
+			if segPointDist(x0, z0, x1, z1, p.x, p.z) < p.r + clear then
+				return true
 			end
-		elseif segSeg(a, b, o.a, o.b) < o.r + rad then
-			return false
-		end
-	end
-	return true
-end
-
---- Plan a shot. `from` is the shooter's spot for a shoot-again (nil on a first shot);
---- `mibs` are the marbles still in the ring; `decel` the field's rolling resistance.
-function Bot.plan(from: Vector2?, mibs: { Vector2 }, decel: number, profile: Config.Bot, rng: Random, obstacles: { Obstacle }?): Plan
-	local spots = {}
-	if from then
-		table.insert(spots, { pos = from, angle = math.atan2(from.Y, from.X) })
-	else
-		for k = 0, 47 do
-			local a = k / 48 * math.pi * 2
-			table.insert(spots, { pos = Rules.placement(a), angle = a })
-		end
-	end
-
-	local best, bestScore = nil, math.huge
-	local options = {}
-	for _, spot in ipairs(spots) do
-		for i, t in ipairs(mibs) do
-			local to = t - spot.pos
-			local dist = to.Magnitude
-			if dist > 1e-3 then
-				local d = to.Unit
-				-- Contact point: the shooter stops one radius-sum short of the marble's centre.
-				local contact = t - d * (Config.SHOOTER_R + Config.MIB_R)
-				local clear = true
-				for j, o in ipairs(mibs) do
-					if j ~= i and segDist(spot.pos, contact, o) < Config.SHOOTER_R + Config.MIB_R + 0.15 then
-						clear = false
-						break
-					end
-				end
-				-- The shooter's way to the marble, and the marble's way out, must miss the map's pieces.
-				if clear then
-					clear = clearOf(obstacles, spot.pos, contact, Config.SHOOTER_R)
-						and clearOf(obstacles, t, t + d * (exitDistance(t, d) + 2), Config.MIB_R)
-				end
-				if clear then
-					local out = exitDistance(t, d)
-					-- Speed the marble needs to roll out (and a little past), then the shooter's.
-					local need = math.sqrt(2 * decel * (out + PAST))
-					local atContact = need / GIVE
-					local travel = math.max(0, (contact - spot.pos).Magnitude)
-					local v0 = math.sqrt(atContact * atContact + 2 * decel * travel)
-					local power = v0 / Config.MAX_SPEED
-					if power <= 1 then
-						local score = out + travel * 0.12
-						if profile.careful then
-							-- Where the shooter rolls to after the hit: out of the ring loses the next shot.
-							local after = atContact * KEEP
-							local rest = contact + d * (after * after / (2 * decel))
-							if rest.Magnitude > Config.RING_R - 1 then
-								score += 6
-							end
-						end
-						local option = { placeAngle = spot.angle, aimAngle = math.atan2(d.Y, d.X), power = math.max(power, 0.12), score = score }
-						table.insert(options, option)
-						if score < bestScore then
-							best, bestScore = option, score
-						end
-					end
-				end
+		elseif p.kind == "wall" then
+			local hx = math.cos(p.a) * p.len / 2
+			local hz = math.sin(p.a) * p.len / 2
+			if segSegDist(x0, z0, x1, z1, p.x - hx, p.z - hz, p.x + hx, p.z + hz) < p.thick / 2 + clear then
+				return true
 			end
 		end
 	end
+	return false
+end
 
-	-- How many shots the bot notices at all (the web profile's candidates): a Rookie sees a
-	-- handful of the open lines, a Legend sees them all, and each takes the best it saw.
-	if #options > profile.candidates then
-		for i = #options, 2, -1 do
-			local j = rng:NextInteger(1, i)
-			options[i], options[j] = options[j], options[i]
+local function pathBlocked(x0, z0, x1, z1, ms, skip: number): boolean
+	local dx, dz = x1 - x0, z1 - z0
+	local len2 = dx * dx + dz * dz
+	local clear = W.targetRadius + W.shooterRadius
+	for _, m in ipairs(ms) do
+		if m.id == skip then
+			continue
 		end
-		best, bestScore = nil, math.huge
-		for i = 1, profile.candidates do
-			if options[i].score < bestScore then
-				best, bestScore = options[i], options[i].score
-			end
+		local t = clamp(((m.x - x0) * dx + (m.z - z0) * dz) / len2, 0, 1)
+		local px = x0 + dx * t - m.x
+		local pz = z0 + dz * t - m.z
+		if px * px + pz * pz < clear * clear then
+			return true
 		end
 	end
-	local pick = best
-	if #options > 1 and rng:NextNumber() < profile.blunder then
-		pick = options[rng:NextInteger(1, #options)]
+	return false
+end
+
+--- Distance s >= 0 along (dx, dz) from (x, z) to the circle of radius r, or nil.
+local function rayCircle(x, z, dx, dz, r): number?
+	local b = x * dx + z * dz
+	local c = x * x + z * z - r * r
+	local disc = b * b - c
+	if disc < 0 then
+		return nil
 	end
-	if not pick and obstacles and #obstacles > 0 then
-		-- Every line is blocked by the map: plan as if it were clear and take the best of those.
-		return Bot.plan(from, mibs, decel, profile, rng, nil)
-	end
-	if not pick then
-		-- Nothing clean: a firm shot at the middle of the cross.
-		local spot = spots[rng:NextInteger(1, #spots)]
-		local d = (-spot.pos).Unit
-		pick = { placeAngle = spot.angle, aimAngle = math.atan2(d.Y, d.X), power = 0.8 }
-	end
+	local s = -b + math.sqrt(disc)
+	return if s >= 0 then s else nil
+end
+
+--- Human hand tremor, applied to the bot's intended shot before it is sent.
+local function jitter(s, p, rng)
+	local aimErr = p.aimErrorDeg * math.pi / 180
 	return {
-		placeAngle = pick.placeAngle,
-		aimAngle = pick.aimAngle + math.rad(gauss(rng) * profile.aimErrorDeg),
-		power = math.clamp(pick.power * (1 + gauss(rng) * profile.powerError), 0.08, 1),
-		spin = 0, -- a natural roll, which the power model above assumes
+		placeAngle = s.placeAngle + rng:gaussian() * aimErr * 0.25,
+		aimAngle = s.aimAngle + rng:gaussian() * aimErr,
+		power = clamp(s.power * (1 + rng:gaussian() * p.powerError), 0.05, 1),
+		spin = clamp(s.spin + rng:gaussian() * 0.08, -1, 1),
 	}
+end
+
+local function generateCandidates(ctx: Context, p, rng)
+	local out = {}
+	local rT, rS = W.targetRadius, W.shooterRadius
+	local others = ctx.layout.targets
+	local powers = { 0.42, 0.55, 0.7, 0.85, 1.0 }
+	local spins = if p.usesSpin then { 0, -0.7 } else { 0 }
+	local fixedOrigin = if not ctx.firstShot and ctx.layout.shooter then ctx.layout.shooter else nil
+
+	for _, t in ipairs(others) do
+		local dist = math.sqrt(t.x * t.x + t.z * t.z)
+		local baseExit = if dist > 0.05 then math.atan2(t.z, t.x) else rng:range(0, TAU)
+		for _, off in ipairs({ 0, -0.4, 0.4 }) do
+			local ea = baseExit + off
+			local ex, ez = math.cos(ea), math.sin(ea)
+			local gx = t.x - ex * (rT + rS)
+			local gz = t.z - ez * (rT + rS)
+
+			local origins = {}
+			if fixedOrigin then
+				table.insert(origins, { x = fixedOrigin.x, z = fixedOrigin.z, place = ctx.seatAngle })
+			else
+				-- Knuckle down directly behind the ghost ball, plus a couple of cut-shot spots.
+				local s = rayCircle(gx, gz, -ex, -ez, PLACE_R)
+				if s then
+					local ox, oz = gx - ex * s, gz - ez * s
+					local pa = math.atan2(oz, ox)
+					-- Wider spots too, for when posts and walls stand in the straight line.
+					for _, d in ipairs({ 0, -0.18, 0.18, -0.45, 0.45 }) do
+						local px, pz = Sim.placementPoint(pa + d)
+						table.insert(origins, { x = px, z = pz, place = pa + d })
+					end
+				end
+			end
+
+			for _, o in ipairs(origins) do
+				local ax, az = gx - o.x, gz - o.z
+				local travel = math.sqrt(ax * ax + az * az)
+				if travel < 1e-3 then
+					continue
+				end
+				local aim = math.atan2(az, ax)
+				local cut = math.abs(wrap(aim - ea))
+				if cut > 1.15 then
+					continue -- too thin to move it meaningfully
+				end
+				local blocked = pathBlocked(o.x, o.z, gx, gz, others, t.id) or obstacleOnPath(o.x, o.z, gx, gz, ctx.pieces, rS)
+				-- A wall or bumper between the mib and the ring line will stop it leaving.
+				local exitBlocked = obstacleOnPath(t.x, t.z, t.x + ex * (W.ringRadius + 0.5), t.z + ez * (W.ringRadius + 0.5), ctx.pieces, rT)
+				-- Distance the target must travel to leave the ring along the exit line.
+				local toEdge = W.ringRadius - (t.x * ex + t.z * ez) + rT
+				for _, pw in ipairs(powers) do
+					for _, sp in ipairs(spins) do
+						local needed = 0.25 + 0.05 * travel + 0.06 * toEdge / math.max(0.2, math.cos(cut))
+						local powerFit = -math.abs(pw - math.min(1, needed + 0.25))
+						local prior = 3 - cut * 2 - (if blocked then 4 else 0) - (if exitBlocked then 2 else 0) + powerFit * 3 - travel * 0.05 + rng:next() * 0.3
+						table.insert(out, { shot = { placeAngle = o.place, aimAngle = aim, power = pw, spin = sp }, prior = prior })
+					end
+				end
+			end
+		end
+	end
+	if #out == 0 then
+		-- Nothing sensible: blast toward the middle.
+		local fx, fz
+		if fixedOrigin then
+			fx, fz = fixedOrigin.x, fixedOrigin.z
+		else
+			fx, fz = Sim.placementPoint(ctx.seatAngle)
+		end
+		table.insert(out, { shot = { placeAngle = ctx.seatAngle, aimAngle = math.atan2(-fz, -fx), power = 0.8, spin = 0 }, prior = 0 })
+	end
+	return out
+end
+
+--- Play an intended shot exactly as the game would and score the outcome.
+local function imagine(ctx: Context, shot, p): number
+	local sim = Sim.new(ctx.layout, ctx.surface, shot, ctx.firstShot, ctx.pieces)
+	sim:runToEnd()
+	local after = sim:resultLayout()
+
+	local captures, left = 0, {}
+	for _, t in ipairs(after.targets) do
+		if Sim.isOutsideRing(t.x, t.z) then
+			captures += 1
+		else
+			table.insert(left, t)
+		end
+	end
+	local s = after.shooter
+	local shooterIn = s ~= nil and not Sim.isOutsideRing(s.x, s.z)
+
+	local v = captures * 10
+	if captures > 0 and shooterIn then
+		v += 6
+		-- Leave: a target close by makes the next shot easy.
+		local nearest = math.huge
+		for _, t in ipairs(left) do
+			nearest = math.min(nearest, math.sqrt((t.x - s.x) ^ 2 + (t.z - s.z) ^ 2))
+		end
+		if #left > 0 then
+			v += p.positional * math.max(0, 3 - nearest)
+		end
+	end
+	if captures == 0 or not shooterIn then
+		-- Turn passes: don't hand the opponent easy marbles sitting on the line.
+		local gifts = 0
+		for _, t in ipairs(left) do
+			if math.sqrt(t.x * t.x + t.z * t.z) > W.ringRadius - 0.6 then
+				gifts += 1
+			end
+		end
+		v -= p.positional * gifts * 1.5
+	end
+	if not shooterIn then
+		v -= 1
+	end
+	return v
+end
+
+--- The rng a bot's shot uses: from the match seed, the shot number and the seat (0-based,
+--- as the web game counts), so a replay or another peer gets the same bot.
+function Bot.rng(seed: number, shotsTaken: number, seat0: number)
+	return Forge.Rng.new(Forge.hashString(string.format("%d:%d:%d", seed, shotsTaken, seat0)))
+end
+
+--- Choose a shot. Yields every few imagined shots (`yield`, task.wait on a server) so a long
+--- think never stalls the game.
+function Bot.plan(ctx: Context, profile, rng, yield: (() -> ())?)
+	local cands = generateCandidates(ctx, profile, rng)
+	table.sort(cands, function(a, b)
+		return a.prior > b.prior
+	end)
+	local pool = {}
+	for i = 1, math.min(#cands, math.max(4, profile.candidates)) do
+		pool[i] = cands[i]
+	end
+
+	for i, c in ipairs(pool) do
+		c.value = imagine(ctx, c.shot, profile)
+		if yield and i % 6 == 0 then
+			yield()
+		end
+	end
+
+	-- Careful players also ask "what if my thumb slips a little?" on their favourite shots.
+	local byValue = function(a, b)
+		return a.value > b.value
+	end
+	table.sort(pool, byValue)
+	local careful = math.floor(profile.positional * 5 + 0.5)
+	if careful > 0 then
+		for i = 1, math.min(careful, #pool) do
+			local c = pool[i]
+			local sum = c.value
+			for _ = 1, 2 do
+				sum += imagine(ctx, jitter(c.shot, profile, rng), profile)
+			end
+			c.value = sum / 3
+			if yield then
+				yield()
+			end
+		end
+		table.sort(pool, byValue)
+	end
+
+	local pick = pool[1]
+	if rng:next() < profile.blunder then
+		local n = math.max(1, math.floor(#pool * 0.4))
+		pick = pool[rng:int(n) + 1]
+	end
+	return jitter(pick.shot, profile, rng)
 end
 
 return Bot

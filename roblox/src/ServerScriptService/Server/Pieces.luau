@@ -1,11 +1,13 @@
--- A generated map (Ringer.Maps) built on a table: walls, posts, bumpers, sunk-sphere bumps and
--- lying ridges are anchored parts the marbles really hit; ground patches (paper, puddles, mud,
--- black ice, speed pads) and mini-golf cups are painted on and act in Table:roll, the way the web
--- game's physics does it (patches scale the rolling resistance, pads push, cups swallow slow
--- marbles). Map units are the web game's; a table is Config.MAP_SCALE times bigger.
+-- A generated map (Ringer.Maps) drawn on a table. Ringer.Sim plays every shot on the map's own
+-- numbers, so these parts are only what players see: nothing here takes part in Roblox physics.
+-- Loose and breakable props (books, mugs, ice blocks...) are parts named "Prop<i>" (i: the
+-- piece's index) that the server and the clients move with each shot. Map units are the web
+-- game's; a table is Config.MAP_SCALE times bigger.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Ringer.Config)
+local Sim = require(ReplicatedStorage.Ringer.Sim)
+local Playback = require(ReplicatedStorage.Ringer.Playback)
 
 local Pieces = {}
 
@@ -66,6 +68,8 @@ local function part(props: { [string]: any }): Part
 	p.TopSurface = Enum.SurfaceType.Smooth
 	p.BottomSurface = Enum.SurfaceType.Smooth
 	p.Material = Enum.Material.SmoothPlastic
+	p.CanCollide = false
+	p.CanTouch = false
 	for k, v in pairs(props) do
 		(p :: any)[k] = v
 	end
@@ -84,6 +88,8 @@ export type Built = {
 	bumpers: { { pos: Vector2, r: number } },
 }
 
+Pieces.propCFrame = Playback.propCFrame
+
 --- Build `map` on the table at `origin`. Positions in the returned lists are ring-relative studs.
 function Pieces.build(map, origin: Vector3, parent: Instance): Built
 	local folder = Instance.new("Folder")
@@ -94,10 +100,10 @@ function Pieces.build(map, origin: Vector3, parent: Instance): Built
 		local skin = p.skin
 		if p.kind == "wall" then
 			part({
-				Name = skin or "Wall",
+				Name = if Sim.propTraits(p) then "Prop" .. i else skin or "Wall",
 				Size = Vector3.new(p.len * S, p.h * S, p.thick * S),
 				-- Length along the map's angle a: rotating +X by -a about Y points it at (cos a, sin a).
-				CFrame = CFrame.new(origin + Vector3.new(p.x * S, p.h * S / 2, p.z * S)) * CFrame.Angles(0, -p.a, 0),
+				CFrame = Pieces.propCFrame(p, { x = p.x, z = p.z, a = p.a }, origin),
 				Color = colorOf(skin, i),
 				Material = if skin == "iceblock" then Enum.Material.Glass else Enum.Material.SmoothPlastic,
 				Transparency = if skin == "iceblock" then 0.25 else 0,
@@ -105,12 +111,12 @@ function Pieces.build(map, origin: Vector3, parent: Instance): Built
 				Parent = folder,
 			})
 		elseif p.kind == "post" or p.kind == "bumper" then
-			local h = (p.h or 0.4) * S
+			local h = (p.h or Sim.BUMPER_H) * S
 			part({
-				Name = skin or p.kind,
+				Name = if Sim.propTraits(p) then "Prop" .. i else skin or p.kind,
 				Shape = Enum.PartType.Cylinder,
 				Size = Vector3.new(h, p.r * 2 * S, p.r * 2 * S),
-				CFrame = CFrame.new(origin + Vector3.new(p.x * S, h / 2, p.z * S)) * CFrame.Angles(0, 0, math.pi / 2),
+				CFrame = Pieces.propCFrame(p, { x = p.x, z = p.z, a = 0 }, origin),
 				Color = colorOf(skin, i),
 				Material = if p.kind == "bumper" then Enum.Material.Neon else Enum.Material.SmoothPlastic,
 				CustomPhysicalProperties = if p.kind == "bumper" then BOUNCY else SOLID,

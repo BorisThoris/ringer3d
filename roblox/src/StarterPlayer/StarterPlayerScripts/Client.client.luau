@@ -15,6 +15,7 @@ local MarbleLook = require(ReplicatedStorage.Ringer.MarbleLook)
 local Modules = script.Parent:WaitForChild("ClientModules")
 local Kit = require(Modules.Kit)
 local Aim = require(Modules.Aim)
+local Replay = require(Modules.Replay)
 
 local player = Players.LocalPlayer
 local Remotes = ReplicatedStorage.Ringer:WaitForChild("Remotes")
@@ -588,17 +589,54 @@ local cards = Kit.new("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = U
 Kit.new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, Padding = UDim.new(0, 16), Parent = cards })
 local banner = Kit.label("", 30, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 92), Size = UDim2.new(0.8, 0, 0, 40), Parent = match })
 local hint = Kit.label("", 20, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -20), Size = UDim2.new(0.8, 0, 0, 30), Parent = match })
-local meterBack = Kit.new("Frame", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -24, 0.5, 0), Size = UDim2.fromOffset(34, 260), BackgroundColor3 = Kit.PANEL, Visible = false, Parent = match })
-Kit.round(meterBack, 12)
+-- The power bar, the web game's: press it, pull down, let go to shoot. A button, so a touch on it
+-- never turns the aim. Hold Space to charge with a keyboard.
+local meterBack = Kit.new("TextButton", { Text = "", AutoButtonColor = false, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -24, 0.5, 0), Size = UDim2.fromOffset(70, 300), BackgroundColor3 = Kit.PANEL, Visible = false, Parent = match })
+Kit.round(meterBack, 16)
 Kit.stroke(meterBack, Kit.INK, 3)
-local meter = Kit.new("Frame", { AnchorPoint = Vector2.new(0, 1), Position = UDim2.fromScale(0, 1), Size = UDim2.fromScale(1, 0), BackgroundColor3 = Kit.GREEN, Parent = meterBack })
-Kit.round(meter, 12)
+local meter = Kit.new("Frame", { Position = UDim2.fromScale(0, 0), Size = UDim2.fromScale(1, 0), BackgroundColor3 = Kit.GREEN, Parent = meterBack })
+Kit.round(meter, 16)
+local meterThumb = Kit.label("v", 22, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 4), Size = UDim2.fromOffset(62, 54), BackgroundTransparency = 0, BackgroundColor3 = Kit.CREAM, TextColor3 = Kit.INK, Parent = meterBack })
+Kit.round(meterThumb, 14)
+local meterLabel = Kit.label("Pull", 18, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 1, 6), Size = UDim2.fromOffset(90, 24), Parent = meterBack })
+local powerHeld = false
+local function powerFrom(y: number)
+	local pad = 30
+	local rel = (y - meterBack.AbsolutePosition.Y - pad) / math.max(1, meterBack.AbsoluteSize.Y - pad * 2)
+	Aim.setPower(math.clamp(rel, 0, 1))
+end
+meterBack.InputBegan:Connect(function(input)
+	if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and Aim.myTurn() then
+		powerHeld = true
+		Aim.setPower(0)
+	end
+end)
+UserInputService.InputChanged:Connect(function(input)
+	if powerHeld and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+		powerFrom(input.Position.Y)
+	end
+end)
+UserInputService.InputEnded:Connect(function(input)
+	if powerHeld and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+		powerHeld = false
+		Aim.release()
+	end
+end)
 Kit.button("Leave", Kit.RED, function()
 	ask("leave")
 end, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -16, 1, -16), Size = UDim2.fromOffset(120, 48), Parent = match })
 Kit.button("View", Kit.BLUE, function()
 	Aim.topView = not Aim.topView
 end, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -146, 1, -16), Size = UDim2.fromOffset(110, 48), Parent = match })
+-- Fast-forward (F): shots play three times as fast.
+local fastButton = Kit.button("Fast >>", Kit.PURPLE, function()
+	Aim.toggleFast()
+end, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -266, 1, -16), Size = UDim2.fromOffset(130, 48), Parent = match })
+Aim.onFast = function(on)
+	Replay.fast = on
+	fastButton.BackgroundColor3 = if on then Kit.ORANGE else Kit.PURPLE
+	fastButton.Text = if on then "Fast >> on" else "Fast >>"
+end
 
 -- The spin pad: touch the top of the marble for topspin (follow through), the bottom for
 -- backspin (stop near the hit). Q/E on a keyboard. A button, so a touch on it never starts a shot.
@@ -613,12 +651,21 @@ Aim.onSpin = function(v)
 	spinLabel.Text = if v > 0.1 then "Topspin · follow" elseif v < -0.1 then "Backspin · stick" else "Spin"
 end
 local function spinFrom(y: number)
-	local rel = (y - spinPad.AbsolutePosition.Y) / math.max(1, spinPad.AbsoluteSize.Y)
-	Aim.setSpin((0.5 - rel) * 2.4)
+	-- Top of the pad = topspin (+1), bottom = backspin (-1), like striking a ball; in tenths.
+	local v = (y - spinPad.AbsolutePosition.Y) / math.max(1, spinPad.AbsoluteSize.Y) * 2 - 1
+	Aim.setSpin(math.floor(-v * 10 + 0.5) / 10)
 end
 local spinHeld = false
+local lastSpinTap = 0
 spinPad.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		if os.clock() - lastSpinTap < 0.35 then
+			-- A double tap sets it back to a plain shot.
+			Aim.setSpin(0)
+			lastSpinTap = 0
+			return
+		end
+		lastSpinTap = os.clock()
 		spinHeld = true
 		spinFrom(input.Position.Y)
 	end
@@ -635,11 +682,11 @@ spinPad.InputEnded:Connect(function(input)
 end)
 
 Aim.onPower = function(power)
-	meterBack.Visible = power ~= nil
-	if power then
-		meter.Size = UDim2.fromScale(1, power)
-		meter.BackgroundColor3 = Kit.GREEN:Lerp(Kit.RED, power)
-	end
+	meter.Size = UDim2.fromScale(1, power)
+	meter.BackgroundColor3 = Kit.GREEN:Lerp(Kit.RED, power)
+	meterThumb.Position = UDim2.new(0.5, 0, (1 - 62 / 300) * power, 4)
+	meterThumb.Text = if power > 0.02 then tostring(math.floor(power * 100 + 0.5)) else "v"
+	meterLabel.Text = if power > 0.02 then "Let go" else "Pull"
 end
 
 local function seatCard(seat, active: boolean)
@@ -672,9 +719,21 @@ local function onState(state)
 	local mine = Aim.mySeat == state.current
 	spinPad.Visible = state.phase == "aim" and mine
 	spinLabel.Visible = spinPad.Visible
+	meterBack.Visible = spinPad.Visible
+	Aim.onPower(0)
 	if state.phase == "aim" then
 		banner.Text = mine and (state.firstShot and "Your turn!" or "Shoot again!") or (state.seats[state.current].name .. "'s turn")
-		hint.Text = mine and (state.firstShot and "Move to pick your spot on the line, then press, pull back and let go" or "Press, pull back and let go") or ""
+		local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+		if not mine then
+			hint.Text = ""
+		elseif touch then
+			hint.Text = if state.firstShot then "Drag your marble along the line, drag anywhere to aim, pull the power bar down and let go" else "Drag to aim, pull the power bar down and let go"
+		else
+			hint.Text = if state.firstShot then "Drag your marble along the line (A/D), drag or arrows to aim, hold Space or pull the bar to shoot" else "Drag or arrows to aim, hold Space or pull the bar to shoot"
+		end
+		if state.series and state.wins and state.wins > 1 then
+			banner.Text ..= string.format("   -   Best of %d: %d-%d", state.wins * 2 - 1, state.series[1], state.series[2])
+		end
 	end
 	if timerConn then
 		timerConn:Disconnect()
@@ -691,6 +750,9 @@ end
 
 Aim.onShot = function()
 	hint.Text = ""
+	meterBack.Visible = false
+	spinPad.Visible = false
+	spinLabel.Visible = false
 	if timerConn then
 		timerConn:Disconnect()
 		timerConn = nil
@@ -732,7 +794,19 @@ local function onResult(r)
 	resultTitle.TextColor3 = r.won and Kit.GOLD or Kit.CREAM
 	local lines = { string.format("Score  %s", table.concat(r.scores, " - ")), string.format("+%d coins", r.coins) }
 	if r.mode == "tower" then
-		table.insert(lines, r.won and string.format("Floor %d cleared!", r.floor) or string.format("Floor %d: try again", r.floor))
+		if r.series and r.wins then
+			local need = r.wins
+			table.insert(lines, string.format("Best of %d: %d-%d", need * 2 - 1, r.series[1], r.series[2]))
+			if r.series[1] >= need then
+				table.insert(lines, string.format("Floor %d cleared!", r.floor))
+			elseif r.series[2] >= need then
+				table.insert(lines, string.format("Floor %d: try again", r.floor))
+			else
+				table.insert(lines, "Next game coming up...")
+			end
+		else
+			table.insert(lines, r.won and string.format("Floor %d cleared!", r.floor) or string.format("Floor %d: try again", r.floor))
+		end
 	end
 	if r.unlocked then
 		table.insert(lines, "Unlocked: " .. Config.MARBLE[r.unlocked].name .. "!")
@@ -798,6 +872,17 @@ Remotes:WaitForChild("BagOpened").OnClientEvent:Connect(onBag)
 Remotes:WaitForChild("TableEvent").OnClientEvent:Connect(function(kind, data, id)
 	if kind == "state" then
 		onState(data)
+	elseif kind == "prepare" then
+		Aim.prepare(data.shot, data.duration)
+	elseif kind == "shot" then
+		local state = Aim.state
+		Aim.shotStarted()
+		hint.Text = ""
+		if state and state.id == id then
+			Replay.play(state, data, function()
+				Remotes.Replayed:FireServer(id, data.n)
+			end)
+		end
 	elseif kind == "result" then
 		onResult(data)
 	elseif kind == "capture" then

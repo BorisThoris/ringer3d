@@ -89,15 +89,36 @@ else
 	check("Marble Bag refused without 300 coins, coins kept", okbag ~= true and (profile and profile.coins == coinsNow), bag)
 end
 
--- A whole match against a Rookie, played with real shots.
+-- A whole match against a Rookie, played with real shots through the game's own aim (the
+-- client's Aim module: the same path the power bar and Space take). Every shot is replayed on
+-- the client's Ringer.Sim; the server waits for that replay, not a fixed time.
+local Aim = require(me:WaitForChild("PlayerScripts"):WaitForChild("ClientModules"):WaitForChild("Aim"))
+local Replay = require(me.PlayerScripts.ClientModules:WaitForChild("Replay"))
+local Playback = require(Ringer:WaitForChild("Playback"))
 local state, result, captures = nil, nil, 0
+local shotAt, waits, prepares = nil, {}, 0
+local replays = 0
 Remotes:WaitForChild("TableEvent").OnClientEvent:Connect(function(kind, data)
 	if kind == "state" then
 		state = data
+		if shotAt then
+			-- Time from the shot to the next turn, against how long the replay takes.
+			table.insert(waits, os.clock() - shotAt.t - Playback.duration(shotAt.steps, shotAt.crossStep, false))
+			shotAt = nil
+		end
 	elseif kind == "result" then
 		result = data
 	elseif kind == "capture" then
 		captures += 1
+	elseif kind == "shot" then
+		shotAt = { t = os.clock(), steps = data.steps, crossStep = data.crossStep }
+		task.defer(function()
+			if Replay.playing then
+				replays += 1
+			end
+		end)
+	elseif kind == "prepare" then
+		prepares += 1
 	end
 end)
 local okp, pw = Request:InvokeServer("play", { mode = "bot", bot = "rookie", arena = "culdesac", difficulty = "easy" })
@@ -137,7 +158,14 @@ while not result and os.clock() < deadline do
 				end
 			end
 			local dir = target - from
-			Shoot:FireServer(s.id, placeAngle, math.atan2(dir.Y, dir.X), 0.9, 0)
+			task.wait(0.3) -- let the client's own state handler run first
+			if s.firstShot then
+				Aim.setPlaceAngle(placeAngle)
+			end
+			Aim.aim.aimAngle = math.atan2(dir.Y, dir.X)
+			Aim.setSpin(0)
+			Aim.setPower(0.9)
+			Aim.release()
 			shots += 1
 		end
 	end
@@ -145,6 +173,13 @@ while not result and os.clock() < deadline do
 end
 check("the match finishes", result ~= nil, result and string.format("scores %s, %d shots by me, %d captures", table.concat(result.scores or {}, "-"), shots, captures))
 check("I took shots", shots > 0, shots)
+check("the bot showed its aim before each shot", prepares > 0, prepares)
+check("the client replayed the shots", replays > 0, replays)
+local worst = 0
+for _, w in ipairs(waits) do
+	worst = math.max(worst, w)
+end
+check("the server waited for the replays, not a timeout", #waits > 0 and worst < 1.2, string.format("%d shots, worst %.2fs over the replay", #waits, worst))
 task.wait(2)
 check("the match paid coins", profile and profile.coins > coinsBefore, profile and string.format("%d -> %d", coinsBefore, profile.coins))
 check("the match counted in stats", profile and profile.played >= 1, profile and profile.played)

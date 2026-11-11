@@ -4,9 +4,11 @@
 --  * capture something and stay inside the ring: shoot again from where the shooter stopped;
 --  * miss, or let the shooter leave the ring: the turn passes (marbles knocked out still count);
 --  * the game ends when the ring is empty or the leader can no longer be caught.
--- Positions here are relative to the ring's centre, on the ground plane (x, z).
+-- Positions here are relative to the ring's centre, on the ground plane (x, z), in studs.
+-- Ringer.Sim plays the shots; this is the scoring, shared with the client.
 
 local Config = require(script.Parent.Config)
+local Sim = require(script.Parent.Sim)
 
 local Rules = {}
 
@@ -27,10 +29,10 @@ function Rules.isOutside(p: Vector2, radius: number?): boolean
 	return p.Magnitude > Config.RING_R
 end
 
---- Where the shooter sits for a first shot at `angle` (radians): just outside the line.
+--- Where the shooter sits for a first shot at `angle` (radians): just outside the line (studs).
 function Rules.placement(angle: number): Vector2
-	local r = Config.RING_R + Config.SHOOTER_R + 0.1
-	return Vector2.new(math.cos(angle) * r, math.sin(angle) * r)
+	local x, z = Sim.placementPoint(angle)
+	return Vector2.new(x, z) * Config.MAP_SCALE
 end
 
 --- Each seat's default knuckle-down angle.

@@ -4,22 +4,25 @@
 
 local Config = {}
 local Forge = require(script.Parent.Forge)
+local Sim = require(script.Parent.Sim)
 
--- ---- The ring (studs). The web game's units times 4. ---------------------------------------
-Config.RING_R = 22 -- the chalk ring
-Config.MAP_SCALE = 4 -- studs per web-game unit (its ring radius is 5.5): generated maps scale by this
-Config.MIB_R = 0.7 -- target marbles
-Config.SHOOTER_R = 0.95 -- the taw
-Config.SPACING = 2.2 -- between marbles in the starting cross
-Config.BOUND_R = 50 -- the kerb: nothing gets past it
+-- ---- The ring (studs): the web game's world (Ringer.Sim, in its units) times MAP_SCALE. -----
+-- Every shot is played on Ringer.Sim in web units; these are only for drawing and the camera.
+local W = Sim.WORLD
+Config.MAP_SCALE = 4 -- studs per web-game unit
+Config.RING_R = W.ringRadius * 4 -- the chalk ring
+Config.MIB_R = W.targetRadius * 4 -- target marbles
+Config.SHOOTER_R = W.shooterRadius * 4 -- the taw
+Config.SPACING = W.targetSpacing * 4 -- between marbles in the starting cross
+Config.BOUND_R = W.boundaryRadius * 4 -- the kerb: nothing gets past it
 Config.EDGE_H = 60 -- the wall above the kerb you can't see, far over the highest hop
-Config.MAX_SPEED = 105 -- shot speed at full power, studs/s
-Config.REST_SPEED = 0.5 -- a marble slower than this is at rest
-Config.REST_TIME = 0.35 -- everything at rest this long ends the shot
-Config.SHOT_CAP = 14 -- seconds: a shot never runs longer than this
-Config.TURN_TIME = 30 -- seconds a player has to shoot
-Config.TARGETS = 13
+Config.MAX_SPEED = W.maxShotSpeed * 4 -- shot speed at full power, studs/s
+Config.TURN_TIME = 30 -- seconds a player has to shoot (Roblox only: see PARITY.md)
+Config.TARGETS = Sim.TARGET_COUNT
 Config.DRY_SHOTS_LIMIT = 40 -- shots in a row with no capture: the ring is called
+Config.MIN_POWER = 0.03 -- a release weaker than this is not a shot
+-- How much aim guide each mode shows: the web game's lengths, in web units.
+Config.GUIDE = { full = 9, short = 2.2, off = 0 }
 
 -- Each table's centre sits on a grid far apart, so matches never touch.
 Config.TABLE_SPACING = 160
@@ -92,30 +95,72 @@ Config.ARENAS = {
 } :: { [string]: Arena }
 Config.ARENA_ORDER = { "desk", "culdesac", "grass", "sand", "ice", "gravel", "minigolf" }
 
--- ---- Bots: the web game's ladder ---------------------------------------------------------
-export type Bot = { id: string, label: string, aimErrorDeg: number, powerError: number, blunder: number, careful: boolean, candidates: number }
+-- ---- Bots: the web game's ladder (src/ai/profiles.ts) ------------------------------------
+export type Bot = {
+	id: string,
+	label: string,
+	aimErrorDeg: number, -- std-dev of aim error
+	powerError: number, -- std-dev of power error, as a fraction
+	candidates: number, -- shots imagined before choosing
+	usesSpin: boolean, -- considers backspin "stick" shots
+	positional: number, -- weight on leaving the taw well placed
+	blunder: number, -- chance of a brain fade
+	thinkMs: { number }, -- cosmetic thinking time
+}
 Config.BOTS = {
-	rookie = { id = "rookie", label = "Rookie", aimErrorDeg = 10, powerError = 0.26, blunder = 0.55, careful = false, candidates = 6 },
-	novice = { id = "novice", label = "Novice", aimErrorDeg = 6.5, powerError = 0.17, blunder = 0.38, careful = false, candidates = 11 },
-	casual = { id = "casual", label = "Casual", aimErrorDeg = 4.2, powerError = 0.11, blunder = 0.2, careful = false, candidates = 18 },
-	regular = { id = "regular", label = "Regular", aimErrorDeg = 3.4, powerError = 0.095, blunder = 0.15, careful = true, candidates = 24 },
-	skilled = { id = "skilled", label = "Skilled", aimErrorDeg = 2.8, powerError = 0.08, blunder = 0.1, careful = true, candidates = 30 },
-	expert = { id = "expert", label = "Expert", aimErrorDeg = 1.8, powerError = 0.05, blunder = 0.04, careful = true, candidates = 56 },
-	master = { id = "master", label = "Master", aimErrorDeg = 1.75, powerError = 0.049, blunder = 0.04, careful = true, candidates = 64 },
-	legend = { id = "legend", label = "Legend", aimErrorDeg = 0.55, powerError = 0.016, blunder = 0, careful = true, candidates = 160 },
+	rookie = { id = "rookie", label = "Rookie", aimErrorDeg = 10, powerError = 0.26, candidates = 6, usesSpin = false, positional = 0, blunder = 0.55, thinkMs = { 700, 1500 } },
+	novice = { id = "novice", label = "Novice", aimErrorDeg = 6.5, powerError = 0.17, candidates = 11, usesSpin = false, positional = 0.08, blunder = 0.38, thinkMs = { 700, 1500 } },
+	casual = { id = "casual", label = "Casual", aimErrorDeg = 4.2, powerError = 0.11, candidates = 18, usesSpin = false, positional = 0.2, blunder = 0.2, thinkMs = { 700, 1400 } },
+	regular = { id = "regular", label = "Regular", aimErrorDeg = 3.4, powerError = 0.095, candidates = 24, usesSpin = true, positional = 0.35, blunder = 0.15, thinkMs = { 750, 1500 } },
+	skilled = { id = "skilled", label = "Skilled", aimErrorDeg = 2.8, powerError = 0.08, candidates = 30, usesSpin = true, positional = 0.5, blunder = 0.1, thinkMs = { 800, 1600 } },
+	expert = { id = "expert", label = "Expert", aimErrorDeg = 1.8, powerError = 0.05, candidates = 56, usesSpin = true, positional = 0.85, blunder = 0.04, thinkMs = { 900, 1700 } },
+	master = { id = "master", label = "Master", aimErrorDeg = 1.75, powerError = 0.049, candidates = 64, usesSpin = true, positional = 0.95, blunder = 0.04, thinkMs = { 1000, 1900 } },
+	legend = { id = "legend", label = "Legend", aimErrorDeg = 0.55, powerError = 0.016, candidates = 160, usesSpin = true, positional = 1.4, blunder = 0, thinkMs = { 1100, 2000 } },
 } :: { [string]: Bot }
 
--- The Tower: eight floors, one step up the ladder each, the Black Taw on top.
-Config.TOWER = {
-	{ name = "Pip", marble = "pip", arena = "grass", bot = "rookie", reward = 60, difficulty = "easy", mapSeed = 101 },
-	{ name = "Tide", marble = "tide", arena = "sand", bot = "novice", reward = 80, difficulty = "easy", mapSeed = 202 },
-	{ name = "Jade", marble = "jade", arena = "grass", bot = "casual", reward = 100, difficulty = "medium", mapSeed = 303 },
-	{ name = "Volt", marble = "volt", arena = "desk", bot = "regular", reward = 130, difficulty = "medium", mapSeed = 404 },
-	{ name = "Ironside", marble = "ironside", arena = "gravel", bot = "skilled", reward = 160, difficulty = "medium", mapSeed = 505 },
-	{ name = "Rime", marble = "rime", arena = "ice", bot = "expert", reward = 200, difficulty = "hard", mapSeed = 606 },
-	{ name = "Nova", marble = "nova", arena = "minigolf", bot = "master", reward = 260, difficulty = "hard", mapSeed = 707 },
-	{ name = "Obsidian", marble = "obsidian", arena = "ice", bot = "legend", reward = 500, boss = true, difficulty = "hard", mapSeed = 808 },
+-- The Tower (src/game/story.ts buildTower, for the default fighter, Ember): seven challengers on
+-- their home fields, one step up the bot ladder each, then the Black Taw. Maps get harder as you
+-- climb and are the same course every retry; the aim guide shortens, then goes; ice floors are
+-- a best of three and the Black Taw a best of five. Rewards are the Roblox economy's.
+local LADDER = {
+	{ id = "pip", name = "Pip", arena = "grass" },
+	{ id = "tide", name = "Tide", arena = "sand" },
+	{ id = "jade", name = "Jade", arena = "grass" },
+	{ id = "volt", name = "Volt", arena = "desk" },
+	{ id = "ironside", name = "Ironside", arena = "gravel" },
+	{ id = "rime", name = "Rime", arena = "ice" },
+	{ id = "nova", name = "Nova", arena = "sand" },
 }
+local LADDER_BOTS = { "rookie", "novice", "casual", "regular", "skilled", "expert", "master" }
+local STAGE_DIFFICULTY = { "easy", "easy", "medium", "medium", "hard", "hard", "hard", "hard" }
+local STAGE_GUIDE = { "full", "full", "full", "short", "short", "short", "off", "off" }
+local REWARDS = { 60, 80, 100, 130, 160, 200, 260, 500 }
+Config.TOWER = {}
+for i, f in ipairs(LADDER) do
+	table.insert(Config.TOWER, {
+		name = f.name,
+		marble = f.id,
+		arena = f.arena,
+		bot = LADDER_BOTS[i],
+		reward = REWARDS[i],
+		difficulty = STAGE_DIFFICULTY[i],
+		mapSeed = Forge.hashString(string.format("tower:%s:%d", f.id, i - 1)) % 100000,
+		guide = STAGE_GUIDE[i],
+		wins = if f.arena == "ice" then 2 else 1,
+	})
+end
+table.insert(Config.TOWER, {
+	name = "Obsidian",
+	marble = "obsidian",
+	arena = "ice",
+	bot = "legend",
+	reward = REWARDS[8],
+	boss = true,
+	difficulty = "hard",
+	mapSeed = Forge.hashString("tower:obsidian") % 100000,
+	guide = STAGE_GUIDE[8],
+	wins = 3,
+})
 
 -- ---- Marbles -------------------------------------------------------------------------------
 -- How a marble looks: a glassy shell around a glowing core (a cat's eye), or a solid ball.

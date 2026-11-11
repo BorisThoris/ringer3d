@@ -23,7 +23,10 @@ collectibles and Robux.
 | `lighting.json` | The place's Lighting (Future, bloom, colour grading), written in by `build.mjs` |
 | `scripts/creator-hub/` | Creator Hub steps run through the signed-in browser: universe, key, monetization, store page, genre, thumbnails |
 | `scripts/shots/` | Real in-game screenshots off-screen: Studio in a private window station + `CaptureService` |
-| `tests/smoke.luau` | Cloud test: everything compiles, the server boots, rules, bot, tables, bag odds |
+| `tests/smoke.luau` | Cloud test: everything compiles, the server boots, rules, bot, Tower, tables, a whole bot game, bag odds |
+| `tests/sim.luau` | Cloud test: 345 shots from the web game's physics (`scripts/sim-fixtures.ts`) replayed on `Ringer.Sim` |
+| `tests/client.luau`, `botmatch.luau`, `botstats.luau` | Client replay and aim, bot games on every field, the bot ladder against the web runner |
+| `PARITY.md` | Every gameplay mechanic of the web game and where the port stands on it |
 | `store/art/` | Icon, thumbnails (with alt text), badge/pass/product images; `ingame/` real frames |
 | `art-pipeline/` | How the store art was made: local SDXL renders + outlined text with sharp |
 | `research/` | Why the store page and the look are what they are: search and genre data, the top earners' style |
@@ -42,15 +45,18 @@ node roblox/scripts/build.mjs                                    # the real buil
 node roblox/scripts/publish.mjs roblox/build/ringer.rbxlx Published
 ```
 
-Cloud test servers don't simulate physics (`RunService:IsRunning()` is false there), so the cloud
-test covers everything but how shots roll; that needs a playtest in Studio or the live game.
+Shots roll on `Ringer.Sim`, not Roblox physics, so the cloud tests cover how shots roll too. The
+sim fixtures are regenerated from the web game with
+`npx esbuild roblox/scripts/sim-fixtures.ts --bundle --platform=node --format=esm --outfile=roblox/build/sim-fixtures.mjs && node roblox/build/sim-fixtures.mjs`.
 
 ## Design notes
 
-- **Physics.** Roblox spheres roll almost forever, so `Table:roll` applies the web game's rolling
-  resistance by hand every step. The kerb is carried up by an invisible 60-stud wall, and a
-  safety net sets down anything found past the kerb or under the ground: no marble leaves the
-  field and no shot can hang.
+- **Physics.** Every shot is played on `Ringer.Sim`, the web game's shot simulation
+  (`src/core/physics.ts`) in pure Luau, in web units, drawn at x4. The server plays a shot to
+  the end at once and its result is final; each client replays the same shot frame by frame and
+  the server waits for those replays. The bot imagines its candidate shots on the same sim, as
+  the web bot does. Roblox's own physics plays no part. `PARITY.md` lists every mechanic and how
+  closely it matches; `tests/sim.luau` checks it against the web game's own physics.
 - **Collectibles.** Roblox does not allow NFTs or blockchain items. Limited marbles are the
   platform's own way to do scarcity: a fixed supply per edition, every copy stamped with a serial
   number from a global DataStore counter.

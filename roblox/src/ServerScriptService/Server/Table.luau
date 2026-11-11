@@ -1,22 +1,29 @@
--- One table: a field, thirteen marbles, two (or more) seats, and the turns, played out on the
--- server's own physics. Seats are players or bots; with only bots it plays itself (the cloud
--- smoke test does exactly that).
+-- One table: a field, its map, thirteen marbles, two (or more) seats, and the turns. Every shot
+-- is played on Ringer.Sim, the web game's physics in Luau, from the table's layout: the server
+-- plays it to the end at once (its result is final), tells the players the shot, and waits while
+-- each client replays the same shot frame by frame. Seats are players or bots; with only bots
+-- it plays itself (the cloud tests do exactly that, with `instant` set so nothing waits).
 --
--- Physics: Roblox spheres roll almost forever, so rolling resistance is applied by hand each
--- step (the web game's `rollDecel`), and a safety net sets down anything that ever gets past the
--- kerb or under the ground, so no shot can hang (the web game's 16 s softlock).
+-- The rules are the web game's Match (src/core/match.ts): knuckle down anywhere on the line for
+-- a turn's first shot, keep what you knock out, shoot again from where the taw stopped if you
+-- captured and stayed in, otherwise the turn passes; the game ends when the ring is empty, the
+-- lead can't be caught, or 40 shots in a row capture nothing.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local Players = game:GetService("Players")
 
 local Config = require(ReplicatedStorage.Ringer.Config)
 local Rules = require(ReplicatedStorage.Ringer.Rules)
 local Bot = require(ReplicatedStorage.Ringer.Bot)
+local Sim = require(ReplicatedStorage.Ringer.Sim)
+local Surfaces = require(ReplicatedStorage.Ringer.Surfaces)
+local Playback = require(ReplicatedStorage.Ringer.Playback)
+local Forge = require(ReplicatedStorage.Ringer.Forge)
 local MarbleLook = require(ReplicatedStorage.Ringer.MarbleLook)
+local Maps = require(ReplicatedStorage.Ringer.Maps)
 local Arena = require(script.Parent.Arena)
 local Pieces = require(script.Parent.Pieces)
-local Maps = require(ReplicatedStorage.Ringer.Maps)
+
+local S = Config.MAP_SCALE
 
 export type Seat = {
 	kind: "player" | "bot",
@@ -25,6 +32,7 @@ export type Seat = {
 	name: string,
 	marble: string,
 	trail: boolean?,
+	fast: boolean?, -- this player has fast-forward on
 }
 
 export type Result = {
@@ -49,6 +57,11 @@ function Table.new(opts: {
 	seed: number?,
 	difficulty: string?, -- the generated map's: easy, medium, hard
 	mapSeed: number?,
+	guide: string?, -- the most aim guide allowed: full, short, off
+	series: { number }?, -- games won so far on a best-of floor, [you, them]
+	wins: number?, -- games to win the series
+	instant: boolean?, -- no waiting for replays or thinking (tests)
+	watched: ((n: number) -> boolean)?, -- a test standing in for a player: true once shot n was watched
 	send: ((tbl: any, kind: string, data: any) -> ())?,
 	finished: ((tbl: any, result: Result) -> ())?,
 	parent: Instance?,
@@ -59,8 +72,15 @@ function Table.new(opts: {
 	self.mode = opts.mode
 	self.floor = opts.floor
 	self.seats = opts.seats
+	self.instant = opts.instant == true
+	self.watched = opts.watched
+	self.guide = opts.guide or "full"
+	self.series = opts.series
+	self.wins = opts.wins
 	self.arena = Config.ARENAS[opts.arena] or Config.ARENAS.desk
-	self.rng = Random.new(opts.seed or os.clock() * 1e6)
+	self.surface = Surfaces[self.arena.id]
+	self.seed = opts.seed or math.floor(os.clock() * 1e6) % 2147483647
+	self.rng = Random.new(self.seed)
 	self.send = opts.send or function() end
 	self.finished = opts.finished or function() end
 	self.scores = table.create(#opts.seats, 0)
@@ -68,12 +88,14 @@ function Table.new(opts: {
 	for i = 1, #opts.seats do
 		self.captured[i] = {}
 	end
-	self.current = self.rng:NextInteger(1, #opts.seats)
+	-- Who lags first comes from the match seed, as in the web game.
+	self.current = Forge.Rng.new(self.seed):int(#opts.seats) + 1
 	self.firstShot = true
 	self.shots = 0
 	self.dryShots = 0
 	self.phase = "aim"
 	self.pending = nil -- a shot waiting to be played
+	self.acks = {} -- players who finished watching the shot in flight
 	self.closed = false
 
 	local model = Instance.new("Model")
@@ -83,41 +105,36 @@ function Table.new(opts: {
 	self.built = Arena.build(opts.origin, self.arena, #opts.seats, self.rng, model, true)
 	self.origin = opts.origin
 	-- The field's generated map, exactly as the web game lays it out for the same spec.
-	local difficulty = if opts.difficulty and table.find(Maps.DIFFICULTIES, opts.difficulty) then opts.difficulty else "medium"
-	self.map = Maps.generate(self.arena.id, difficulty, opts.mapSeed or self.rng:NextInteger(1, 2 ^ 31 - 1))
-	self.pieces = Pieces.build(self.map, opts.origin, model)
-	self.obstacles = Pieces.obstacles(self.map)
+	self.difficulty = if opts.difficulty and table.find(Maps.DIFFICULTIES, opts.difficulty) then opts.difficulty else "medium"
+	self.mapSeed = opts.mapSeed or self.rng:NextInteger(1, 2 ^ 31 - 1)
+	self.map = Maps.generate(self.arena.id, self.difficulty, self.mapSeed)
+	Pieces.build(self.map, opts.origin, model)
+	self.mapFolder = model:FindFirstChild("Map")
 
-	-- The thirteen marbles, in the cross.
+	self.layout = Sim.startingLayout()
 	local marbles = Instance.new("Folder")
 	marbles.Name = "Marbles"
 	marbles.Parent = model
 	self.marbleFolder = marbles
-	self.mibs = {}
-	local physics = { density = 2.6, friction = 0.3, elasticity = self.arena.elasticity }
-	for i, p in ipairs(Rules.startingCross()) do
-		local colors = Config.MIB_COLORS[(i - 1) % #Config.MIB_COLORS + 1]
+	self.parts = {} :: { [number]: BasePart } -- by marble id; the taw is Sim.SHOOTER_ID
+	for _, t in ipairs(self.layout.targets) do
+		local colors = Config.MIB_COLORS[t.id % #Config.MIB_COLORS + 1]
 		local look = { id = "mib", name = "Mib", rarity = "Common", shell = colors[1], core = colors[2], material = Enum.Material.Glass, transparency = 0.3, glow = 0.2 }
-		local ball = MarbleLook.make(look :: any, Config.MIB_R, physics)
-		ball.Name = "Mib" .. i
-		ball.Anchored = false
-		ball.CFrame = CFrame.new(self:world(p, Config.MIB_R))
+		local ball = MarbleLook.make(look :: any, Config.MIB_R)
+		ball.Name = "Mib" .. t.id
+		ball.Anchored = true
+		ball.CanCollide = false
+		ball.CFrame = CFrame.new(self:world(t.x, t.y, t.z))
 		ball.Parent = marbles
-		ball:SetNetworkOwner(nil)
-		table.insert(self.mibs, ball)
+		self.parts[t.id] = ball
 	end
-	self.shooter = nil :: BasePart?
+	self.rot = {} :: { [number]: CFrame } -- each marble's turn, from the spin it rolled with
 	return self
 end
 
--- ---- Coordinates: ring-relative (x, z) on the ground <-> world ---------------------------
-function Table:world(p: Vector2, radius: number): Vector3
-	return self.origin + Vector3.new(p.X, radius, p.Y)
-end
-
-function Table:flat(v: Vector3): Vector2
-	local d = v - self.origin
-	return Vector2.new(d.X, d.Z)
+-- ---- Coordinates: web units on the ring <-> studs in the world ----------------------------
+function Table:world(x: number, y: number, z: number): Vector3
+	return self.origin + Vector3.new(x * S, y * S, z * S)
 end
 
 function Table:seatOf(player: Player): number?
@@ -139,12 +156,13 @@ function Table:players(): { Player }
 	return out
 end
 
---- What clients need to draw the table's HUD.
+--- What clients need to draw the table, aim, and replay the next shot exactly.
 function Table:state()
 	local seats = {}
 	for i, s in ipairs(self.seats) do
 		seats[i] = { name = s.name, marble = s.marble, bot = s.kind == "bot" and Config.BOTS[s.bot or "casual"].label or nil, userId = s.player and s.player.UserId or nil, score = self.scores[i] }
 	end
+	local shooter = self.layout.shooter
 	return {
 		id = self.id,
 		mode = self.mode,
@@ -152,16 +170,22 @@ function Table:state()
 		arena = self.arena.id,
 		arenaName = self.arena.name,
 		mapName = self.map.name,
-		difficulty = self.map.difficulty,
+		difficulty = self.difficulty,
+		mapSeed = self.mapSeed,
 		origin = self.origin,
 		seats = seats,
 		current = self.current,
 		phase = self.phase,
 		firstShot = self.firstShot,
-		shooter = self.shooter and self.shooter.Position or nil,
-		remaining = #self.mibs,
+		shooter = if shooter and not self.firstShot then self:world(shooter.x, shooter.y, shooter.z) else nil,
+		remaining = #self.layout.targets,
 		turnEnds = self.turnEnds,
 		seatAngle = Rules.seatAngle(self.current, #self.seats),
+		shots = self.shots,
+		layout = self.layout,
+		guide = self.guide,
+		series = self.series,
+		wins = self.wins,
 	}
 end
 
@@ -180,194 +204,210 @@ function Table:submit(player: Player, placeAngle: number, aimAngle: number, powe
 			return false
 		end
 	end
+	if power < Config.MIN_POWER then
+		return false
+	end
 	local s = if typeof(spin) == "number" and spin == spin then math.clamp(spin, -1, 1) else 0
-	self.pending = { placeAngle = placeAngle, aimAngle = aimAngle, power = math.clamp(power, 0.05, 1), spin = s }
+	self.pending = { placeAngle = placeAngle, aimAngle = aimAngle, power = math.clamp(power, 0, 1), spin = s }
 	return true
 end
 
--- ---- One shot -----------------------------------------------------------------------------
-function Table:launch(shot)
-	local seat = self.seats[self.current]
-	if self.firstShot or not self.shooter then
-		if self.shooter then
-			self.shooter:Destroy()
-		end
-		local look = MarbleLook.lookFor(seat.marble)
-		local ball = MarbleLook.make(look, Config.SHOOTER_R, { density = 2.6, friction = 0.3, elasticity = self.arena.elasticity })
-		ball.Name = "Shooter"
-		ball.Anchored = false
-		ball.CFrame = CFrame.new(self:world(Rules.placement(shot.placeAngle), Config.SHOOTER_R))
-		if seat.trail then
-			MarbleLook.addTrail(ball, look.core)
-		end
-		ball.Parent = self.marbleFolder
-		ball:SetNetworkOwner(nil)
-		self.shooter = ball
+--- A player finished watching shot `n` (their replay ended).
+function Table:ack(player: Player, n: number)
+	if n == self.shots then
+		self.acks[player] = true
 	end
-	local dir = Vector3.new(math.cos(shot.aimAngle), 0, math.sin(shot.aimAngle))
-	local v = dir * shot.power * Config.MAX_SPEED
-	local shooter = self.shooter :: BasePart
-	shooter.AssemblyLinearVelocity = v
-	-- Spin. Neutral is a natural roll: on Roblox's friction a sliding launch (the web game's
-	-- neutral) loses a big share of its speed before it rolls, and the bots' power model assumes
-	-- a rolling shooter. -1 spins backwards at the rolling rate (backspin: stops near the hit),
-	-- +1 at twice it (topspin: follows through).
-	local spin = shot.spin or 0
-	local w = if spin >= 0 then 1 + spin else 1 + 2 * spin
-	shooter.AssemblyAngularVelocity = Vector3.new(v.Z, 0, -v.X) / Config.SHOOTER_R * w
+end
+
+--- A player turned fast-forward on or off.
+function Table:setFast(player: Player, on: boolean)
+	local seat = self:seatOf(player)
+	if seat then
+		self.seats[seat].fast = on == true
+	end
+end
+
+-- ---- One shot -----------------------------------------------------------------------------
+
+--- Make sure there is a taw part for the shooter in play.
+function Table:shooterPart(): BasePart
+	local seat = self.seats[self.current]
+	local ball = self.parts[Sim.SHOOTER_ID]
+	if ball and ball:GetAttribute("Seat") == self.current then
+		return ball
+	end
+	if ball then
+		ball:Destroy()
+	end
+	local look = MarbleLook.lookFor(seat.marble)
+	ball = MarbleLook.make(look, Config.SHOOTER_R)
+	ball.Name = "Shooter"
+	ball.Anchored = true
+	ball.CanCollide = false
+	ball:SetAttribute("Seat", self.current)
+	if seat.trail then
+		MarbleLook.addTrail(ball, look.core)
+	end
+	ball.Parent = self.marbleFolder
+	self.parts[Sim.SHOOTER_ID] = ball
+	self.rot[Sim.SHOOTER_ID] = CFrame.identity
+	return ball
+end
+
+--- Play `shot` on the sim, let the players watch it, then score it. True when the game is over.
+function Table:play(shot): boolean
+	shot = Sim.quantizeShot(shot)
+	local before = self.layout
+	local first = self.firstShot
+	local sim = Sim.new(before, self.surface, shot, first, self.map.pieces)
+	local tawPart = self:shooterPart()
+	if first then
+		self.rot[Sim.SHOOTER_ID] = CFrame.identity
+	end
+	local b0 = sim.shooter
+	if b0 then
+		tawPart.CFrame = CFrame.new(self:world(b0.px, b0.py, b0.pz)) * self.rot[Sim.SHOOTER_ID]
+	end
+	local crossStep = nil
+	local broken = {}
+	while not sim.done do
+		sim:step()
+		Playback.spin(sim, self.rot)
+		if not crossStep and Playback.crossedNow(sim) then
+			crossStep = sim.steps
+		end
+		for _, p in ipairs(sim.broke) do
+			table.insert(broken, { i = p.i, skin = p.piece.skin or p.piece.kind, pos = self:world(p.x, p.h / 2, p.z) })
+		end
+	end
+	local after = sim:resultLayout()
+	local holed = sim.holed
+
 	self.shots += 1
 	self.phase = "rolling"
-	self:broadcast("shot", { seat = self.current, aimAngle = shot.aimAngle, power = shot.power, spin = shot.spin or 0 })
-end
+	table.clear(self.acks)
+	self:broadcast("shot", {
+		seat = self.current,
+		n = self.shots,
+		shot = shot,
+		first = first,
+		layout = before,
+		steps = sim.steps,
+		crossStep = crossStep,
+	})
 
-function Table:bodies(): { BasePart }
-	local out = table.clone(self.mibs)
-	if self.shooter then
-		table.insert(out, self.shooter)
-	end
-	return out
-end
-
---- A marble drops into a cup and leaves the table: it is set down in a pocket just beyond the
---- ring, where the rules count it as knocked out (or the shooter as gone), as in the web game.
-function Table:drop(b: BasePart, cup)
-	local d = cup.pos.Magnitude > 1e-3 and cup.pos.Unit or Vector2.new(1, 0)
-	b.AssemblyLinearVelocity = Vector3.zero
-	b.AssemblyAngularVelocity = Vector3.zero
-	b.Anchored = true
-	b.CanCollide = false
-	b.CFrame = CFrame.new(self:world(d * (Config.RING_R + 4), b.Size.X / 2))
-	self:broadcast("cup", { pos = self:world(cup.pos, 0) })
-end
-
---- Step the rolling resistance and the safety net until everything rests (or the cap).
-function Table:roll()
-	self.kicked = self.kicked or {}
-	local started = os.clock()
-	local still = 0
-	local decel = self.arena.rollDecel
-	local floorY = self.origin.Y
-	while true do
-		local dt = RunService.Heartbeat:Wait()
-		local moving = false
-		for _, b in ipairs(self:bodies()) do
-			local r = b.Size.X / 2
-			local p = b.Position
-			local flat = self:flat(p)
-			-- Safety net: past the kerb or under the ground -> set down inside the kerb, at rest.
-			if p.Y < floorY - 3 or flat.Magnitude > Config.BOUND_R + 2 then
-				local d = flat.Magnitude > 1e-3 and flat.Unit or Vector2.new(1, 0)
-				b.AssemblyLinearVelocity = Vector3.zero
-				b.AssemblyAngularVelocity = Vector3.zero
-				b.CFrame = CFrame.new(self:world(d * (Config.BOUND_R - 3), r))
-				continue
-			end
-			if b.Anchored then
-				continue -- in a cup
-			end
-			local v = b.AssemblyLinearVelocity
-			local grounded = p.Y < floorY + r + 0.25
-			if grounded then
-				-- Mini-golf cups take a slow enough marble (it counts as knocked out).
-				local holed = false
-				for _, h in ipairs(self.pieces.holes) do
-					local lip = h.r - r * 0.3
-					if (flat - h.pos).Magnitude < lip and Vector3.new(v.X, 0, v.Z).Magnitude < Pieces.HOLE_SPEED then
-						self:drop(b, h)
-						holed = true
-						break
-					end
-				end
-				if holed then
-					continue
-				end
-				-- Patches of different ground: sticky and slick scale the rolling resistance,
-				-- speed pads push along their arrow.
-				local here = decel
-				for _, z in ipairs(self.pieces.zones) do
-					if (flat - z.pos).Magnitude <= z.r then
-						if z.effect == "boost" then
-							v += Vector3.new(z.dir.X, 0, z.dir.Y) * Pieces.BOOST * dt
-						else
-							here *= z.k
-						end
-					end
-				end
-				local h = Vector3.new(v.X, 0, v.Z)
-				local sp = h.Magnitude
-				if sp > 0 then
-					local f = math.max(0, sp - here * dt) / sp
-					b.AssemblyLinearVelocity = Vector3.new(v.X * f, v.Y, v.Z * f)
-					b.AssemblyAngularVelocity = b.AssemblyAngularVelocity * f
-				end
-			end
-			-- Bumpers kick a marble back harder than it came.
-			for _, bm in ipairs(self.pieces.bumpers) do
-				local off = flat - bm.pos
-				if off.Magnitude < bm.r + r + 0.15 and off.Magnitude > 1e-3 and (self.kicked[b] or 0) < os.clock() then
-					local n = off.Unit
-					local lv = b.AssemblyLinearVelocity
-					local out = lv.X * n.X + lv.Z * n.Y
-					if out > 1 then
-						local add = out * (Pieces.BUMPER_KICK - 1)
-						b.AssemblyLinearVelocity = lv + Vector3.new(n.X * add, 0, n.Y * add)
-						self.kicked[b] = os.clock() + 0.25
-					end
-				end
-			end
-			if b.AssemblyLinearVelocity.Magnitude > Config.REST_SPEED then
-				moving = true
+	-- The players watch it: until each has replayed it, or as long as it takes at full speed.
+	if not self.instant then
+		local fastAll = true
+		local humans = self:players()
+		for _, s in ipairs(self.seats) do
+			if s.player and not s.fast then
+				fastAll = false
 			end
 		end
-		still = moving and 0 or still + dt
-		if still >= Config.REST_TIME or os.clock() - started > Config.SHOT_CAP then
-			break
+		local limit = os.clock() + Playback.duration(sim.steps, crossStep, false) + 1.5
+		local soonest = os.clock() + Playback.duration(sim.steps, crossStep, fastAll and #humans > 0) * 0.9
+		while os.clock() < limit and not self.closed do
+			local all = os.clock() >= soonest
+			for _, p in ipairs(humans) do
+				if p.Parent and not self.acks[p] then
+					all = false
+				end
+			end
+			if self.watched then
+				all = self.watched(self.shots)
+			end
+			if all and (#humans > 0 or self.watched or os.clock() >= soonest) then
+				break
+			end
+			task.wait(0.05)
 		end
 	end
-	for _, b in ipairs(self:bodies()) do
-		b.AssemblyLinearVelocity = Vector3.zero
-		b.AssemblyAngularVelocity = Vector3.zero
+
+	-- The table now shows where everything came to rest (clients already replayed it there).
+	for _, b in ipairs(after.targets) do
+		local part = self.parts[b.id]
+		if part then
+			local cup = holed[b.id]
+			local x, y, z = b.x, b.y, b.z
+			if cup then
+				x, y, z = cup.x, -1, cup.z
+			end
+			part.CFrame = CFrame.new(self:world(x, y, z)) * (self.rot[b.id] or CFrame.identity)
+		end
 	end
+	local taw = after.shooter
+	if taw and tawPart then
+		tawPart.CFrame = CFrame.new(self:world(taw.x, taw.y, taw.z)) * (self.rot[Sim.SHOOTER_ID] or CFrame.identity)
+	end
+	for _, p in ipairs(after.props or {}) do
+		local part = self.mapFolder and self.mapFolder:FindFirstChild("Prop" .. p.i)
+		if part then
+			if p.broken then
+				part:Destroy()
+			else
+				part.CFrame = Playback.propCFrame(self.map.pieces[p.i], p, self.origin, S)
+			end
+		end
+	end
+	for _, b in ipairs(broken) do
+		self:broadcast("break", b)
+	end
+	for id, cup in pairs(holed) do
+		self:broadcast("cup", { pos = self:world(cup.x, 0, cup.z), id = id })
+	end
+	return self:resolve(after, holed)
 end
 
---- Score the shot and decide whose turn it is. Returns true when the game is over.
-function Table:resolve(): boolean
+--- Score the shot and decide whose turn it is (the web game's Match.resolve).
+function Table:resolve(after, holed): boolean
 	local seat = self.current
-	local capturedNow = 0
 	self.dryShots += 1
-	for i = #self.mibs, 1, -1 do
-		local ball = self.mibs[i]
-		if Rules.isOutside(self:flat(ball.Position)) then
-			table.remove(self.mibs, i)
-			capturedNow += 1
+	local kept = {}
+	for _, t in ipairs(after.targets) do
+		if Sim.isOutsideRing(t.x, t.z) then
 			self.dryShots = 0
 			self.scores[seat] += 1
-			table.insert(self.captured[seat], ball.Name)
-			self:broadcast("capture", { seat = seat, pos = ball.Position })
-			ball.Anchored = true
-			ball.CanCollide = false
-			task.delay(0.6, function()
-				ball:Destroy()
-			end)
+			table.insert(self.captured[seat], "Mib" .. t.id)
+			local part = self.parts[t.id]
+			local cup = holed[t.id]
+			local pos = if cup then self:world(cup.x, 0, cup.z) else self:world(t.x, t.y, t.z)
+			self:broadcast("capture", { seat = seat, pos = pos, id = t.id })
+			if part then
+				self.parts[t.id] = nil
+				task.delay(0.6, function()
+					part:Destroy()
+				end)
+			end
+		else
+			table.insert(kept, t)
 		end
 	end
-	local shooterOut = not self.shooter or Rules.isOutside(self:flat((self.shooter :: BasePart).Position))
+	after.targets = kept
+	local shooter = after.shooter
+	local shooterOut = not shooter or Sim.isOutsideRing(shooter.x, shooter.z)
 	if shooterOut then
 		self:broadcast("shooterOut", { seat = seat })
 	end
+	self.layout = after
 
-	local winners = Rules.gameOver(self.scores, #self.mibs, self.dryShots)
+	local winners = Rules.gameOver(self.scores, #after.targets, self.dryShots)
 	if winners then
 		self.winners = winners
+		self.layout.shooter = nil
 		return true
 	end
-	if capturedNow > 0 and not shooterOut then
+	local capturedNow = self.dryShots == 0
+	if capturedNow and not shooterOut then
 		self.firstShot = false
 		self:broadcast("shootAgain", { seat = seat })
 	else
-		if self.shooter then
-			self.shooter:Destroy()
-			self.shooter = nil
+		-- Turn passes: the shooter is picked up.
+		self.layout.shooter = nil
+		local taw = self.parts[Sim.SHOOTER_ID]
+		if taw then
+			taw:Destroy()
+			self.parts[Sim.SHOOTER_ID] = nil
 		end
 		self.firstShot = true
 		self.current = self.current % #self.seats + 1
@@ -377,19 +417,67 @@ end
 
 -- ---- The game loop ----------------------------------------------------------------------
 function Table:wait(seconds: number): boolean
+	if self.instant then
+		return not self.closed
+	end
 	local t = os.clock() + seconds
 	while os.clock() < t do
 		if self.closed then
 			return false
 		end
-		task.wait(0.1)
+		task.wait(0.05)
 	end
 	return not self.closed
 end
 
+--- Is anyone watching this table with fast-forward on (a bot's preparation plays faster)?
+function Table:fast(): boolean
+	local any, all = false, true
+	for _, s in ipairs(self.seats) do
+		if s.player then
+			any = true
+			all = all and s.fast == true
+		end
+	end
+	return any and all
+end
+
+--- A bot's turn: think (imagining shots on the sim), then show the aim and fire.
+function Table:botTurn(seat)
+	local profile = Config.BOTS[seat.bot or "casual"]
+	local rng = Bot.rng(self.seed, self.shots, self.current - 1)
+	local started = os.clock()
+	local seatAngle = Rules.seatAngle(self.current, #self.seats)
+	local shot = Bot.plan({
+		layout = self.layout,
+		firstShot = self.firstShot,
+		seatAngle = seatAngle,
+		surface = self.surface,
+		pieces = self.map.pieces,
+	}, profile, rng, function()
+		task.wait()
+	end)
+	if self.closed then
+		return nil
+	end
+	local think = rng:range(profile.thinkMs[1], profile.thinkMs[2]) / 1000
+	local speed = if self:fast() then Playback.FAST else 1
+	if not self:wait(math.max(0, think - (os.clock() - started)) / speed) then
+		return nil
+	end
+	-- Clients swing the aim round to the shot and charge it, as the web game does.
+	self:broadcast("prepare", { seat = self.current, shot = shot, duration = 1.4 })
+	if not self:wait(1.4 / speed) then
+		return nil
+	end
+	return shot
+end
+
 --- Play the whole game; returns the result (also passed to `finished`).
 function Table:run(): Result
-	task.wait(0.5)
+	if not self.instant then
+		task.wait(0.5)
+	end
 	while not self.closed and not self.abandoned do
 		local seat = self.seats[self.current]
 		self.phase = "aim"
@@ -398,17 +486,10 @@ function Table:run(): Result
 		self:broadcast("state", self:state())
 
 		if seat.kind == "bot" then
-			if not self:wait(0.6 + self.rng:NextNumber() * 0.9) then
-				break
-			end
-			local from = (not self.firstShot and self.shooter) and self:flat((self.shooter :: BasePart).Position) or nil
-			local mibs = {}
-			for _, b in ipairs(self.mibs) do
-				table.insert(mibs, self:flat(b.Position))
-			end
-			self.pending = Bot.plan(from, mibs, self.arena.rollDecel, Config.BOTS[seat.bot or "casual"], self.rng, self.obstacles)
+			self.pending = self:botTurn(seat)
 		else
-			-- A player has TURN_TIME to shoot; then a weak shot is taken for them.
+			-- A player has TURN_TIME to shoot (Roblox only); then a firm shot at the middle is
+			-- taken for them, from wherever they would shoot.
 			while not self.pending and not self.closed do
 				if not (seat.player and seat.player.Parent) then
 					self.abandoned = self.current
@@ -416,21 +497,24 @@ function Table:run(): Result
 				end
 				if workspace:GetServerTimeNow() > self.turnEnds then
 					local a = Rules.seatAngle(self.current, #self.seats)
-					self.pending = { placeAngle = a, aimAngle = a + math.pi, power = 0.15 }
+					local from = self.layout.shooter
+					local aim = a + math.pi
+					if from and not self.firstShot then
+						aim = math.atan2(-from.z, -from.x)
+					end
+					self.pending = { placeAngle = a, aimAngle = aim, power = 0.5, spin = 0 }
 					break
 				end
-				task.wait(0.1)
+				task.wait(0.05)
 			end
 			if self.abandoned then
 				break
 			end
 		end
-		if self.closed then
+		if self.closed or not self.pending then
 			break
 		end
-		self:launch(self.pending)
-		self:roll()
-		if self:resolve() then
+		if self:play(self.pending) then
 			break
 		end
 	end
