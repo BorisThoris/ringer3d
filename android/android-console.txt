@@ -1,6 +1,10 @@
-11-04 14:27:56.415  3119  3119 W Capacitor/Console: File: https://localhost/assets/index-DC-pgxxA.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
-11-04 14:28:17.792  3119  3119 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-04 14:28:17.802  3119  3119 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-04 14:28:24.794  3119  3119 I Capacitor/Console: File:  - Line 333 - Msg: {}
-11-04 14:28:26.879  3119  3119 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-04 14:28:28.412  3119  3119 I Capacitor/Console: File:  - Line 333 - Msg: undefined
+11-11 22:25:51.198  2517  2517 W Capacitor/Console: File: https://localhost/assets/index-DC-pgxxA.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+11-11 22:25:58.120  2517  2517 W Capacitor/Console: File: https://localhost/assets/index-DC-pgxxA.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+11-11 22:26:26.655  2517  2517 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+11-11 22:26:26.663  2517  2517 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+11-11 22:26:26.669  2517  2517 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+11-11 22:26:26.670  2517  2517 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+11-11 22:26:27.713  2517  2517 I Capacitor/Console: File:  - Line 333 - Msg: {}
+11-11 22:26:28.253  2517  2517 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+11-11 22:26:28.255  2517  2517 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+11-11 22:26:32.193  2517  2517 I Capacitor/Console: File:  - Line 333 - Msg: undefined
