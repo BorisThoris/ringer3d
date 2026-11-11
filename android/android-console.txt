@@ -1,8 +1,12 @@
-11-11 22:42:16.290  3019  3019 W Capacitor/Console: File: https://localhost/assets/index-DC-pgxxA.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
-11-11 22:42:37.921  3019  3019 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-11 22:42:37.926  3019  3019 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-11 22:42:39.938  3019  3019 I Capacitor/Console: File:  - Line 333 - Msg: {}
-11-11 22:42:39.938  3019  3019 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-11 22:42:40.896  3019  3019 I Capacitor/Console: File:  - Line 333 - Msg: undefined
-11-11 22:43:01.470  1069  1087 E JavaBinder: *** Uncaught remote exception! Exceptions are not yet supported across processes. Client PID 4159 UID 10118.
-11-11 22:43:03.576  1069  1086 E JavaBinder: *** Uncaught remote exception! Exceptions are not yet supported across processes. Client PID 4159 UID 10118.
+11-11 22:54:32.516  2786  2786 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
+11-11 22:54:32.517  2786  2786 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
+11-11 22:54:32.517  2786  2786 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
+11-11 22:54:34.465  2786  2786 W Capacitor/Console: File: https://localhost/assets/index-DC-pgxxA.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+11-11 22:54:41.568  1044  2263 E JavaBinder: *** Uncaught remote exception! Exceptions are not yet supported across processes. Client PID 3948 UID 10118.
+11-11 22:54:44.163  1044  1065 E JavaBinder: *** Uncaught remote exception! Exceptions are not yet supported across processes. Client PID 3948 UID 10118.
+11-11 22:54:53.897  2786  2786 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+11-11 22:54:53.908  2786  2786 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+11-11 22:54:54.910  2786  2786 I Capacitor/Console: File:  - Line 333 - Msg: {}
+11-11 22:54:56.782  2786  2786 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+11-11 22:54:59.374  2786  2786 I Capacitor/Console: File:  - Line 333 - Msg: undefined
+11-11 22:55:19.846  1044  1078 E JavaBinder: *** Uncaught remote exception! Exceptions are not yet supported across processes. Client PID 4049 UID 10118.
