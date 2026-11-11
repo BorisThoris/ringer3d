@@ -51,7 +51,15 @@ function Rng:int(maxExclusive: number): number
 	return math.floor(self:next() * maxExclusive)
 end
 
+--- Approximately normal, mean 0, std-dev 1 (Box-Muller), as the web game's Rng.gaussian.
+function Rng:gaussian(): number
+	local u = math.max(1e-12, self:next())
+	local v = self:next()
+	return math.sqrt(-2 * math.log(u)) * math.cos(2 * math.pi * v)
+end
+
 Forge.Rng = Rng
+Forge.imul = imul
 
 function Forge.hashString(s: string): number
 	local h = 2166136261
