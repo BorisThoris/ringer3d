@@ -28,7 +28,9 @@ export type Profile = {
 	forged: { { id: string, at: number, tally: number } },
 	book: { [string]: boolean }, -- Marble Book sets already paid out
 	equipped: string,
-	tower: number, -- next floor to play (9 = cleared)
+	tower: number, -- next floor to play (9 = cleared), for towerFighter's run
+	towerFighter: string, -- the fighter climbing (one run at a time, as in the web game)
+	fighters: { string }, -- fighters unlocked: the starters, then each one beaten in the Tower
 	towerBest: number,
 	streak: number,
 	lastDaily: number, -- day number (UTC) of the last daily claim
@@ -48,6 +50,8 @@ local function fresh(): Profile
 		book = {},
 		equipped = "ember",
 		tower = 1,
+		towerFighter = "ember",
+		fighters = { "ember", "tide", "pip", "jade" },
 		towerBest = 0,
 		streak = 0,
 		lastDaily = 0,

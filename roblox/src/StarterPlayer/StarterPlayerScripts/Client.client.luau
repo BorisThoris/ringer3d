@@ -166,11 +166,22 @@ end, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -16), 
 
 local towerCard = card(playBody, "The Tower", "Eight floors, each foe tougher. The Black Taw waits at the top.", Kit.PURPLE)
 local towerLabel = Kit.label("Floor 1 of 8", 24, { Position = UDim2.new(0, 0, 0, 150), Size = UDim2.new(1, 0, 0, 30), Parent = towerCard })
+-- The fighter you climb as: the starters, then each one you beat (the web game's choice).
+local fighterPick = nil :: string?
+local fighterButton
+fighterButton = Kit.button("Fighter: Ember", Kit.BLUE, function()
+	local list = profile and profile.fighters or Config.STARTERS
+	local cur = fighterPick or (profile and profile.towerFighter) or "ember"
+	local i = table.find(list, cur) or 0
+	fighterPick = list[i % #list + 1]
+	fighterButton.Text = "Fighter: " .. Config.FIGHTER[fighterPick].name
+	toast(if profile and fighterPick ~= profile.towerFighter then "A new climb starts at floor 1." else "Continue your climb.", "info")
+end, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -80), Size = UDim2.new(0.85, 0, 0, 44), Parent = towerCard })
 Kit.button("Climb", Kit.GREEN, function()
-	if profile and profile.tower > #Config.TOWER then
+	if profile and profile.tower > 8 and (fighterPick == nil or fighterPick == profile.towerFighter) then
 		toast("You've conquered the Tower! Replaying the Black Taw.", "good")
 	end
-	play({ mode = "tower" })
+	play({ mode = "tower", fighter = fighterPick })
 end, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -16), Size = UDim2.new(0.85, 0, 0, 56), Parent = towerCard })
 
 -- =============================================================================================
@@ -749,14 +760,7 @@ local function onState(state)
 	if timerConn then
 		timerConn:Disconnect()
 	end
-	if state.phase == "aim" and mine then
-		timerConn = game:GetService("RunService").Heartbeat:Connect(function()
-			local left = math.max(0, math.floor((state.turnEnds or 0) - workspace:GetServerTimeNow()))
-			if left <= 10 then
-				banner.Text = string.format("%s  %ds", state.firstShot and "Your turn!" or "Shoot again!", left)
-			end
-		end)
-	end
+
 end
 
 Aim.onShot = function()
@@ -826,6 +830,9 @@ local function onResult(r)
 			table.insert(lines, r.won and string.format("Floor %d cleared!", r.floor) or string.format("Floor %d: try again", r.floor))
 		end
 	end
+	if r.fighter and Config.FIGHTER[r.fighter] then
+		table.insert(lines, "New fighter: " .. Config.FIGHTER[r.fighter].name .. "!")
+	end
 	if r.unlocked then
 		table.insert(lines, "Unlocked: " .. Config.MARBLE[r.unlocked].name .. "!")
 	end
@@ -872,7 +879,11 @@ Remotes:WaitForChild("ProfileSync").OnClientEvent:Connect(function(p)
 	end
 	profile = p
 	setCoins(p.coins)
-	towerLabel.Text = p.tower > #Config.TOWER and "Conquered!" or string.format("Floor %d of %d: %s", p.tower, #Config.TOWER, Config.TOWER[p.tower].name)
+	local climb = Config.buildTower(p.towerFighter or "ember")
+	towerLabel.Text = p.tower > #climb and "Conquered!" or string.format("Floor %d of %d: %s", p.tower, #climb, climb[p.tower].name)
+	if not fighterPick then
+		fighterButton.Text = "Fighter: " .. Config.FIGHTER[p.towerFighter or "ember"].name
+	end
 	dailyButton.Text = "🎁 Daily"
 	dailyBadge.Visible = p.dailyReady == true
 	if panels.shop.Visible then
@@ -908,6 +919,8 @@ Remotes:WaitForChild("TableEvent").OnClientEvent:Connect(function(kind, data, id
 		banner.Text = mine and "Got one!" or "Captured!"
 	elseif kind == "shootAgain" then
 		banner.Text = data.seat == Aim.mySeat and "Shoot again!" or "They shoot again"
+	elseif kind == "seatLost" then
+		toast(data.name .. " left: a bot takes their seat.", "info")
 	elseif kind == "shooterOut" and data.seat == Aim.mySeat then
 		hint.Text = "Your marble left the ring: turn over"
 	end

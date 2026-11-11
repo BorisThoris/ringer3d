@@ -582,6 +582,10 @@ function Aim.set(state)
 		sent = false
 		charging = false
 		aim.power = 0
+		-- Every turn and every shoot-again starts with a plain shot (the web game's).
+		if not was or was.shots ~= state.shots or was.current ~= state.current then
+			Aim.setSpin(0)
+		end
 		if state.firstShot then
 			-- Knuckle down at your seat, aimed straight in.
 			aim.placeAngle = Rules.seatAngle(state.current, #state.seats)

@@ -49,8 +49,9 @@ same maps, seats swapped) on the port. Shots per game, Luau / web:
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 14.8 / 10.3 | 15.8 / 21.2 | 12.2 / 14.7 | 33.8 / 36.3 | 8.3 / 7.7 | 28.7 / 31.2 | 13.0 / 9.8 | 18.1 / 18.7 |
 
-Skilled beat casual in 36 of 42 games on the port and 31 of 42 on the web, within the noise of
-42 games. `tests/client.luau` replays a whole bot game as a client: all 26 replays end exactly
+Skilled beat casual in 36 of 42 games on the port and 31 of 42 on the web: a two-proportion test
+gives z = 1.36 (p = 0.17), so no measurable difference at this sample; per-field shot counts swing
+as much between seeds as between ports. `tests/client.luau` replays a whole bot game as a client: all 26 replays end exactly
 where the server's sim did. `tests/think.luau` times the Tower's bots on their real floors
 (skilled 0.4 s, expert 1.4 s, master 0.9 s, legend 4.0 s on a cloud server); a think runs in
 12 ms slices, so three at once never hold the server more than about 40 ms.
@@ -99,8 +100,10 @@ where the server's sim did. `tests/think.luau` times the Tower's bots on their r
 | Game over: ring empty, lead locked, or 40 dry shots | yes | yes | same |
 | Seat angles | pi/2 + i/n * 2pi | same | same |
 | Power floor | under 0.03 is not a shot | 0.04 client, 0.05 server | fixed |
-| Turn clock | none | 30 s, then a weak 0.15 shot | deviation: a Roblox table needs one (a player can walk away); the auto-shot is now a firm 0.5 shot at the middle |
-| A player leaves mid-game | a bot takes their seat and the game goes on | the leaver forfeits | deviation: kept; a Roblox duel is between the two people who started it |
+| Turn clock | none: shoot when ready | 30 s, then a weak 0.15 shot | fixed: no clock |
+| A beat before acting | 1.1 s at a turn's start, 0.7 s to shoot again | none | fixed |
+| Spin each turn | back to 0 on every turn and shoot-again | kept | fixed |
+| A player leaves mid-game | a skilled bot takes their seat and the game goes on | the leaver forfeits | fixed (with nobody left at the table the game ends) |
 
 ## Bot (`src/ai/bot.ts`, `profiles.ts`)
 
@@ -119,13 +122,13 @@ where the server's sim did. `tests/think.luau` times the Tower's bots on their r
 
 | Mechanic | Web game | Roblox before | Now |
 | --- | --- | --- | --- |
-| Ladder | 7 challengers on their home fields, then Obsidian; your fighter skipped | fixed list | fixed for the default fighter, Ember |
+| Ladder | 7 challengers on their home fields, then Obsidian; your fighter skipped | fixed list | fixed (tests check the ladders as Ember, Pip and Nova) |
 | Fields | Nova on sand | Nova on minigolf | fixed |
 | Map difficulty | easy, easy, medium, medium, hard, hard, hard, hard | ...medium on floor 5 | fixed |
 | Map seeds | hashString(`tower:id:i`) % 100000 | 101..808 | fixed (tests/smoke.luau checks all 8 floors) |
 | Aim guide cap | full x3, short x3, off x2 | none | fixed |
 | Series | ice floors best of 3, Obsidian best of 5 | single games | fixed |
-| Picking a fighter | eight fighters, four to start | none | deviation: Roblox players are their equipped marble; the ladder is the one Ember climbs |
+| Picking a fighter | Ember, Tide, Pip, Jade to start; each one beaten unlocks; one run at a time | none | fixed: the Fighter button on the Tower card; another fighter starts a new climb; you play as their marble |
 
 ## Controls and table view (`src/render/controls.ts`, `src/ui/Hud.tsx`, `GameView.ts`, `session.ts`)
 

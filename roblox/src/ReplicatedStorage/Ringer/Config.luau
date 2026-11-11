@@ -17,7 +17,6 @@ Config.SPACING = W.targetSpacing * 4 -- between marbles in the starting cross
 Config.BOUND_R = W.boundaryRadius * 4 -- the kerb: nothing gets past it
 Config.EDGE_H = 60 -- the wall above the kerb you can't see, far over the highest hop
 Config.MAX_SPEED = W.maxShotSpeed * 4 -- shot speed at full power, studs/s
-Config.TURN_TIME = 30 -- seconds a player has to shoot (Roblox only: see PARITY.md)
 Config.TARGETS = Sim.TARGET_COUNT
 Config.DRY_SHOTS_LIMIT = 40 -- shots in a row with no capture: the ring is called
 Config.MIN_POWER = 0.03 -- a release weaker than this is not a shot
@@ -118,49 +117,70 @@ Config.BOTS = {
 	legend = { id = "legend", label = "Legend", aimErrorDeg = 0.55, powerError = 0.016, candidates = 160, usesSpin = true, positional = 1.4, blunder = 0, thinkMs = { 1100, 2000 } },
 } :: { [string]: Bot }
 
--- The Tower (src/game/story.ts buildTower, for the default fighter, Ember): seven challengers on
--- their home fields, one step up the bot ladder each, then the Black Taw. Maps get harder as you
--- climb and are the same course every retry; the aim guide shortens, then goes; ice floors are
--- a best of three and the Black Taw a best of five. Rewards are the Roblox economy's.
-local LADDER = {
-	{ id = "pip", name = "Pip", arena = "grass" },
-	{ id = "tide", name = "Tide", arena = "sand" },
-	{ id = "jade", name = "Jade", arena = "grass" },
-	{ id = "volt", name = "Volt", arena = "desk" },
-	{ id = "ironside", name = "Ironside", arena = "gravel" },
-	{ id = "rime", name = "Rime", arena = "ice" },
-	{ id = "nova", name = "Nova", arena = "sand" },
+-- The fighters and the Tower (src/game/story.ts). You climb as a fighter: Ember, Tide, Pip and
+-- Jade from the start, the others once you beat them in the Tower. The Tower is seven challengers
+-- on their home fields (your own fighter skipped, the next one taking the place), one step up the
+-- bot ladder each, then the Black Taw. Maps get harder as you climb and are the same course every
+-- retry; the aim guide shortens, then goes; ice floors are a best of three and the Black Taw a
+-- best of five. Rewards are the Roblox economy's.
+Config.FIGHTERS = {
+	{ id = "ember", name = "Ember", homeArena = "culdesac", starter = true },
+	{ id = "tide", name = "Tide", homeArena = "sand", starter = true },
+	{ id = "pip", name = "Pip", homeArena = "grass", starter = true },
+	{ id = "jade", name = "Jade", homeArena = "grass", starter = true },
+	{ id = "volt", name = "Volt", homeArena = "desk", starter = false },
+	{ id = "rime", name = "Rime", homeArena = "ice", starter = false },
+	{ id = "ironside", name = "Ironside", homeArena = "gravel", starter = false },
+	{ id = "nova", name = "Nova", homeArena = "sand", starter = false },
+	{ id = "obsidian", name = "Obsidian", homeArena = "ice", starter = false },
 }
+Config.FIGHTER = {}
+for _, f in ipairs(Config.FIGHTERS) do
+	Config.FIGHTER[f.id] = f
+end
+Config.STARTERS = { "ember", "tide", "pip", "jade" }
+
+local LADDER_ORDER = { "pip", "tide", "jade", "volt", "ironside", "rime", "nova", "ember" }
 local LADDER_BOTS = { "rookie", "novice", "casual", "regular", "skilled", "expert", "master" }
 local STAGE_DIFFICULTY = { "easy", "easy", "medium", "medium", "hard", "hard", "hard", "hard" }
 local STAGE_GUIDE = { "full", "full", "full", "short", "short", "short", "off", "off" }
 local REWARDS = { 60, 80, 100, 130, 160, 200, 260, 500 }
-Config.TOWER = {}
-for i, f in ipairs(LADDER) do
-	table.insert(Config.TOWER, {
-		name = f.name,
-		marble = f.id,
-		arena = f.arena,
-		bot = LADDER_BOTS[i],
-		reward = REWARDS[i],
-		difficulty = STAGE_DIFFICULTY[i],
-		mapSeed = Forge.hashString(string.format("tower:%s:%d", f.id, i - 1)) % 100000,
-		guide = STAGE_GUIDE[i],
-		wins = if f.arena == "ice" then 2 else 1,
+
+--- The Tower a fighter climbs (the web game's buildTower).
+function Config.buildTower(fighter: string)
+	local stages = {}
+	for _, id in ipairs(LADDER_ORDER) do
+		if id ~= fighter and #stages < 7 then
+			local i = #stages + 1
+			local f = Config.FIGHTER[id]
+			table.insert(stages, {
+				name = f.name,
+				marble = id,
+				arena = f.homeArena,
+				bot = LADDER_BOTS[i],
+				reward = REWARDS[i],
+				difficulty = STAGE_DIFFICULTY[i],
+				mapSeed = Forge.hashString(string.format("tower:%s:%d", id, i - 1)) % 100000,
+				guide = STAGE_GUIDE[i],
+				wins = if f.homeArena == "ice" then 2 else 1,
+			})
+		end
+	end
+	table.insert(stages, {
+		name = "Obsidian",
+		marble = "obsidian",
+		arena = "ice",
+		bot = "legend",
+		reward = REWARDS[8],
+		boss = true,
+		difficulty = "hard",
+		mapSeed = Forge.hashString("tower:obsidian") % 100000,
+		guide = STAGE_GUIDE[8],
+		wins = 3,
 	})
+	return stages
 end
-table.insert(Config.TOWER, {
-	name = "Obsidian",
-	marble = "obsidian",
-	arena = "ice",
-	bot = "legend",
-	reward = REWARDS[8],
-	boss = true,
-	difficulty = "hard",
-	mapSeed = Forge.hashString("tower:obsidian") % 100000,
-	guide = STAGE_GUIDE[8],
-	wins = 3,
-})
+Config.TOWER = Config.buildTower("ember")
 
 -- ---- Marbles -------------------------------------------------------------------------------
 -- How a marble looks: a glassy shell around a glowing core (a cat's eye), or a solid ball.

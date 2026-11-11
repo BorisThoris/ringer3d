@@ -144,6 +144,77 @@ check("bot game captures marbles", total > 0, string.format("%d in %d shots, %.1
 check("shots were broadcast", (events.shot or 0) == res.shots, events.shot)
 g:destroy()
 
+-- Climbing as another fighter skips them, as the web game's buildTower does.
+local WANT_OTHERS = {
+	pip = { { "tide", "sand", "rookie", "easy", 56622, "full", 1 }, { "jade", "grass", "novice", "easy", 9243, "full", 1 }, { "volt", "desk", "casual", "medium", 36351, "full", 1 }, { "ironside", "gravel", "regular", "medium", 83330, "short", 1 }, { "rime", "ice", "skilled", "hard", 60617, "short", 2 }, { "nova", "sand", "expert", "hard", 21427, "short", 1 }, { "ember", "culdesac", "master", "hard", 41255, "off", 1 }, { "obsidian", "ice", "legend", "hard", 90949, "off", 3 } },
+	nova = { { "pip", "grass", "rookie", "easy", 43467, "full", 1 }, { "tide", "sand", "novice", "easy", 34241, "full", 1 }, { "jade", "grass", "casual", "medium", 86862, "full", 1 }, { "volt", "desk", "regular", "medium", 58732, "short", 1 }, { "ironside", "gravel", "skilled", "hard", 95235, "short", 1 }, { "rime", "ice", "expert", "hard", 82998, "short", 2 }, { "ember", "culdesac", "master", "hard", 41255, "off", 1 }, { "obsidian", "ice", "legend", "hard", 90949, "off", 3 } },
+}
+for fighter, want in pairs(WANT_OTHERS) do
+	local tower = Config.buildTower(fighter)
+	local same = #tower == #want
+	for i, w in ipairs(want) do
+		local st = tower[i]
+		local got = st and { st.marble, st.arena, st.bot, st.difficulty, st.mapSeed, st.guide, st.wins } or {}
+		for k = 1, 7 do
+			same = same and got[k] == w[k]
+		end
+	end
+	check("tower as " .. fighter .. " is the web game's", same)
+end
+
+-- A player who goes is replaced by a skilled bot, as in the web game. With nobody left the
+-- game ends; in a duel it goes on for the one who stayed.
+local function fake(name)
+	local f = Instance.new("Folder")
+	f.Name = name
+	f.Parent = workspace
+	return f
+end
+local solo = fake("Solo")
+local tl = Table.new({ seats = { { kind = "player", player = solo :: any, name = "Solo", marble = "ember" }, { kind = "bot", bot = "rookie", name = "B", marble = "tide" } }, arena = "desk", origin = Vector3.new(3600, 0, 0), mode = "test", seed = 5, instant = true })
+local soloDone = nil
+task.spawn(function()
+	soloDone = tl:run()
+end)
+task.wait(0.5)
+solo.Parent = nil
+local w0 = os.clock()
+while not soloDone and os.clock() - w0 < 60 do
+	task.wait(0.1)
+end
+check("a solo game whose player leaves ends", soloDone ~= nil and soloDone.abandoned ~= nil)
+tl:destroy()
+
+local stay, go = fake("Stay"), fake("Go")
+local lost = 0
+local td = Table.new({
+	seats = { { kind = "player", player = stay :: any, name = "Stay", marble = "ember" }, { kind = "player", player = go :: any, name = "Go", marble = "tide" } },
+	arena = "culdesac", origin = Vector3.new(3800, 0, 0), mode = "test", seed = 9, instant = true,
+	send = function(_, kind)
+		if kind == "seatLost" then
+			lost += 1
+		end
+	end,
+})
+local duelDone = nil
+task.spawn(function()
+	duelDone = td:run()
+end)
+local wd = os.clock()
+go.Parent = nil -- "Go" leaves at once: a bot plays their turns
+while not duelDone and os.clock() - wd < 120 do
+	-- "Stay" shoots at the middle whenever it's their turn.
+	if td.phase == "aim" and td.current == 1 and not td.pending then
+		local a = Rules.seatAngle(1, 2)
+		local from = td.layout.shooter
+		local aim = if from and not td.firstShot then math.atan2(-from.z, -from.x) else a + math.pi
+		td:submit(stay :: any, a, aim, 0.8, 0)
+	end
+	task.wait(0.05)
+end
+check("a duel goes on with a bot in the leaver's seat", duelDone ~= nil and duelDone.abandoned == nil and lost == 1 and td.seats[2].kind == "bot" and td.seats[2].bot == "skilled", duelDone and table.concat(duelDone.scores, "-"))
+td:destroy()
+
 -- 6. Collectibles: Marble Bags mint generated marbles at the odds the bag shows.
 local Forge = mod(Ringer.Forge)
 local total = 0

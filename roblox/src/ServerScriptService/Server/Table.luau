@@ -160,7 +160,7 @@ end
 function Table:state()
 	local seats = {}
 	for i, s in ipairs(self.seats) do
-		seats[i] = { name = s.name, marble = s.marble, bot = s.kind == "bot" and Config.BOTS[s.bot or "casual"].label or nil, userId = s.player and s.player.UserId or nil, score = self.scores[i] }
+		seats[i] = { name = s.name, marble = s.marble, bot = s.kind == "bot" and Config.BOTS[s.bot or "casual"].label or nil, userId = if s.player and s.player:IsA("Player") then s.player.UserId else nil, score = self.scores[i] }
 	end
 	local shooter = self.layout.shooter
 	return {
@@ -179,7 +179,6 @@ function Table:state()
 		firstShot = self.firstShot,
 		shooter = if shooter and not self.firstShot then self:world(shooter.x, shooter.y, shooter.z) else nil,
 		remaining = #self.layout.targets,
-		turnEnds = self.turnEnds,
 		seatAngle = Rules.seatAngle(self.current, #self.seats),
 		shots = self.shots,
 		layout = self.layout,
@@ -210,6 +209,24 @@ function Table:submit(player: Player, placeAngle: number, aimAngle: number, powe
 	local s = if typeof(spin) == "number" and spin == spin then math.clamp(spin, -1, 1) else 0
 	self.pending = { placeAngle = placeAngle, aimAngle = aimAngle, power = math.clamp(power, 0, 1), spin = s }
 	return true
+end
+
+--- A player left the table (quit or disconnected). As in the web game, a skilled bot takes
+--- their seat and the game goes on; with nobody left to play for, it ends.
+function Table:lose(player: Player)
+	local seat = self:seatOf(player)
+	if not seat then
+		return
+	end
+	local s = self.seats[seat]
+	s.player = nil
+	s.kind = "bot"
+	s.bot = s.bot or "skilled"
+	s.lost = true
+	self:broadcast("seatLost", { seat = seat, name = s.name })
+	if #self:players() == 0 then
+		self.abandoned = seat
+	end
 end
 
 --- A player finished watching shot `n` (their replay ended).
@@ -492,33 +509,29 @@ function Table:run(): Result
 		local seat = self.seats[self.current]
 		self.phase = "aim"
 		self.pending = nil
-		self.turnEnds = workspace:GetServerTimeNow() + Config.TURN_TIME
 		self:broadcast("state", self:state())
 
+		-- A beat before anyone acts: 1.1 s for a new turn, 0.7 s to shoot again (the web game's).
+		if not self:wait(if self.firstShot then 1.1 else 0.7) then
+			break
+		end
 		if seat.kind == "bot" then
 			self.pending = self:botTurn(seat)
 		else
-			-- A player has TURN_TIME to shoot (Roblox only); then a firm shot at the middle is
-			-- taken for them, from wherever they would shoot.
-			while not self.pending and not self.closed do
-				if not (seat.player and seat.player.Parent) then
-					self.abandoned = self.current
-					break
-				end
-				if workspace:GetServerTimeNow() > self.turnEnds then
-					local a = Rules.seatAngle(self.current, #self.seats)
-					local from = self.layout.shooter
-					local aim = a + math.pi
-					if from and not self.firstShot then
-						aim = math.atan2(-from.z, -from.x)
-					end
-					self.pending = { placeAngle = a, aimAngle = aim, power = 0.5, spin = 0 }
+			-- No clock, as in the web game: the player shoots when ready. If they go, a bot
+			-- takes the seat (Table:lose) and this turn is played by it.
+			while not self.pending and not self.closed and not self.abandoned and seat.kind ~= "bot" do
+				if seat.player and not seat.player.Parent then
+					self:lose(seat.player)
 					break
 				end
 				task.wait(0.05)
 			end
 			if self.abandoned then
 				break
+			end
+			if seat.kind == "bot" and not self.pending then
+				self.pending = self:botTurn(seat)
 			end
 		end
 		if self.closed or not self.pending then

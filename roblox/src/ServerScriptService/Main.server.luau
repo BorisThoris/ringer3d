@@ -280,6 +280,13 @@ local function seatFor(player: Player): Table.Seat
 	}
 end
 
+-- In the Tower you play as your fighter: their marble.
+local function fighterSeat(player: Player, fighter: string): Table.Seat
+	local s = seatFor(player)
+	s.marble = fighter
+	return s
+end
+
 local towerTally
 local function send(tbl, kind: string, data: any)
 	for _, player in ipairs(tbl:players()) do
@@ -342,14 +349,19 @@ local function pay(tbl, result: Table.Result)
 			if seriesWon then
 				Economy.progression(player, floor, Enum.AnalyticsProgressionType.Complete)
 				if floor == p.tower then
-					local stage = Config.TOWER[floor]
+					local stage = Config.buildTower(tbl.fighter or "ember")[floor]
 					extra.towerCoins = Economy.give(player, stage.reward, "tower:" .. floor)
 					Data.update(player, function(pp)
 						pp.tower = floor + 1
 						pp.towerBest = math.max(pp.towerBest, floor)
+						-- Beating a fighter unlocks them to climb as (the web game's unlocks).
+						if not table.find(pp.fighters, stage.marble) and Config.FIGHTER[stage.marble] then
+							table.insert(pp.fighters, stage.marble)
+							extra.fighter = stage.marble
+						end
 					end)
 					if floor >= 7 then
-						local unlock = Config.TOWER[floor].marble
+						local unlock = stage.marble
 						Collectibles.grant(player, unlock)
 						extra.unlocked = unlock
 					end
@@ -370,6 +382,7 @@ local function pay(tbl, result: Table.Result)
 			mode = tbl.mode,
 			floor = tbl.floor,
 			unlocked = extra.unlocked,
+			fighter = extra.fighter,
 			abandoned = result.abandoned ~= nil,
 			series = if (tbl.wins or 1) > 1 then tally else nil,
 			wins = tbl.wins,
@@ -378,7 +391,7 @@ local function pay(tbl, result: Table.Result)
 end
 
 local startTable
-startTable = function(seats: { Table.Seat }, arena: string, mode: string, floor: number?, difficulty: string?, mapSeed: number?, extra: { guide: string?, series: { number }?, wins: number? }?)
+startTable = function(seats: { Table.Seat }, arena: string, mode: string, floor: number?, difficulty: string?, mapSeed: number?, extra: { guide: string?, series: { number }?, wins: number?, fighter: string? }?)
 	local slot = freeSlot()
 	local tbl = Table.new({
 		seats = seats,
@@ -393,6 +406,7 @@ startTable = function(seats: { Table.Seat }, arena: string, mode: string, floor:
 		wins = extra and extra.wins,
 		send = send,
 	})
+	tbl.fighter = extra and extra.fighter
 	tables[slot] = tbl
 	for i, seat in ipairs(seats) do
 		if seat.player then
@@ -414,8 +428,8 @@ startTable = function(seats: { Table.Seat }, arena: string, mode: string, floor:
 				tables[slot] = nil
 				tbl:destroy()
 				active[player] = nil
-				local stage = Config.TOWER[tbl.floor]
-				startTable({ seatFor(player), botSeat(stage.bot, stage.name, stage.marble) }, stage.arena, "tower", tbl.floor, stage.difficulty, stage.mapSeed, { guide = stage.guide, series = tally, wins = need })
+				local stage = Config.buildTower(tbl.fighter)[tbl.floor]
+				startTable({ fighterSeat(player, tbl.fighter), botSeat(stage.bot, stage.name, stage.marble) }, stage.arena, "tower", tbl.floor, stage.difficulty, stage.mapSeed, { guide = stage.guide, series = tally, wins = need, fighter = tbl.fighter })
 				return
 			end
 		end
@@ -538,9 +552,17 @@ function handlers.play(player: Player, args)
 		startTable({ seatFor(player), botSeat(bot) }, arena, "bot", nil, difficulty)
 		return true
 	elseif mode == "tower" then
-		local floor = math.clamp(p.tower, 1, #Config.TOWER)
-		local stage = Config.TOWER[floor]
-		startTable({ seatFor(player), botSeat(stage.bot, stage.name, stage.marble) }, stage.arena, "tower", floor, stage.difficulty, stage.mapSeed, { guide = stage.guide, series = { 0, 0 }, wins = stage.wins })
+		-- Climb as a fighter you've unlocked; another fighter starts a new run (the web game keeps one).
+		local fighter = if typeof(args.fighter) == "string" and table.find(p.fighters, args.fighter) then args.fighter else p.towerFighter
+		if fighter ~= p.towerFighter then
+			Data.update(player, function(pp)
+				pp.towerFighter = fighter
+				pp.tower = 1
+			end)
+		end
+		local floor = math.clamp(p.tower, 1, 8)
+		local stage = Config.buildTower(fighter)[floor]
+		startTable({ fighterSeat(player, fighter), botSeat(stage.bot, stage.name, stage.marble) }, stage.arena, "tower", floor, stage.difficulty, stage.mapSeed, { guide = stage.guide, series = { 0, 0 }, wins = stage.wins, fighter = fighter })
 		Economy.progression(player, floor, Enum.AnalyticsProgressionType.Start)
 		return true
 	end
@@ -555,13 +577,8 @@ end
 function handlers.leave(player: Player)
 	local tbl = active[player]
 	if tbl then
-		-- Leaving mid-game forfeits: the table sees the seat as gone.
-		tbl.abandoned = tbl:seatOf(player) or tbl.current
-		for _, seat in ipairs(tbl.seats) do
-			if seat.player == player then
-				seat.player = nil
-			end
-		end
+		-- As in the web game, a bot takes the seat and the game goes on for anyone still there.
+		tbl:lose(player)
 		active[player] = nil
 		freeze(player, nil)
 	end
@@ -690,7 +707,7 @@ Players.PlayerRemoving:Connect(function(player)
 	Collectibles.forget(player)
 	local tbl = active[player]
 	if tbl then
-		tbl.abandoned = tbl:seatOf(player) or tbl.current
+		tbl:lose(player)
 	end
 	active[player] = nil
 end)
