@@ -1,10 +1,8 @@
-11-11 22:25:51.198  2517  2517 W Capacitor/Console: File: https://localhost/assets/index-DC-pgxxA.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
-11-11 22:25:58.120  2517  2517 W Capacitor/Console: File: https://localhost/assets/index-DC-pgxxA.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
-11-11 22:26:26.655  2517  2517 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-11 22:26:26.663  2517  2517 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-11 22:26:26.669  2517  2517 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-11 22:26:26.670  2517  2517 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-11 22:26:27.713  2517  2517 I Capacitor/Console: File:  - Line 333 - Msg: {}
-11-11 22:26:28.253  2517  2517 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-11 22:26:28.255  2517  2517 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-11 22:26:32.193  2517  2517 I Capacitor/Console: File:  - Line 333 - Msg: undefined
+11-11 22:42:16.290  3019  3019 W Capacitor/Console: File: https://localhost/assets/index-DC-pgxxA.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+11-11 22:42:37.921  3019  3019 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+11-11 22:42:37.926  3019  3019 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+11-11 22:42:39.938  3019  3019 I Capacitor/Console: File:  - Line 333 - Msg: {}
+11-11 22:42:39.938  3019  3019 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+11-11 22:42:40.896  3019  3019 I Capacitor/Console: File:  - Line 333 - Msg: undefined
+11-11 22:43:01.470  1069  1087 E JavaBinder: *** Uncaught remote exception! Exceptions are not yet supported across processes. Client PID 4159 UID 10118.
+11-11 22:43:03.576  1069  1086 E JavaBinder: *** Uncaught remote exception! Exceptions are not yet supported across processes. Client PID 4159 UID 10118.
