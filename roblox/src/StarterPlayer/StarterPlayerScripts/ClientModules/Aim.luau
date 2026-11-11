@@ -539,7 +539,18 @@ function Aim.start()
 			Aim.release()
 			return
 		end
-		if pointers[input] then
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			for k in pairs(pointers) do
+				if k.UserInputType == Enum.UserInputType.MouseButton1 then
+					pointers[k] = nil
+				end
+			end
+			local n = 0
+			for _ in pairs(pointers) do
+				n += 1
+			end
+			mode = if n == 0 then "none" else "aim"
+		elseif pointers[input] then
 			pointers[input] = nil
 			local n = 0
 			for _ in pairs(pointers) do

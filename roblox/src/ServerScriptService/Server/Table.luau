@@ -442,6 +442,18 @@ function Table:fast(): boolean
 	return any and all
 end
 
+--- A yield for long work: gives the frame back once this slice has run 12 ms (of a 16 ms frame), so a bot's think
+--- (or several at once) never stalls the server.
+function Table.slicer(): () -> ()
+	local since = os.clock()
+	return function()
+		if os.clock() - since > 0.012 then
+			task.wait()
+			since = os.clock()
+		end
+	end
+end
+
 --- A bot's turn: think (imagining shots on the sim), then show the aim and fire.
 function Table:botTurn(seat)
 	local profile = Config.BOTS[seat.bot or "casual"]
@@ -454,9 +466,7 @@ function Table:botTurn(seat)
 		seatAngle = seatAngle,
 		surface = self.surface,
 		pieces = self.map.pieces,
-	}, profile, rng, function()
-		task.wait()
-	end)
+	}, profile, rng, Table.slicer())
 	if self.closed then
 		return nil
 	end

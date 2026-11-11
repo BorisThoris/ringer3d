@@ -40,10 +40,20 @@ physics with hand-converted constants. It now does what the web game does, in pu
 
 A break scatters chaotically (Rapier and this solver can't agree bit for bit), so what has to
 match is how the game plays: how far a roll goes, where a hit sends a marble, what a break
-captures, what breaks. `tests/botstats.luau` plays the web runner's skilled-vs-casual matchups on
-the same maps: shots per game desk 14.8 / 10.3 (Luau / web), cul-de-sac 15.8 / 21.2, lawn
-12.2 / 14.7, sand 33.8 / 36.3, ice 8.3 / 7.7; skilled won 26 / 23 of 30. `tests/client.luau`
-replays a whole bot game as a client: all 26 replays end exactly where the server's sim did.
+captures, what breaks.
+
+`tests/botstats.luau` plays the web runner's skilled-vs-casual matchups (six games a field, the
+same maps, seats swapped) on the port. Shots per game, Luau / web:
+
+| Desk | Cul-de-sac | Lawn | Sand | Ice | Gravel | Mini-golf | All |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 14.8 / 10.3 | 15.8 / 21.2 | 12.2 / 14.7 | 33.8 / 36.3 | 8.3 / 7.7 | 28.7 / 31.2 | 13.0 / 9.8 | 18.1 / 18.7 |
+
+Skilled beat casual in 36 of 42 games on the port and 31 of 42 on the web, within the noise of
+42 games. `tests/client.luau` replays a whole bot game as a client: all 26 replays end exactly
+where the server's sim did. `tests/think.luau` times the Tower's bots on their real floors
+(skilled 0.4 s, expert 1.4 s, master 0.9 s, legend 4.0 s on a cloud server); a think runs in
+12 ms slices, so three at once never hold the server more than about 40 ms.
 
 ## Shot simulation (`src/core/physics.ts`)
 
@@ -90,6 +100,7 @@ replays a whole bot game as a client: all 26 replays end exactly where the serve
 | Seat angles | pi/2 + i/n * 2pi | same | same |
 | Power floor | under 0.03 is not a shot | 0.04 client, 0.05 server | fixed |
 | Turn clock | none | 30 s, then a weak 0.15 shot | deviation: a Roblox table needs one (a player can walk away); the auto-shot is now a firm 0.5 shot at the middle |
+| A player leaves mid-game | a bot takes their seat and the game goes on | the leaver forfeits | deviation: kept; a Roblox duel is between the two people who started it |
 
 ## Bot (`src/ai/bot.ts`, `profiles.ts`)
 
@@ -124,7 +135,7 @@ replays a whole bot game as a client: all 26 replays end exactly where the serve
 | Knuckle down | drag the taw round the line; A/D | taw follows the pointer | fixed |
 | Power | pull-down power bar, let go to shoot; hold Space to charge (1.6 s ping-pong) | pull length | fixed |
 | Spin | spin pad in tenths, Q/E in quarters, double-tap resets | pad and Q/E in quarters | fixed |
-| Guide | line to the first mib, its way out, the taw's glance; full 9, short 2.2, off | one power line | fixed |
+| Guide | line to the first mib, its way out, the taw's glance; full 9, short 2.2, off; the player's setting, capped on Tower floors | one power line | fixed (the Guide button in a match sets it) |
 | Camera | behind the taw along the aim, tilt by drag or Up/Down, wheel/pinch zoom, T top view | fixed seat view, top view | fixed |
 | Cancel | Esc | none | fixed |
 | Fast-forward | F, 3x | none | fixed |
@@ -134,6 +145,15 @@ replays a whole bot game as a client: all 26 replays end exactly where the serve
 
 ## Not verified here
 
-A Studio playtest with a real client (mouse, touch, camera) could not run on 2026-11-12: Studio
-must update to 0.747 first, and its updater fails in the private window station. Everything
-else above is covered by the cloud tests (`smoke`, `sim`, `client`, `botmatch`, `botstats`).
+A Studio playtest with a real client could not run on 2026-11-12: Studio must update to 0.747
+first, and its updater fails in the private window station. The cloud tests (`smoke`, `sim`,
+`client`, `botmatch`, `botstats`, `think`) cover the physics, rules, bot, Tower, the server's
+table and the client's Replay and Aim modules run on a server. Still unchecked on a real client:
+
+- the HUD wiring in `Client.client.luau` (power bar, spin pad, Guide and Fast buttons, the
+  shot and prepare events): it compiles, but has only run on a server;
+- mouse and touch input (drag to aim, drag the taw, pinch) and the camera;
+- replays on a phone: a client's `math.sin`/`cos` may differ from the server's in the last bit,
+  which a break can grow; the server's result is final, so at worst a marble snaps a little at
+  rest. If that shows, send the result layout with the shot and ease to it.
+- `scripts/playtest/RingerE2ERig.lua` was updated for the new shot protocol but has not run.

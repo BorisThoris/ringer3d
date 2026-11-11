@@ -200,9 +200,9 @@ local function generateCandidates(ctx: Context, p, rng)
 end
 
 --- Play an intended shot exactly as the game would and score the outcome.
-local function imagine(ctx: Context, shot, p): number
+local function imagine(ctx: Context, shot, p, yield: (() -> ())?): number
 	local sim = Sim.new(ctx.layout, ctx.surface, shot, ctx.firstShot, ctx.pieces)
-	sim:runToEnd()
+	sim:runToEnd(yield)
 	local after = sim:resultLayout()
 
 	local captures, left = 0, {}
@@ -250,8 +250,9 @@ function Bot.rng(seed: number, shotsTaken: number, seat0: number)
 	return Forge.Rng.new(Forge.hashString(string.format("%d:%d:%d", seed, shotsTaken, seat0)))
 end
 
---- Choose a shot. Yields every few imagined shots (`yield`, task.wait on a server) so a long
---- think never stalls the game.
+--- Choose a shot. Calls `yield` after every simulated step of every imagined shot (a server
+--- passes Table.slicer, which gives the frame back every few milliseconds), so a long think
+--- never stalls the game.
 function Bot.plan(ctx: Context, profile, rng, yield: (() -> ())?)
 	local cands = generateCandidates(ctx, profile, rng)
 	table.sort(cands, function(a, b)
@@ -262,11 +263,8 @@ function Bot.plan(ctx: Context, profile, rng, yield: (() -> ())?)
 		pool[i] = cands[i]
 	end
 
-	for i, c in ipairs(pool) do
-		c.value = imagine(ctx, c.shot, profile)
-		if yield and i % 6 == 0 then
-			yield()
-		end
+	for _, c in ipairs(pool) do
+		c.value = imagine(ctx, c.shot, profile, yield)
 	end
 
 	-- Careful players also ask "what if my thumb slips a little?" on their favourite shots.
@@ -280,12 +278,9 @@ function Bot.plan(ctx: Context, profile, rng, yield: (() -> ())?)
 			local c = pool[i]
 			local sum = c.value
 			for _ = 1, 2 do
-				sum += imagine(ctx, jitter(c.shot, profile, rng), profile)
+				sum += imagine(ctx, jitter(c.shot, profile, rng), profile, yield)
 			end
 			c.value = sum / 3
-			if yield then
-				yield()
-			end
 		end
 		table.sort(pool, byValue)
 	end

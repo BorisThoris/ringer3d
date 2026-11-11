@@ -56,9 +56,7 @@ check("empty ring ends", Rules.gameOver({ 6, 7 }, 0, 0) ~= nil)
 -- along a clear line at a real marble, and its think fits in a turn.
 local start = Sim.startingLayout()
 local t0 = os.clock()
-local plan = Bot.plan({ layout = start, firstShot = true, seatAngle = Rules.seatAngle(1, 2), surface = Surfaces.desk, pieces = {} }, Config.BOTS.legend, Bot.rng(1, 0, 0), function()
-	task.wait()
-end)
+local plan = Bot.plan({ layout = start, firstShot = true, seatAngle = Rules.seatAngle(1, 2), surface = Surfaces.desk, pieces = {} }, Config.BOTS.legend, Bot.rng(1, 0, 0), require(game.ServerScriptService.Server.Table).slicer())
 local thinkSecs = os.clock() - t0
 local fx, fz = Sim.placementPoint(plan.placeAngle)
 local dx, dz = math.cos(plan.aimAngle), math.sin(plan.aimAngle)

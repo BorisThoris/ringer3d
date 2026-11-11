@@ -628,6 +628,13 @@ end, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -16, 1, -16), Si
 Kit.button("View", Kit.BLUE, function()
 	Aim.topView = not Aim.topView
 end, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -146, 1, -16), Size = UDim2.fromOffset(110, 48), Parent = match })
+-- The aim guide, the web game's setting: full, short or off (a Tower floor may cap it lower).
+local guideButton
+guideButton = Kit.button("Guide: Full", Kit.BLUE, function()
+	local nextMode = { full = "short", short = "off", off = "full" }
+	Aim.guideSetting = nextMode[Aim.guideSetting]
+	guideButton.Text = "Guide: " .. (Aim.guideSetting:sub(1, 1):upper() .. Aim.guideSetting:sub(2))
+end, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -406, 1, -16), Size = UDim2.fromOffset(150, 48), Parent = match })
 -- Fast-forward (F): shots play three times as fast.
 local fastButton = Kit.button("Fast >>", Kit.PURPLE, function()
 	Aim.toggleFast()
@@ -699,7 +706,11 @@ local function seatCard(seat, active: boolean)
 end
 
 local timerConn: RBXScriptConnection? = nil
+local resultPanelRef: Frame? = nil
 local function onState(state)
+	if resultPanelRef and resultPanelRef.Visible and state.phase ~= "over" then
+		resultPanelRef.Visible = false
+	end
 	inMatch = state.phase ~= "over"
 	match.Visible = true
 	hud.Visible = false
@@ -767,6 +778,7 @@ local resultPanel, resultBody = Kit.panel(screen, "Result", UDim2.fromOffset(520
 	match.Visible = false
 	hud.Visible = true
 end)
+resultPanelRef = resultPanel
 local resultTitle = Kit.label("", 44, { Size = UDim2.new(1, 0, 0, 56), Parent = resultBody })
 local resultText = Kit.label("", 22, { Position = UDim2.fromOffset(0, 66), Size = UDim2.new(1, 0, 0, 120), TextYAlignment = Enum.TextYAlignment.Top, Parent = resultBody })
 Kit.button("Play again", Kit.GREEN, function()
@@ -786,10 +798,16 @@ Kit.button("Lobby", Kit.BLUE, function()
 end, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -10, 1, -6), Size = UDim2.new(0.46, 0, 0, 60), Parent = resultBody })
 
 local function onResult(r)
-	inMatch = false
 	meterBack.Visible = false
-	banner.Text = ""
 	hint.Text = ""
+	if r.mode == "tower" and r.series and r.wins and r.series[1] < r.wins and r.series[2] < r.wins and not r.abandoned then
+		-- Mid-series: the next game starts by itself; say how it stands and stay at the table.
+		banner.Text = string.format("%s  -  Best of %d: %d-%d, next game coming up", if r.won then "Game to you!" elseif r.draw then "Drawn game" else "Game to them", r.wins * 2 - 1, r.series[1], r.series[2])
+		toast(string.format("+%d coins", r.coins), "good")
+		return
+	end
+	inMatch = false
+	banner.Text = ""
 	resultTitle.Text = r.abandoned and (r.won and "They left: you win!" or "You left") or r.draw and "Draw!" or r.won and "You win!" or "You lose"
 	resultTitle.TextColor3 = r.won and Kit.GOLD or Kit.CREAM
 	local lines = { string.format("Score  %s", table.concat(r.scores, " - ")), string.format("+%d coins", r.coins) }

@@ -785,9 +785,37 @@ function ShotSim:collide()
 	local kerbR = WORLD.boundaryRadius
 	local edgeRest = math.min(S.edge.restitution, mr)
 	local edgeFric = MARBLE_FRICTION * S.edge.friction
+	-- A marble lying perfectly still on the ground with nothing coming near it can't change this
+	-- step: leave it out (most of the thirteen, most of the time). Anything within reach of a
+	-- moving marble wakes, and whatever is within reach of that, and so on.
+	for _, b in ipairs(bodies) do
+		b.awake = not b.holed
+			and (b.vx * b.vx + b.vy * b.vy + b.vz * b.vz + b.wx * b.wx + b.wy * b.wy + b.wz * b.wz > 1e-18 or b.py > b.r + 1e-3)
+	end
+	local woke = true
+	while woke do
+		woke = false
+		for _, a in ipairs(bodies) do
+			if not a.awake then
+				continue
+			end
+			local reach = math.sqrt(a.vx * a.vx + a.vy * a.vy + a.vz * a.vz) * dt + 0.02
+			for _, b in ipairs(bodies) do
+				if b.awake or b.holed then
+					continue
+				end
+				local lim = reach + a.r + b.r
+				local dx, dy, dz = a.px - b.px, a.py - b.py, a.pz - b.pz
+				if dx * dx + dy * dy + dz * dz < lim * lim then
+					b.awake = true
+					woke = true
+				end
+			end
+		end
+	end
 	for i = 1, n do
 		local a = bodies[i]
-		if a.holed then
+		if not a.awake then
 			continue
 		end
 		local speedA = math.sqrt(a.vx * a.vx + a.vy * a.vy + a.vz * a.vz)
@@ -807,7 +835,7 @@ function ShotSim:collide()
 		-- Other marbles.
 		for j = i + 1, n do
 			local b = bodies[j]
-			if b.holed then
+			if not b.awake then
 				continue
 			end
 			local dx, dy, dz = a.px - b.px, a.py - b.py, a.pz - b.pz
@@ -1010,7 +1038,7 @@ function ShotSim:solve()
 	end
 	for _ = 1, ITERATIONS do
 		for _, b in ipairs(bodies) do
-			if not b.holed then
+			if b.awake then
 				b.vy += gh
 				b.vx *= ld
 				b.vy *= ld
@@ -1066,7 +1094,7 @@ function ShotSim:solve()
 		-- Move, and close each contact's gap by the move. Rapier never turns a body more than a
 		-- quarter turn a step: a fast topspin shot slips until the marble slows to match.
 		for _, b in ipairs(bodies) do
-			if not b.holed then
+			if b.awake then
 				local w2 = b.wx * b.wx + b.wy * b.wy + b.wz * b.wz
 				if w2 > MAX_SPIN * MAX_SPIN then
 					local k = MAX_SPIN / math.sqrt(w2)
@@ -1361,9 +1389,12 @@ function ShotSim:step()
 end
 
 --- Run to completion (the server's result, and the bot's imagination).
-function ShotSim:runToEnd()
+function ShotSim:runToEnd(yield: (() -> ())?)
 	while not self.done do
 		self:step()
+		if yield then
+			yield()
+		end
 	end
 end
 
