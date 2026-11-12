@@ -48,6 +48,7 @@ local sent = false
 local charging, chargeT = false, 0
 local pitch, zoom = 0.62, 1
 local prepared: { shot: any, from: any, t: number, duration: number }? = nil
+local keysDown: { [Enum.KeyCode]: boolean } = {} -- keys held, kept by the input handlers
 
 local camera = Workspace.CurrentCamera or Instance.new("Camera")
 local viz: Folder? = nil
@@ -372,24 +373,24 @@ local function update(dt: number)
 		return
 	end
 	-- Keyboard: aim, slide, tilt, charge.
-	local fine = if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or UserInputService:IsKeyDown(Enum.KeyCode.RightShift) then 0.15 else 1
+	local fine = if keysDown[Enum.KeyCode.LeftShift] or keysDown[Enum.KeyCode.RightShift] then 0.15 else 1
 	local rate = 0.9 * fine * dt
-	if UserInputService:IsKeyDown(Enum.KeyCode.Left) then
+	if keysDown[Enum.KeyCode.Left] then
 		Aim.rotateAim(-rate)
 	end
-	if UserInputService:IsKeyDown(Enum.KeyCode.Right) then
+	if keysDown[Enum.KeyCode.Right] then
 		Aim.rotateAim(rate)
 	end
-	if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+	if keysDown[Enum.KeyCode.A] then
 		Aim.setPlaceAngle(aim.placeAngle - rate * 0.6)
 	end
-	if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+	if keysDown[Enum.KeyCode.D] then
 		Aim.setPlaceAngle(aim.placeAngle + rate * 0.6)
 	end
-	if UserInputService:IsKeyDown(Enum.KeyCode.Up) then
+	if keysDown[Enum.KeyCode.Up] then
 		pitch = math.min(1.15, pitch + dt * 0.8)
 	end
-	if UserInputService:IsKeyDown(Enum.KeyCode.Down) then
+	if keysDown[Enum.KeyCode.Down] then
 		pitch = math.max(0.3, pitch - dt * 0.8)
 	end
 	if charging then
@@ -428,7 +429,18 @@ end
 
 function Aim.start()
 	RunService.RenderStepped:Connect(update)
-	UserInputService.InputBegan:Connect(function(input, processed)
+	UserInputService.InputBegan:Connect(Aim.input.began)
+	UserInputService.InputChanged:Connect(Aim.input.changed)
+	UserInputService.InputEnded:Connect(Aim.input.ended)
+end
+
+-- The input handlers (the web game's Controls). The engine's UserInputService events call them;
+-- a test can call them with its own input events.
+Aim.input = {}
+function Aim.input.began(input, processed)
+		if input.UserInputType == Enum.UserInputType.Keyboard and not processed then
+			keysDown[input.KeyCode] = true
+		end
 		if not Aim.state or Aim.state.phase == "over" then
 			return
 		end
@@ -479,8 +491,8 @@ function Aim.start()
 				mode = "aim"
 			end
 		end
-	end)
-	UserInputService.InputChanged:Connect(function(input)
+end
+function Aim.input.changed(input)
 		if input.UserInputType == Enum.UserInputType.MouseWheel then
 			zoom = math.clamp(zoom * math.exp(-input.Position.Z * 0.12), 0.5, 2.2)
 			return
@@ -533,8 +545,11 @@ function Aim.start()
 			Aim.rotateAim(d.X / math.max(1, w) * 2.1 * fine * Aim.sensitivity)
 			pitch = math.clamp(pitch + d.Y * 0.0035, 0.3, 1.15)
 		end
-	end)
-	UserInputService.InputEnded:Connect(function(input)
+end
+function Aim.input.ended(input)
+		if input.UserInputType == Enum.UserInputType.Keyboard then
+			keysDown[input.KeyCode] = nil
+		end
 		if input.KeyCode == Enum.KeyCode.Space then
 			Aim.release()
 			return
@@ -558,7 +573,6 @@ function Aim.start()
 			end
 			mode = if n == 0 then "none" else "aim"
 		end
-	end)
 end
 
 --- A new state from the server.

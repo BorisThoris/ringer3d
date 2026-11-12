@@ -109,7 +109,7 @@ Remotes:WaitForChild("TableEvent").OnClientEvent:Connect(function(kind, data)
 			-- Time from the shot to the next turn, against how long the replay takes.
 			local w = os.clock() - shotAt.t - Playback.duration(shotAt.steps, shotAt.crossStep, false)
 			table.insert(waits, w)
-			print("[e2e] shot", shotAt.n, "steps", shotAt.steps, "over by", string.format("%.2f", w), "replayDone", shotAt.doneAt and string.format("%.2f", shotAt.doneAt - shotAt.t) or "no", "fps", string.format("%.0f", frames / math.max(0.01, os.clock() - shotAt.t)))
+			print("[e2e] shot", shotAt.n, "steps", shotAt.steps, "over by", string.format("%.2f", w), "replayDone", shotAt.doneAt and string.format("%.2f", shotAt.doneAt - shotAt.t) or "no", "fps", string.format("%.0f", frames / math.max(0.01, os.clock() - shotAt.t)), "kb", math.floor(gcinfo()), "workspace", #workspace:GetDescendants(), "gui", #me.PlayerGui:GetDescendants(), "aimview", workspace:FindFirstChild("AimView") and #workspace.AimView:GetChildren() or 0)
 			shotAt = nil
 		end
 	elseif kind == "result" then
@@ -137,6 +137,96 @@ Remotes:WaitForChild("TableEvent").OnClientEvent:Connect(function(kind, data)
 		prepares += 1
 	end
 end)
+-- Input the way a player gives it, for the first three of my turns: mouse, keyboard, touch. The
+-- events go into the game's own input handlers (Aim.input, Aim.powerBar), the functions the
+-- engine's UserInputService events call; a test client can't make the engine send real ones
+-- (VirtualInputManager needs core-script rights).
+local MB1, MOVE, TOUCH, KEY = Enum.UserInputType.MouseButton1, Enum.UserInputType.MouseMovement, Enum.UserInputType.Touch, Enum.UserInputType.Keyboard
+local function ev(kind, x, y, code)
+	return { UserInputType = kind, KeyCode = code or Enum.KeyCode.Unknown, Position = Vector3.new(x or 0, y or 0, 0) }
+end
+local function drag(handlers, kind, x0, y0, x1, y1, steps)
+	local down = ev(kind, x0, y0)
+	handlers.began(down, false)
+	for i = 1, steps do
+		task.wait(0.03)
+		local x, y = x0 + (x1 - x0) * i / steps, y0 + (y1 - y0) * i / steps
+		if kind == TOUCH then
+			down.Position = Vector3.new(x, y, 0)
+			handlers.changed(down)
+		else
+			handlers.changed(ev(MOVE, x, y))
+		end
+	end
+	task.wait(0.1)
+	return down
+end
+local function key(code, hold)
+	local e = ev(KEY, 0, 0, code)
+	Aim.input.began(e, false)
+	task.wait(hold)
+	Aim.input.ended(e)
+end
+local inputTurns = 0
+local function inputTurn(s)
+	inputTurns += 1
+	local cam = workspace.CurrentCamera
+	local w, h = cam.ViewportSize.X, cam.ViewportSize.Y
+	local a0 = Aim.aim.aimAngle
+	if inputTurns == 1 then
+		-- Mouse: a drag across the table turns the aim; then the power bar, pulled down, let go.
+		local down = drag(Aim.input, MB1, w * 0.4, h * 0.6, w * 0.4 + 260, h * 0.6, 20)
+		Aim.input.ended(down)
+		task.wait(0.1)
+		check("a mouse drag turns the aim", math.abs(Aim.aim.aimAngle - a0) > 0.05, string.format("%.3f rad", Aim.aim.aimAngle - a0))
+		Aim.aim.aimAngle = a0
+		local pb = Aim.powerBar
+		check("the power bar is up on my turn", pb ~= nil and pb.bar.Visible)
+		if pb then
+			local bar = pb.bar
+			local x = bar.AbsolutePosition.X + bar.AbsoluteSize.X / 2
+			local top, H = bar.AbsolutePosition.Y, bar.AbsoluteSize.Y
+			local pdown = drag(pb, MB1, x, top + 20, x, top + 30 + (H - 60) * 0.8, 15)
+			local pw = Aim.aim.power
+			check("pulling the power bar down charges the shot", pw > 0.6, string.format("%.2f", pw))
+			pb.ended(pdown)
+			local t0 = os.clock()
+			while not shotAt and os.clock() - t0 < 5 do
+				task.wait(0.05)
+			end
+			check("letting go of the power bar shoots", shotAt ~= nil)
+		end
+	elseif inputTurns == 2 then
+		-- Keyboard: arrows turn the aim, Q sets backspin, Space charges and shoots on release.
+		key(Enum.KeyCode.Right, 0.5)
+		check("the right arrow turns the aim", Aim.aim.aimAngle - a0 > 0.2, string.format("%.3f rad", Aim.aim.aimAngle - a0))
+		Aim.aim.aimAngle = a0
+		key(Enum.KeyCode.Q, 0.05)
+		check("Q sets a quarter of backspin", math.abs(Aim.aim.spin + 0.25) < 1e-9, Aim.aim.spin)
+		Aim.setSpin(0)
+		local space = ev(KEY, 0, 0, Enum.KeyCode.Space)
+		Aim.input.began(space, false)
+		task.wait(1.0)
+		local pw = Aim.aim.power
+		check("holding Space charges", pw > 0.3, string.format("%.2f", pw))
+		Aim.input.ended(space)
+		local t0 = os.clock()
+		while not shotAt and os.clock() - t0 < 5 do
+			task.wait(0.05)
+		end
+		check("letting go of Space shoots", shotAt ~= nil)
+	else
+		-- Touch: a finger dragged across the table turns the aim.
+		local down = drag(Aim.input, TOUCH, w * 0.4, h * 0.6, w * 0.4 + 260, h * 0.6, 20)
+		Aim.input.ended(down)
+		task.wait(0.1)
+		check("a touch drag turns the aim", math.abs(Aim.aim.aimAngle - a0) > 0.05, string.format("%.3f rad", Aim.aim.aimAngle - a0))
+		Aim.aim.aimAngle = a0
+		return false -- shoot this turn through Aim as usual
+	end
+	return true
+end
+
 local okp, pw = Request:InvokeServer("play", { mode = "bot", bot = "rookie", arena = "culdesac", difficulty = "easy" })
 check("start a match vs Rookie on the Cul-de-sac", okp == true, pw)
 local coinsBefore = profile and profile.coins or 0
@@ -174,11 +264,15 @@ while not result and os.clock() < deadline do
 				end
 			end
 			local dir = target - from
-			task.wait(0.3) -- let the client's own state handler run first
+			task.wait(1.3) -- the server's beat before a turn, and the client's own state handler
 			if s.firstShot then
 				Aim.setPlaceAngle(placeAngle)
 			end
 			Aim.aim.aimAngle = math.atan2(dir.Y, dir.X)
+			if inputTurns < 3 and inputTurn(s) then
+				shots += 1
+				continue
+			end
 			Aim.setSpin(0)
 			Aim.setPower(0.9)
 			Aim.release()

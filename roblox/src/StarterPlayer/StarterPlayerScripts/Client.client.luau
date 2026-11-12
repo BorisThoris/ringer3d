@@ -616,23 +616,30 @@ local function powerFrom(y: number)
 	local rel = (y - meterBack.AbsolutePosition.Y - pad) / math.max(1, meterBack.AbsoluteSize.Y - pad * 2)
 	Aim.setPower(math.clamp(rel, 0, 1))
 end
-meterBack.InputBegan:Connect(function(input)
-	if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and Aim.myTurn() then
-		powerHeld = true
-		Aim.setPower(0)
-	end
-end)
-UserInputService.InputChanged:Connect(function(input)
-	if powerHeld and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-		powerFrom(input.Position.Y)
-	end
-end)
-UserInputService.InputEnded:Connect(function(input)
-	if powerHeld and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-		powerHeld = false
-		Aim.release()
-	end
-end)
+-- The bar's handlers live on Aim.powerBar so a test can press, pull and let go as a player does.
+Aim.powerBar = {
+	bar = meterBack,
+	began = function(input)
+		if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and Aim.myTurn() then
+			powerHeld = true
+			Aim.setPower(0)
+		end
+	end,
+	changed = function(input)
+		if powerHeld and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			powerFrom(input.Position.Y)
+		end
+	end,
+	ended = function(input)
+		if powerHeld and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+			powerHeld = false
+			Aim.release()
+		end
+	end,
+}
+meterBack.InputBegan:Connect(Aim.powerBar.began)
+UserInputService.InputChanged:Connect(Aim.powerBar.changed)
+UserInputService.InputEnded:Connect(Aim.powerBar.ended)
 Kit.button("Leave", Kit.RED, function()
 	ask("leave")
 end, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -16, 1, -16), Size = UDim2.fromOffset(120, 48), Parent = match })

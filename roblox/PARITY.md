@@ -149,11 +149,14 @@ where the server's sim did. `tests/think.luau` times the Tower's bots on their r
 ## Real-client playtest
 
 2026-11-12, Studio 0.747 in the private window station, `scripts/playtest/RingerE2ERig.lua`: a real
-client plays a whole match against a Rookie through the game's own Aim module (shot, power, spin)
-and HUD; 21/21 checks. Every shot is replayed on the client and the next turn comes 0.03-0.20 s
-after the replay ends (client at ~15 fps). Published as version 46 (v31 is the last Roblox-physics
-version, for rollback).
+client plays a whole match against a Rookie; 30/30 checks. Its first turns are played with input:
+a mouse drag turns the aim, pulling the power bar down charges to 80% and letting go shoots; the
+right arrow turns the aim, Q sets backspin, holding Space charges and letting go shoots; a touch
+drag turns the aim. The events go into the game's own input handlers (`Aim.input`,
+`Aim.powerBar`), the functions the engine's UserInputService events call; a test client can't
+make the engine send them (VirtualInputManager needs core-script rights). Every shot (18) is
+replayed on the client and the next turn comes 0.00-0.18 s after the replay ends; client memory
+and object counts stay flat over the match.
 
-Not driven by the rig: real mouse drags, touch and pinch gestures, which go through the same Aim
-functions the rig calls. A client on a phone may differ from the server in the last bit of
-`math.sin`/`cos`; the server's result is final, so at worst a marble snaps a little at rest.
+A client on a phone may differ from the server in the last bit of `math.sin`/`cos`; the server's
+result is final, so at worst a marble snaps a little at rest.
