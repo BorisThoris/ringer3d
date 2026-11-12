@@ -95,6 +95,11 @@ function Kit.button(text: string, color: Color3, onClick: () -> (), props: { [st
 	b.Activated:Connect(function()
 		scale.Scale = 0.9
 		TweenService:Create(scale, TweenInfo.new(0.25, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+		-- The web game's tap on every button.
+		local ok, Sfx = pcall(require, script.Parent:FindFirstChild("Sfx"))
+		if ok and Sfx then
+			Sfx.chime("tap")
+		end
 		onClick()
 	end)
 	return b
@@ -148,9 +153,10 @@ function Kit.preview(id: string, parent: Instance, size: UDim2?): ViewportFrame
 	local vp = Kit.new("ViewportFrame", {
 		BackgroundTransparency = 1,
 		Size = size or UDim2.fromScale(1, 1),
-		Ambient = Color3.fromRGB(170, 170, 180),
+		Ambient = Color3.fromRGB(190, 190, 205),
 		LightColor = Color3.new(1, 1, 1),
 		LightDirection = Vector3.new(-1, -1.5, -1),
+		BackgroundColor3 = Color3.new(0, 0, 0),
 		Parent = parent,
 	})
 	local ball = MarbleLook.make(look, 1)
@@ -168,6 +174,84 @@ function Kit.preview(id: string, parent: Instance, size: UDim2?): ViewportFrame
 		end
 	end)
 	return vp
+end
+
+-- How much show each rarity gets around its preview: a glow, turning rays, twinkles.
+local SHOW = {
+	Common = { glow = 0, rays = 0, twinkles = 0 },
+	Rare = { glow = 1, rays = 0, twinkles = 2 },
+	Epic = { glow = 2, rays = 8, twinkles = 4 },
+	Legendary = { glow = 3, rays = 12, twinkles = 6 },
+	Mythic = { glow = 3, rays = 16, twinkles = 8, rainbow = true },
+	Limited = { glow = 3, rays = 12, twinkles = 6 },
+	Exclusive = { glow = 3, rays = 12, twinkles = 6 },
+}
+Kit.SHOW = SHOW
+
+--- A marble's preview with the show its rarity earns, all drawn in the interface (particles
+--- and lights don't draw in a ViewportFrame): a soft glow in the rarity's colour, light rays
+--- turning behind it, and stars twinkling round it. Returns the holder frame.
+function Kit.showcase(id: string, parent: Instance, size: UDim2?, rarity: string?, color: Color3?): Frame
+	local look = MarbleLook.lookFor(id)
+	local tier = rarity or look.rarity or "Common"
+	local show = SHOW[tier] or SHOW.Common
+	local col = color or look.ui or look.accent or Color3.new(1, 1, 1)
+	local holder = Kit.new("Frame", { Name = "Showcase", BackgroundTransparency = 1, Size = size or UDim2.fromScale(1, 1), ClipsDescendants = false, Parent = parent })
+	local square = Kit.new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(1, 1), Parent = holder })
+	Kit.new("UIAspectRatioConstraint", { AspectRatio = 1, Parent = square })
+	local rays = nil
+	if show.rays > 0 then
+		rays = Kit.new("Frame", { Name = "Rays", BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(1.15, 1.15), Parent = square })
+		for i = 0, show.rays - 1 do
+			local ray = Kit.new("Frame", { BackgroundColor3 = col, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(0.07, 1), Rotation = i * 180 / show.rays, Parent = rays })
+			Kit.new("UIGradient", { Rotation = 90, Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.5, 0.45), NumberSequenceKeypoint.new(1, 1) }), Parent = ray })
+		end
+	end
+	local glows = {}
+	for g = 1, show.glow do
+		local s = 0.95 - g * 0.17
+		local glow = Kit.new("Frame", { BackgroundColor3 = col, BackgroundTransparency = 0.88 - g * 0.04, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(s, s), Parent = square })
+		Kit.new("UICorner", { CornerRadius = UDim.new(0.5, 0), Parent = glow })
+		table.insert(glows, glow)
+	end
+	local vp = Kit.preview(id, square, UDim2.fromScale(1, 1))
+	vp.ZIndex = 3
+	local stars = {}
+	local rng = Random.new(#id * 13)
+	for _ = 1, show.twinkles do
+		local star = Kit.new("Frame", { BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Rotation = 45, ZIndex = 4, Position = UDim2.fromScale(rng:NextNumber(0.12, 0.88), rng:NextNumber(0.12, 0.88)), Size = UDim2.fromScale(0.05, 0.05), Parent = square })
+		table.insert(stars, { f = star, phase = rng:NextNumber() * 6, speed = rng:NextNumber(1.5, 3) })
+	end
+	if rays or #stars > 0 or #glows > 0 then
+		task.spawn(function()
+			while holder.Parent do
+				local t = os.clock()
+				if holder.AbsoluteSize.X > 0 then
+					if rays then
+						rays.Rotation = (t * 18) % 360
+						if show.rainbow then
+							local c = Color3.fromHSV((t * 0.12) % 1, 0.75, 1)
+							for _, r in ipairs(rays:GetChildren()) do
+								(r :: Frame).BackgroundColor3 = c
+							end
+						end
+					end
+					for i, g in ipairs(glows) do
+						local k = 1 + 0.06 * math.sin(t * 2.2 + i)
+						local s = (0.95 - i * 0.17) * k
+						g.Size = UDim2.fromScale(s, s)
+					end
+					for _, s in ipairs(stars) do
+						local v = math.max(0, math.sin(t * s.speed + s.phase))
+						s.f.Size = UDim2.fromScale(0.07 * v, 0.07 * v)
+						s.f.BackgroundTransparency = 1 - v
+					end
+				end
+				task.wait(1 / 30)
+			end
+		end)
+	end
+	return holder
 end
 
 local toastHolder: Frame? = nil

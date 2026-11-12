@@ -132,8 +132,9 @@ local function mythicWith(effect: string): string
 end
 local mythicVoid, mythicAurora, mythicInferno = mythicWith("void"), mythicWith("aurora"), mythicWith("inferno")
 
--- The collectibles on pedestals, each labelled with its rarity in the rarity's colour.
-local showcase = { "obsidian", mythicAurora, mythicInferno, "volt", "nova", "rime", "ember", "tide", "comet" }
+-- The Premium Collection on pedestals round the pad, alive in the open air (particles, lights,
+-- moons), each labelled with its rarity and price, plus a Mythic a bag could hold.
+local showcase = { "blackhole", "dragon", "unicorn", "thunder", "phantom", "lavalamp", "globe", "candy", mythicInferno }
 for i, id in ipairs(showcase) do
 	local look = MarbleLook.lookFor(id)
 	local a = i / #showcase * math.pi * 2
@@ -148,6 +149,14 @@ for i, id in ipairs(showcase) do
 	local holder = lobbyPart({ Name = "Label", Size = Vector3.new(1, 1, 1), CFrame = CFrame.new(at + Vector3.new(0, 7.8 + (i % 2) * 2.4, 0)), Transparency = 1, CanCollide = false, CanQuery = false, CanTouch = false })
 	bigText(holder, look.name, { rgb(255, 255, 255), rgb(255, 235, 190) }, Vector2.new(6.5, 1.2)).Parent.MaxDistance = 45
 	bigText(holder, string.upper(look.rarity), { rc:Lerp(rgb(255, 255, 255), 0.35), rc }, Vector2.new(4.5, 0.9), Vector3.new(0, -1, 0)).Parent.MaxDistance = 45
+	local price = Config.MARBLE[id] and Config.MARBLE[id].price
+	bigText(holder, if price then ("🪙 " .. price .. " coins") else "🎁 in Marble Bags", { rgb(255, 245, 170), rgb(255, 190, 60) }, Vector2.new(5.5, 0.9), Vector3.new(0, -2, 0)).Parent.MaxDistance = 45
+	-- A spotlight from below, in the rarity's colour.
+	local glow = Instance.new("PointLight")
+	glow.Color = rc
+	glow.Range = 10
+	glow.Brightness = 1.5
+	glow.Parent = ball
 end
 
 -- The mascot: a giant Void marble with a face, bobbing and turning over the ring.

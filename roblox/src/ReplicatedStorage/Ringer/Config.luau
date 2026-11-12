@@ -31,65 +31,102 @@ Config.TABLE_Y = 0
 export type Arena = {
 	id: string,
 	name: string,
-	material: Enum.Material,
-	color: Color3, -- the field outside the ring
-	inner: Color3, -- the disc inside the ring, a shade lighter
+	tagline: string,
+	surface: string, -- how it sounds: wood, concrete, grass, sand, ice, gravel, turf
+	material: Enum.Material, -- the ground
+	color: Color3,
 	rollDecel: number, -- studs/s^2 of rolling resistance
 	friction: number,
 	elasticity: number,
-	kerb: { Color3 }, -- the bumper's candy stripes
-	line: Color3,
-	backstop: { name: string, size: Vector3, colors: { Color3 }, material: Enum.Material },
-	trees: Color3, -- the round toy trees round the field
+	-- The bank along the edge of play, as the web game's lathe profile (web units: radius past
+	-- the boundary, height), its colour and material.
+	bank: { profile: { { number } }, color: Color3, material: Enum.Material },
+	ring: { color: Color3, style: string }, -- string, chalk, drawn (finger in sand), etched (skate)
+	-- The light and air: the web game's sky, fog and sun (src/game/arenas.ts).
+	sky: { top: Color3, bottom: Color3 },
+	fog: Color3,
+	sun: { color: Color3, brightness: number, clock: number },
+	ambient: Color3,
+	air: string?, -- "dust" (lamplight motes) or "snow"
+	mood: string, -- the ambient pad: bright, calm, night, cold, ominous
 }
 
--- The look follows the top-earning Roblox games (Steal a Brainrot, Pet Simulator 99, Adopt Me!,
--- Grow a Garden): flat, saturated toy colours in smooth plastic, no realistic textures. Feel
--- (friction, bounce, rolling resistance) is set by the numbers, never by the material.
+-- The fields as the web game builds them (src/game/arenas.ts, src/render/arenaBuilder.ts,
+-- groundArt.ts): a varnished oak desk under a lamp, a concrete street, a mown lawn, a beach, a
+-- frozen lake, a gravel pit and a mini-golf course, each with its bank, ring line and scenery.
+-- Feel (friction, bounce, rolling resistance) is set by Ringer.Sim, never by the material.
 local rgb = Color3.fromRGB
-local TOY = { rgb(255, 75, 75), rgb(255, 205, 40), rgb(60, 150, 255), rgb(150, 90, 240) }
+local hex = Color3.fromHex
 Config.ARENAS = {
 	desk = {
-		id = "desk", name = "The Desk", material = Enum.Material.SmoothPlastic, color = rgb(235, 160, 85), inner = rgb(255, 185, 105),
-		rollDecel = 28, friction = 0.5, elasticity = 0.92, kerb = { rgb(255, 80, 70), rgb(255, 255, 255) }, line = rgb(255, 255, 255),
-		backstop = { name = "Book", size = Vector3.new(5.2, 2, 1.5), colors = TOY, material = Enum.Material.SmoothPlastic },
-		trees = rgb(120, 220, 90),
+		id = "desk", name = "The Desk", tagline = "Homework can wait. Varnished oak, lamp on, ring of string.", surface = "wood",
+		material = Enum.Material.Wood, color = rgb(168, 104, 52),
+		rollDecel = 28, friction = 0.5, elasticity = 0.92,
+		bank = { profile = { { -0.1, 0 }, { -0.1, 0.4 }, { 0.05, 0.55 }, { 0.55, 0.55 }, { 0.7, 0.4 }, { 0.7, 0 } }, color = hex("#8a5634"), material = Enum.Material.Wood },
+		ring = { color = hex("#e6ddcc"), style = "string" },
+		sky = { top = hex("#d9c3a3"), bottom = hex("#8a6a4a") }, fog = hex("#cdb796"),
+		sun = { color = hex("#ffe6c4"), brightness = 2.2, clock = 15.6 }, ambient = hex("#5a3c22"),
+		air = "dust", mood = "calm",
 	},
 	culdesac = {
-		id = "culdesac", name = "The Cul-de-sac", material = Enum.Material.SmoothPlastic, color = rgb(110, 125, 175), inner = rgb(135, 155, 210),
-		rollDecel = 36, friction = 0.6, elasticity = 0.86, kerb = { rgb(255, 210, 40), rgb(255, 255, 255) }, line = rgb(255, 255, 255),
-		backstop = { name = "Kerbstone", size = Vector3.new(5, 1.3, 1.2), colors = TOY, material = Enum.Material.SmoothPlastic },
-		trees = rgb(90, 210, 120),
+		id = "culdesac", name = "The Cul-de-sac", tagline = "Chalk on concrete, the gutter one bad flick away.", surface = "concrete",
+		material = Enum.Material.Concrete, color = rgb(150, 147, 141),
+		rollDecel = 36, friction = 0.6, elasticity = 0.86,
+		bank = { profile = { { 0, 0 }, { 0, 0.58 }, { 0.08, 0.68 }, { 1.35, 0.7 }, { 1.5, 0.6 }, { 1.5, 0 } }, color = hex("#c9c3b8"), material = Enum.Material.Concrete },
+		ring = { color = hex("#f7f5ef"), style = "chalk" },
+		sky = { top = hex("#5aa9ff"), bottom = hex("#dff1ff") }, fog = hex("#cfe7ff"),
+		sun = { color = hex("#fff3e2"), brightness = 2.0, clock = 14.2 }, ambient = hex("#6b6256"),
+		mood = "bright",
 	},
 	grass = {
-		id = "grass", name = "The Back Lawn", material = Enum.Material.SmoothPlastic, color = rgb(70, 190, 70), inner = rgb(105, 215, 85),
-		rollDecel = 56, friction = 0.85, elasticity = 0.78, kerb = { rgb(255, 255, 255), rgb(255, 90, 90) }, line = rgb(255, 255, 255),
-		backstop = { name = "Log", size = Vector3.new(6.4, 1.2, 1.2), colors = TOY, material = Enum.Material.SmoothPlastic },
-		trees = rgb(255, 150, 200),
+		id = "grass", name = "The Back Lawn", tagline = "Fresh-cut grass grabs every marble. Flick hard.", surface = "grass",
+		material = Enum.Material.Grass, color = rgb(86, 158, 48),
+		rollDecel = 56, friction = 0.85, elasticity = 0.78,
+		bank = { profile = { { -0.2, 0 }, { 0.6, 0.35 }, { 1.6, 0.55 }, { 3, 0.2 }, { 3.8, 0 } }, color = hex("#4f9a37"), material = Enum.Material.Grass },
+		ring = { color = hex("#f4f1e8"), style = "string" },
+		sky = { top = hex("#5aa9ff"), bottom = hex("#e6f4ff") }, fog = hex("#d6ebff"),
+		sun = { color = hex("#fff4e0"), brightness = 3.0, clock = 12.8 }, ambient = hex("#3f5a26"),
+		mood = "bright",
 	},
 	sand = {
-		id = "sand", name = "The Beach", material = Enum.Material.SmoothPlastic, color = rgb(255, 205, 105), inner = rgb(255, 220, 130),
-		rollDecel = 52, friction = 0.7, elasticity = 0.72, kerb = { rgb(255, 110, 120), rgb(255, 255, 255) }, line = rgb(255, 255, 255),
-		backstop = { name = "Driftwood", size = Vector3.new(7, 1, 1), colors = TOY, material = Enum.Material.SmoothPlastic },
-		trees = rgb(60, 200, 110),
+		id = "sand", name = "The Beach", tagline = "Ring drawn with a finger. Sand eats speed and keeps tracks.", surface = "sand",
+		material = Enum.Material.Sand, color = rgb(214, 192, 150),
+		rollDecel = 52, friction = 0.7, elasticity = 0.72,
+		bank = { profile = { { -0.3, 0 }, { 0.8, 0.55 }, { 2, 0.75 }, { 3.4, 0.3 }, { 4.2, 0 } }, color = hex("#d6b67f"), material = Enum.Material.Sand },
+		ring = { color = hex("#5a4630"), style = "drawn" },
+		sky = { top = hex("#4f9be8"), bottom = hex("#e9f4ff") }, fog = hex("#e3eef7"),
+		sun = { color = hex("#fff1d6"), brightness = 3.2, clock = 14.0 }, ambient = hex("#a8916a"),
+		mood = "calm",
 	},
 	ice = {
-		id = "ice", name = "The Frozen Lake", material = Enum.Material.SmoothPlastic, color = rgb(95, 185, 255), inner = rgb(140, 210, 255),
-		rollDecel = 22, friction = 0.12, elasticity = 0.88, kerb = { rgb(255, 255, 255), rgb(120, 170, 255) }, line = rgb(255, 255, 255),
-		backstop = { name = "Ice block", size = Vector3.new(4.6, 1.6, 1.4), colors = { rgb(200, 240, 255), rgb(150, 210, 255) }, material = Enum.Material.Glass },
-		trees = rgb(235, 250, 255),
+		id = "ice", name = "The Frozen Lake", tagline = "Black ice, a ring scratched with a skate. Nothing stops.", surface = "ice",
+		material = Enum.Material.Ice, color = rgb(18, 40, 66),
+		rollDecel = 22, friction = 0.12, elasticity = 0.88,
+		bank = { profile = { { -0.3, 0 }, { 0.4, 0.6 }, { 1.6, 1.05 }, { 3, 0.6 }, { 4, 0 } }, color = hex("#f4f8fc"), material = Enum.Material.Snow },
+		ring = { color = hex("#eaf6ff"), style = "etched" },
+		sky = { top = hex("#7f9fc4"), bottom = hex("#dfe8f2") }, fog = hex("#dde6ef"),
+		sun = { color = hex("#eef4ff"), brightness = 1.4, clock = 11.5 }, ambient = hex("#5d7088"),
+		air = "snow", mood = "cold",
 	},
 	gravel = {
-		id = "gravel", name = "The Gravel Pit", material = Enum.Material.SmoothPlastic, color = rgb(80, 185, 170), inner = rgb(110, 210, 195),
-		rollDecel = 48, friction = 0.8, elasticity = 0.8, kerb = { rgb(255, 140, 40), rgb(255, 255, 255) }, line = rgb(255, 255, 255),
-		backstop = { name = "Slab", size = Vector3.new(4.8, 1, 1.2), colors = TOY, material = Enum.Material.SmoothPlastic },
-		trees = rgb(255, 190, 70),
+		id = "gravel", name = "The Gravel Pit", tagline = "Loose stones under every roll. Nothing goes where you sent it.", surface = "gravel",
+		material = Enum.Material.Pebble, color = rgb(160, 152, 140),
+		rollDecel = 48, friction = 0.8, elasticity = 0.8,
+		bank = { profile = { { -0.2, 0 }, { 0.6, 0.5 }, { 1.8, 0.7 }, { 3.2, 0.25 }, { 4, 0 } }, color = hex("#a39a8f"), material = Enum.Material.Pebble },
+		ring = { color = hex("#ffd23f"), style = "chalk" },
+		sky = { top = hex("#6f9ed6"), bottom = hex("#e4ecf3") }, fog = hex("#cfd6dc"),
+		sun = { color = hex("#fff3e2"), brightness = 2.0, clock = 14.2 }, ambient = hex("#6b6256"),
+		mood = "bright",
 	},
 	minigolf = {
-		id = "minigolf", name = "The Mini-Golf Course", material = Enum.Material.SmoothPlastic, color = rgb(60, 185, 95), inner = rgb(85, 205, 115),
-		rollDecel = 40, friction = 0.7, elasticity = 0.85, kerb = { rgb(255, 80, 80), rgb(255, 255, 255) }, line = rgb(255, 255, 255),
-		backstop = { name = "Rail", size = Vector3.new(6, 1.4, 0.7), colors = { rgb(255, 255, 255) }, material = Enum.Material.SmoothPlastic },
-		trees = rgb(255, 120, 200),
+		id = "minigolf", name = "The Mini-Golf Course", tagline = "Bumpers, speed pads and cups. Ringer goes to the seaside arcade.", surface = "turf",
+		material = Enum.Material.Carpet, color = rgb(22, 128, 34),
+		rollDecel = 40, friction = 0.7, elasticity = 0.85,
+		bank = { profile = { { 0, 0 }, { 0, 0.55 }, { 0.06, 0.62 }, { 0.42, 0.62 }, { 0.48, 0.55 }, { 0.48, 0 } }, color = hex("#f6f2e8"), material = Enum.Material.SmoothPlastic },
+		ring = { color = hex("#ffffff"), style = "chalk" },
+		sky = { top = hex("#5aa9ff"), bottom = hex("#e6f4ff") }, fog = hex("#d8ecff"),
+		sun = { color = hex("#fff4e0"), brightness = 3.0, clock = 12.8 }, ambient = hex("#2f6b33"),
+		mood = "bright",
 	},
 } :: { [string]: Arena }
 Config.ARENA_ORDER = { "desk", "culdesac", "grass", "sand", "ice", "gravel", "minigolf" }
@@ -196,6 +233,7 @@ export type Marble = {
 	price: number?, -- coins, if sold in the shop
 	supply: number?, -- Limited: how many will ever exist (serial numbered)
 	source: string?, -- how else it is earned: "tower", "vip", "premium", "pass"
+	tagline: string?, -- the line under it in the Shop
 }
 
 local function m(id, name, rarity, shell, core, material, transparency, glow, extra)
@@ -223,6 +261,15 @@ Config.MARBLES = {
 	m("ruby", "Ruby Heart", "Legendary", rgb(150, 0, 30), rgb(255, 60, 90), Enum.Material.Glass, 0.2, 0.7, {}),
 	m("moss", "Moss Agate", "Rare", rgb(80, 120, 70), rgb(200, 230, 150), Enum.Material.Glass, 0.3, 0.1, {}),
 	m("sunset", "Sunset", "Epic", rgb(255, 150, 70), rgb(255, 60, 120), Enum.Material.Glass, 0.25, 0.6, {}),
+	-- The Premium Collection: each one alive inside (MarbleFX), sold for coins in the Shop.
+	m("candy", "Candy Swirl", "Rare", rgb(255, 210, 235), rgb(255, 80, 170), Enum.Material.Glass, 0.3, 0.4, { price = 900, tagline = "Sugar-pink swirls and rainbow sprinkles" }),
+	m("globe", "Snow Globe", "Epic", rgb(235, 248, 255), rgb(120, 200, 255), Enum.Material.Glass, 0.3, 0.3, { price = 2200, tagline = "Shake it: it's snowing inside" }),
+	m("lavalamp", "Lava Lamp", "Epic", rgb(60, 10, 40), rgb(255, 120, 30), Enum.Material.Glass, 0.25, 1, { price = 2600, tagline = "Glowing blobs rise through it, forever" }),
+	m("thunder", "Thunderball", "Epic", rgb(20, 16, 50), rgb(90, 200, 255), Enum.Material.Glass, 0.25, 1, { price = 3200, tagline = "A lightning storm trapped in glass" }),
+	m("phantom", "Phantom", "Legendary", rgb(225, 240, 255), rgb(160, 220, 255), Enum.Material.Glass, 0.4, 0.6, { price = 4800, tagline = "Ghost wisps that fade in and out" }),
+	m("dragon", "Dragon's Eye", "Legendary", rgb(60, 8, 0), rgb(255, 110, 0), Enum.Material.Glass, 0.2, 1, { price = 6500, tagline = "A live flame burns in its eye" }),
+	m("unicorn", "Unicorn Dream", "Legendary", rgb(255, 240, 255), rgb(200, 120, 255), Enum.Material.Glass, 0.3, 0.9, { price = 7500, tagline = "Rainbow glitter, stardust and three little moons" }),
+	m("blackhole", "Black Hole", "Mythic", rgb(10, 6, 24), rgb(170, 90, 255), Enum.Material.Glass, 0.15, 1, { price = 15000, tagline = "It swallows the light. Moons included." }),
 } :: { Marble }
 
 Config.MARBLE = {} :: { [string]: Marble }
@@ -253,6 +300,14 @@ Config.ART = {
 	ruby = art("swirl", "#96001e", "#ff3c5a", "#ffd0d8", 0.45, 0.7, "#ff3c5a"),
 	moss = art("onionskin", "#506e46", "#c8e696", "#f0f5dc", 0.5, 0.1, "#8cc864"),
 	sunset = art("onionskin", "#ff9646", "#ff3c78", "#ffe08a", 0.6, 0.6, "#ff7a50"),
+	candy = art("swirl", "#ffd2eb", "#ff50aa", "#ffffff", 0.7, 0.4, "#ff50aa"),
+	globe = art("clearie", "#ebf8ff", "#78c8ff", "#ffffff", 0.95, 0.3, "#78c8ff"),
+	lavalamp = art("onyx", "#3c0a28", "#ff781e", "#ffd23f", 0.35, 1, "#ff781e"),
+	thunder = art("neon", "#141032", "#5ac8ff", "#c87aff", 0.6, 1, "#5ac8ff"),
+	phantom = art("clearie", "#e1f0ff", "#a0dcff", "#ffffff", 0.95, 0.6, "#a0dcff"),
+	dragon = art("catseye", "#3c0800", "#ff6e00", "#ffd23f", 0.5, 1, "#ff6e00"),
+	unicorn = art("opal", "#fff0ff", "#c878ff", "#7af0ff", 0.8, 0.9, "#c878ff"),
+	blackhole = art("galaxy", "#0a0618", "#aa5aff", "#ffd36b", 0.5, 1, "#aa5aff"),
 }
 
 -- The 13 targets (src/game/marbles.ts MIB_LOOKS): target id t wears MIB_LOOKS[(t * 5) % 8].

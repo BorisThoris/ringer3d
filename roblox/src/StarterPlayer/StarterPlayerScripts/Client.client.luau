@@ -12,10 +12,18 @@ local UserInputService = game:GetService("UserInputService")
 local Config = require(ReplicatedStorage.Ringer.Config)
 local Forge = require(ReplicatedStorage.Ringer.Forge)
 local MarbleLook = require(ReplicatedStorage.Ringer.MarbleLook)
+local MarbleFX = require(ReplicatedStorage.Ringer.MarbleFX)
 local Modules = script.Parent:WaitForChild("ClientModules")
 local Kit = require(Modules.Kit)
 local Aim = require(Modules.Aim)
 local Replay = require(Modules.Replay)
+local Sfx = require(Modules.Sfx)
+local Ambience = require(Modules.Ambience)
+local Pets = require(Modules.Pets)
+
+-- Marbles come alive (bolts, moons, auras), and everyone's marble floats beside them.
+MarbleFX.animate()
+Pets.start()
 
 local player = Players.LocalPlayer
 local Remotes = ReplicatedStorage.Ringer:WaitForChild("Remotes")
@@ -64,6 +72,7 @@ local function setCoins(n: number)
 		return
 	end
 	Kit.popup(screen, "+" .. Kit.comma(n - from), UDim2.new(0.5, 40, 0, 90))
+	Sfx.ui("coin")
 	local v = Instance.new("NumberValue")
 	v.Value = from
 	v.Changed:Connect(function(x)
@@ -204,7 +213,7 @@ local function page(name: string)
 		Visible = false,
 		Parent = pages,
 	})
-	Kit.new("UIGridLayout", { CellSize = UDim2.fromOffset(190, 250), CellPadding = UDim2.fromOffset(12, 12), Parent = f })
+	Kit.new("UIGridLayout", { CellSize = UDim2.fromOffset(200, 300), CellPadding = UDim2.fromOffset(12, 12), Parent = f })
 	pageOf[name] = f
 	Kit.button(name, Kit.BLUE, function()
 		for n, p in pairs(pageOf) do
@@ -227,6 +236,7 @@ local function itemCard(parent: Instance, title: string, sub: string, color: Col
 	return c
 end
 
+local onBag -- the bag reveal, defined further down
 local function refreshShop()
 	for _, f in ipairs({ marblesPage, bagsPage, robuxPage }) do
 		for _, c in ipairs(f:GetChildren()) do
@@ -238,18 +248,50 @@ local function refreshShop()
 	if not profile then
 		return
 	end
-	-- Marbles for coins.
+	-- Marbles for coins: the most wanted first, each alive in its card.
+	local forSale = {}
 	for _, look in ipairs(Config.MARBLES) do
 		if look.price then
-			local c = itemCard(marblesPage, look.name, look.rarity, Config.RARITY_COLOR[look.rarity])
-			Kit.preview(look.id, c, UDim2.new(1, 0, 0, 116))
+			table.insert(forSale, look)
+		end
+	end
+	local RANK = { Mythic = 5, Legendary = 4, Epic = 3, Rare = 2, Common = 1 }
+	table.sort(forSale, function(a, b)
+		if (RANK[a.rarity] or 0) ~= (RANK[b.rarity] or 0) then
+			return (RANK[a.rarity] or 0) > (RANK[b.rarity] or 0)
+		end
+		return a.price > b.price
+	end)
+	for order, look in ipairs(forSale) do
+		do
+			local color = Config.RARITY_COLOR[look.rarity] or Kit.CREAM
+			local c = Kit.new("Frame", { BackgroundColor3 = Color3.fromRGB(40, 30, 62), LayoutOrder = order, Parent = marblesPage })
+			Kit.round(c, 16)
+			Kit.stroke(c, color, 3)
+			Kit.new("UIGradient", { Rotation = 90, Color = ColorSequence.new(color:Lerp(Color3.fromRGB(40, 30, 62), 0.7), Color3.fromRGB(30, 22, 48)), Parent = c })
+			Kit.showcase(look.id, c, UDim2.new(1, 0, 0, 132), look.rarity, color).Position = UDim2.fromOffset(0, 4)
+			Kit.label(look.name, 22, { Position = UDim2.fromOffset(4, 136), Size = UDim2.new(1, -8, 0, 26), Parent = c })
+			local chip = Kit.label(string.upper(look.rarity), 14, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 163), Size = UDim2.fromOffset(110, 20), BackgroundTransparency = 0, BackgroundColor3 = color, TextColor3 = Kit.INK, Parent = c })
+			Kit.round(chip, 10)
+			local fx = MarbleFX.describe(MarbleLook.lookFor(look.id))
+			Kit.label((look.tagline or "") .. (if fx ~= "" then "\n✦ " .. fx else ""), 13, { Position = UDim2.fromOffset(8, 186), Size = UDim2.new(1, -16, 0, 52), TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, TextColor3 = Color3.fromRGB(225, 215, 245), Parent = c })
+			if look.tagline then
+				local ribbon = Kit.label("NEW", 14, { Position = UDim2.fromOffset(8, 8), Size = UDim2.fromOffset(48, 22), BackgroundTransparency = 0, BackgroundColor3 = Kit.RED, ZIndex = 5, Parent = c })
+				Kit.round(ribbon, 8)
+			end
 			local owned = profile.owned[look.id]
 			Kit.button(owned and "Owned" or (look.price .. " coins"), owned and Color3.fromRGB(110, 110, 120) or Kit.GREEN, function()
 				if owned then
 					return
 				end
 				local ok, why = ask("buy", look.id)
+				if ok then
+					Sfx.ui("buy")
+				end
 				toast(ok and ("You got " .. look.name .. "!") or (why or "Couldn't buy."), ok and "good" or "bad")
+				if ok then
+					onBag({ id = look.id, bought = true })
+				end
 			end, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -10), Size = UDim2.new(0.86, 0, 0, 44), Parent = c })
 		end
 	end
@@ -329,7 +371,6 @@ local function meltValue(c): number
 	local fx = if c.effect ~= "none" then 4 else 1
 	return math.floor(Config.MELT[c.tier] * wear * (if c.shiny then 5 else 1) * fx + 0.5)
 end
-local onBag -- the bag reveal, defined further down
 
 local colPanel, colBody = Kit.panel(screen, "Your Marbles", UDim2.fromScale(0.8, 0.8))
 panels.marbles = colPanel
@@ -397,6 +438,7 @@ local function forgedCard(o, c, order: number)
 	end
 	Kit.button(isOn and "Equipped" or "Equip", isOn and Color3.fromRGB(110, 110, 120) or Kit.GREEN, function()
 		ask("equip", c.id)
+	Sfx.ui("equip")
 	end, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -56), Size = UDim2.new(0.86, 0, 0, 38), Parent = card })
 	local melt = Kit.button("Melt " .. Kit.comma(meltValue(c)), Kit.RED, function()
 		local ok, got = ask("melt", c.id)
@@ -512,6 +554,7 @@ refreshCollection = function()
 			local equipped = profile.equipped == look.id
 			Kit.button(equipped and "Equipped" or "Equip", equipped and Color3.fromRGB(110, 110, 120) or Kit.GREEN, function()
 				ask("equip", look.id)
+				Sfx.ui("equip")
 			end, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -10), Size = UDim2.new(0.86, 0, 0, 40), Parent = c })
 		end
 	end
@@ -725,7 +768,45 @@ end
 
 local timerConn: RBXScriptConnection? = nil
 local resultPanelRef: Frame? = nil
+-- The field's light, air and sound follow the table this client watches.
+local soundTable: number? = nil
+local lastTurn = ""
+Replay.onImpact = function(kind, strength, _pos)
+	Sfx.clack(strength, kind)
+end
+Replay.onFrame = function(speed)
+	Sfx.setRolling(speed)
+end
+Replay.onCross = function(_pos)
+	Sfx.chime("capture")
+end
+Replay.onBreak = function(_pos)
+	Sfx.clack(900, "kerb")
+end
+local function leaveTable()
+	soundTable = nil
+	lastTurn = ""
+	Sfx.stopPad()
+	Ambience.leave()
+end
+
 local function onState(state)
+	local field = Config.ARENAS[state.arena]
+	if field and state.origin then
+		Ambience.enter(state.arena, state.origin, state.id)
+		if soundTable ~= state.id then
+			soundTable = state.id
+			Sfx.setSurface(field.surface)
+			Sfx.startPad(field.mood)
+		end
+	end
+	if state.phase == "aim" and state.firstShot then
+		local key = tostring(state.id) .. ":" .. tostring(state.current) .. ":" .. tostring(state.scores and table.concat(state.scores, ","))
+		if key ~= lastTurn then
+			lastTurn = key
+			Sfx.chime("turn")
+		end
+	end
 	if resultPanelRef and resultPanelRef.Visible and state.phase ~= "over" then
 		resultPanelRef.Visible = false
 	end
@@ -785,6 +866,7 @@ end
 -- Results and the Marble Bag reveal
 -- =============================================================================================
 local resultPanel, resultBody = Kit.panel(screen, "Result", UDim2.fromOffset(520, 380), function()
+	leaveTable()
 	Aim.stop()
 	match.Visible = false
 	hud.Visible = true
@@ -794,6 +876,7 @@ local resultTitle = Kit.label("", 44, { Size = UDim2.new(1, 0, 0, 56), Parent = 
 local resultText = Kit.label("", 22, { Position = UDim2.fromOffset(0, 66), Size = UDim2.new(1, 0, 0, 120), TextYAlignment = Enum.TextYAlignment.Top, Parent = resultBody })
 Kit.button("Play again", Kit.GREEN, function()
 	resultPanel.Visible = false
+	leaveTable()
 	Aim.stop()
 	match.Visible = false
 	hud.Visible = true
@@ -803,6 +886,7 @@ Kit.button("Play again", Kit.GREEN, function()
 end, { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 10, 1, -6), Size = UDim2.new(0.46, 0, 0, 60), Parent = resultBody })
 Kit.button("Lobby", Kit.BLUE, function()
 	resultPanel.Visible = false
+	leaveTable()
 	Aim.stop()
 	match.Visible = false
 	hud.Visible = true
@@ -819,6 +903,7 @@ local function onResult(r)
 	end
 	inMatch = false
 	banner.Text = ""
+	Sfx.chime(if r.won or r.draw then "win" else "lose")
 	resultTitle.Text = r.abandoned and (r.won and "They left: you win!" or "You left") or r.draw and "Draw!" or r.won and "You win!" or "You lose"
 	resultTitle.TextColor3 = r.won and Kit.GOLD or Kit.CREAM
 	local lines = { string.format("Score  %s", table.concat(r.scores, " - ")), string.format("+%d coins", r.coins) }
@@ -847,34 +932,110 @@ local function onResult(r)
 	Kit.open(resultPanel)
 end
 
-local revealPanel, revealBody = Kit.panel(screen, "Marble Bag", UDim2.fromOffset(460, 440))
-local revealHolder = Kit.new("Frame", { Size = UDim2.new(1, 0, 0, 220), BackgroundTransparency = 1, Parent = revealBody })
-local revealText = Kit.label("", 30, { Position = UDim2.fromOffset(0, 230), Size = UDim2.new(1, 0, 0, 90), Parent = revealBody })
+local revealPanel, revealBody = Kit.panel(screen, "Marble Bag", UDim2.fromOffset(480, 500))
+local revealHolder = Kit.new("Frame", { Size = UDim2.new(1, 0, 0, 260), BackgroundTransparency = 1, ClipsDescendants = false, Parent = revealBody })
+local revealTier = Kit.label("", 34, { Position = UDim2.fromOffset(0, 262), Size = UDim2.new(1, 0, 0, 40), Parent = revealBody })
+local revealText = Kit.label("", 24, { Position = UDim2.fromOffset(0, 302), Size = UDim2.new(1, 0, 0, 96), TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, Parent = revealBody })
+-- A full-screen flash for the moment the bag bursts.
+local flash = Kit.new("Frame", { Name = "Flash", BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 50, Active = false, Visible = false, Parent = screen })
+local revealing = 0
+local RANK = { Common = 1, Rare = 2, Epic = 3, Legendary = 4, Mythic = 5, Limited = 4, Exclusive = 4 }
 
-onBag = function(got)
+--- Paper confetti in the rarity's colours, falling over the panel.
+local function confetti(parent: GuiObject, color: Color3, n: number)
+	local rng = Random.new()
+	for _ = 1, n do
+		local col = if rng:NextNumber() < 0.5 then color else Color3.fromHSV(rng:NextNumber(), 0.7, 1)
+		local bit = Kit.new("Frame", { BackgroundColor3 = col, BorderSizePixel = 0, ZIndex = 20, Size = UDim2.fromOffset(rng:NextInteger(6, 12), rng:NextInteger(10, 18)), Position = UDim2.new(rng:NextNumber(), 0, 0, -20), Rotation = rng:NextNumber(0, 360), Parent = parent })
+		local tw = TweenService:Create(bit, TweenInfo.new(rng:NextNumber(1.4, 2.4), Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Position = UDim2.new(bit.Position.X.Scale + rng:NextNumber(-0.2, 0.2), 0, 1.1, 0), Rotation = bit.Rotation + rng:NextNumber(-540, 540) })
+		tw.Completed:Connect(function()
+			bit:Destroy()
+		end)
+		tw:Play()
+	end
+end
+
+local function reveal(got)
+	revealing += 1
+	local me = revealing
 	for _, c in ipairs(revealHolder:GetChildren()) do
 		c:Destroy()
 	end
-	Kit.preview(got.id, revealHolder)
 	local c = Forge.fromId(got.id)
-	if c then
-		-- A generated marble: its rarity, wear and anything special about it.
-		local extra = #c.traits > 0 and ("\n✦ " .. table.concat(c.traits, " · ")) or ""
-		revealText.Text = string.format("%s\n%s · %s %.4f%s", c.marble.name, c.tier, c.wear, c.float, extra)
-		revealText.TextColor3 = Config.RARITY_COLOR[c.tier] or Kit.CREAM
-		Kit.open(revealPanel)
-		return
-	end
 	local look = Config.MARBLE[got.id]
-	local line = look.name .. "\n" .. look.rarity
-	if got.serial then
-		line = string.format("%s\nLimited #%d of %d", look.name, got.serial, look.supply)
+	local tier = if c then c.tier else (look and look.rarity or "Common")
+	local color = Config.RARITY_COLOR[tier] or Kit.CREAM
+	local name = if c then c.marble.name else look.name
+	local line
+	if c then
+		-- A generated marble: its wear and anything special about it.
+		line = string.format("%s · %.4f", c.wear, c.float)
+		if #c.traits > 0 then
+			line ..= "\n✦ " .. table.concat(c.traits, " · ")
+		end
+	elseif got.serial then
+		line = string.format("Limited #%d of %d", got.serial, look.supply)
 	elseif got.duplicate then
-		line = string.format("%s (duplicate)\n+%d coins", look.name, got.duplicate)
+		line = string.format("Duplicate: +%d coins", got.duplicate)
+	else
+		line = look.tagline or ""
 	end
-	revealText.Text = line
-	revealText.TextColor3 = Config.RARITY_COLOR[look.rarity] or Kit.CREAM
+	local fx = MarbleFX.describe(MarbleLook.lookFor(got.id))
+	if fx ~= "" and not c then
+		line ..= "\n✦ " .. fx
+	end
+	revealTier.Text = ""
+	revealText.Text = ""
 	Kit.open(revealPanel)
+
+	if not got.bought then
+		-- The bag: it shakes, faster and faster, then bursts.
+		local bag = Kit.new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.55), Size = UDim2.fromOffset(150, 160), BackgroundColor3 = Color3.fromRGB(160, 100, 55), Parent = revealHolder })
+		Kit.round(bag, 60)
+		Kit.stroke(bag, Kit.INK, 4)
+		Kit.new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(255, 230, 190), Color3.fromRGB(150, 100, 60)), Parent = bag })
+		local tie = Kit.new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.12), Size = UDim2.fromOffset(90, 18), BackgroundColor3 = Color3.fromRGB(240, 70, 120), Parent = bag })
+		Kit.round(tie, 9)
+		Kit.label("?", 72, { Size = UDim2.fromScale(1, 1), TextColor3 = Kit.CREAM, Parent = bag })
+		local beats = 9
+		for i = 1, beats do
+			if me ~= revealing then
+				return
+			end
+			Sfx.ui("tick", 0.4 + i * 0.06)
+			bag.Rotation = if i % 2 == 0 then 6 + i else -6 - i
+			bag.Size = UDim2.fromOffset(150 + i * 4, 160 + i * 4)
+			task.wait(0.22 - i * 0.017)
+		end
+		if me ~= revealing then
+			return
+		end
+		Sfx.ui("whoosh")
+		bag:Destroy()
+		flash.Visible = true
+		flash.BackgroundColor3 = color:Lerp(Color3.new(1, 1, 1), 0.6)
+		flash.BackgroundTransparency = if (RANK[tier] or 1) >= 3 then 0.05 else 0.4
+		TweenService:Create(flash, TweenInfo.new(0.6), { BackgroundTransparency = 1 }):Play()
+		task.delay(0.6, function()
+			flash.Visible = false
+		end)
+	end
+	-- The marble, in its rarity's light, popping in.
+	local show = Kit.showcase(got.id, revealHolder, UDim2.fromScale(1, 1), tier, color)
+	local scale = Kit.new("UIScale", { Scale = 0.2, Parent = show })
+	TweenService:Create(scale, TweenInfo.new(0.55, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+	revealTier.Text = string.upper(tier)
+	revealTier.TextColor3 = color
+	revealText.Text = name .. (if line ~= "" then "\n" .. line else "")
+	Sfx.reveal(tier)
+	Sfx.ui("equip", 0.6)
+	if (RANK[tier] or 1) >= 3 then
+		confetti(revealBody, color, if (RANK[tier] or 1) >= 4 then 60 else 30)
+	end
+end
+-- The reveal takes its time; whoever asked for it does not wait.
+onBag = function(got)
+	task.spawn(reveal, got)
 end
 
 -- =============================================================================================
@@ -913,6 +1074,9 @@ Remotes:WaitForChild("TableEvent").OnClientEvent:Connect(function(kind, data, id
 	elseif kind == "shot" then
 		local state = Aim.state
 		Aim.shotStarted()
+		if data.shot and data.shot.power then
+			Sfx.launch(data.shot.power)
+		end
 		hint.Text = ""
 		if state and state.id == id then
 			Replay.play(state, data, function()

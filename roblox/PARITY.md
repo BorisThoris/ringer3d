@@ -158,10 +158,35 @@ reticle is too fat, all marbles look generic flat").
 | Marble interiors | real geometry in a glass shell: cat's-eye blades, spiral ribbons, onionskin, galaxy flecks round a deep core, neon ribbons, onyx cracks, opal heart, clearie wisp, glitter, bubbles, seed bubbles and stones | one coloured inner ball | fixed: `Ringer.MarbleArt` builds the same pieces from the same seeds (xorshift and flaws checked in `tests/marbles.luau`) |
 | Targets | `MIB_LOOKS[(id * 5) % 8]`, each its own pattern | eight colour pairs | fixed |
 | Glass | transmissive: refraction, magnification, dispersion, iridescence, milk and clouds, normal maps, caustics | Roblox Glass | **deviation**: Roblox draws nothing inside Glass and has none of these, so the shell is smooth see-through plastic with reflectance and the ribbons are drawn 1.8x wider to stand in for the magnification |
-| Phenomena | shader volumes | Roblox Fire/Smoke/Sparkles | unchanged (Roblox effects) |
+| Phenomena | shader volumes | Roblox Fire/Smoke/Sparkles | replaced by `Ringer.MarbleFX` (below) |
 
 Side-by-side renders of the same eight collectibles (JS Forge vs Roblox Studio):
 `D:/agent-work/ringer3d/2026-11-12-marble-art/compare-collectibles-v3.jpg`.
+
+## Fields, map pieces and sound (`src/render/arenaBuilder.ts`, `groundArt.ts`, `mapPieces.ts`, `audio.ts`)
+
+Added 2026-11-13 after a playtest ("environments really lacking compared to the real ones", "there's
+no sound effects"). Not gameplay: shots still roll on `Ringer.Sim`.
+
+| Item | Web game | Roblox before | Now |
+| --- | --- | --- | --- |
+| Ground | PBR scans: varnished oak, concrete, mown lawn, sand, black ice, gravel, turf | flat toy-coloured plastic | Roblox materials in the web colours (Wood, Concrete, Grass, Sand, Ice, Pebble, Carpet), mowing stripes, ice cracks and drifts, sand ripples, desk varnish |
+| Edge of play | a lathe bank per field (tray lip, kerb, berm, dune, snowbank, stone bank, painted rail) | candy-striped kerb | the same profiles in studs (`Arena.luau`), rail stripe on the course |
+| Ring line | string, chalk, finger-drawn groove, skate scratch | white plastic | each field's style |
+| Scenery | books and the lamp, hedges, tufts and shrubs, marram grass and rocks, snowy pines, boulders, a turning windmill | lollipop trees | ported; the windmill turns on the client |
+| Light and air | per-field sun, fog, sky; dust motes on the desk, snow on the lake | one midday | `ClientModules/Ambience` sets the field's light, fog and particles while watching a table |
+| Map pieces | modelled books with page blocks, sharpened pencils, paper clips, mugs, pen pots, cones, logs, rocks, sandcastles, shells, rails, bumpers with ring and cap, pads with chevrons, ruled paper, coffee stains, cups with flags | coloured primitives | ported part by part (`Pieces.luau`); details are welded so moving props carry them |
+| Sound | Kenney CC0 impacts by surface, synthesised roll, chimes, ambient pad | none | all of it rendered into one sprite (`audio/build_sprite.py`), played as PlaybackRegions (`ClientModules/Sfx`); clacks, flick, roll, captures, breaks, turn, win/lose, pad, plus shop and bag sounds. **Needs the audio asset uploaded** (`store/ids.json` `audio.sfx`); silent until then |
+
+## Marble effects and the shop (`Ringer.MarbleFX`, `Kit.showcase`, `ClientModules/Pets`)
+
+Roblox-only: the web game has no equivalent. Each named marble has a signature effect inside its
+glass (flames, lightning, galaxy, snow globe, lava, hearts, rainbow glitter, ghost wisps...), rarer
+ones add an aura and orbiting moons; generated marbles get effects by tier, phenomenon and Shiny.
+Eight new marbles (the Premium Collection) are sold for coins. Shop cards and the bag reveal draw
+rarity glows, rays and twinkles round the preview (particles don't draw in a ViewportFrame); the
+bag shakes, bursts with a flash and confetti and plays a sting by rarity. Every player's equipped
+marble floats beside them. Checked in `tests/look.luau`.
 
 ## Real-client playtest
 

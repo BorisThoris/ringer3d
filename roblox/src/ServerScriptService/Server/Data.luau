@@ -106,6 +106,10 @@ function Data.await(player: Player, timeout: number?): Profile?
 end
 
 local function leaderstats(player: Player, p: Profile)
+	-- Everyone's clients float this marble beside the player (ClientModules/Pets).
+	if player:GetAttribute("Marble") ~= p.equipped then
+		player:SetAttribute("Marble", p.equipped)
+	end
 	local ls = player:FindFirstChild("leaderstats") or Instance.new("Folder")
 	ls.Name = "leaderstats"
 	local wins = ls:FindFirstChild("Wins") or Instance.new("IntValue")

@@ -5,6 +5,7 @@
 local Config = require(script.Parent.Config)
 local Forge = require(script.Parent.Forge)
 local MarbleArt = require(script.Parent.MarbleArt)
+local MarbleFX = require(script.Parent.MarbleFX)
 
 local MarbleLook = {}
 
@@ -159,26 +160,6 @@ function MarbleLook.make(look: any, radius: number, physics: { density: number, 
 		ball.Transparency = transparency
 		ball.Reflectance = reflect
 		MarbleArt.build(ball, look, radius, seed)
-		if look.effect and look.effect ~= "none" then
-			-- A phenomenon's holder (MarbleLook.decorate): a small core for its light.
-			local core = Instance.new("Part")
-			core.Name = "Core"
-			core.Shape = Enum.PartType.Ball
-			core.Size = Vector3.one * radius * 0.5
-			core.Color = look.core
-			core.Material = Enum.Material.Neon
-			core.CanCollide = false
-			core.CanQuery = false
-			core.CanTouch = false
-			core.Massless = true
-			core.CastShadow = false
-			core.CFrame = ball.CFrame
-			core.Parent = ball
-			local weld = Instance.new("WeldConstraint")
-			weld.Part0 = ball
-			weld.Part1 = core
-			weld.Parent = core
-		end
 		if (look.glow or 0) > 0.3 then
 			local light = Instance.new("PointLight")
 			light.Color = look.accent
@@ -197,63 +178,11 @@ function MarbleLook.make(look: any, radius: number, physics: { density: number, 
 	return ball
 end
 
---- Phenomena, glitter and Shiny on a generated marble, from Roblox's built-in effects.
+--- The marble's effects (MarbleFX): what lives inside its glass, its aura and its moons. The
+--- ring's target marbles stay clean.
 function MarbleLook.decorate(ball: BasePart, look: any, radius: number)
-	local fx = look.effect
-	local c = look.effectColor
-	if fx and fx ~= "none" then
-		local holder = ball:FindFirstChild("Core") or ball
-		local light = Instance.new("PointLight")
-		light.Color = c
-		light.Range = radius * 7
-		light.Brightness = 2
-		light.Shadows = false
-		light.Parent = holder
-		-- A glow in the phenomenon's colour, drawn over everything.
-		local hl = Instance.new("Highlight")
-		hl.FillColor = c
-		hl.FillTransparency = 0.7
-		hl.OutlineColor = c
-		hl.OutlineTransparency = 0.15
-		hl.DepthMode = Enum.HighlightDepthMode.Occluded
-		hl.Parent = ball
-		if fx == "inferno" then
-			local f = Instance.new("Fire")
-			f.Color = c
-			f.SecondaryColor = look.core
-			f.Size = math.max(2, radius * 1.3)
-			f.Heat = 2
-			f.Parent = ball
-		elseif fx == "storm" then
-			local sm = Instance.new("Smoke")
-			sm.Color = c
-			sm.Opacity = 0.35
-			sm.Size = math.max(0.5, radius * 0.9)
-			sm.RiseVelocity = 0.5
-			sm.Parent = ball
-			local sp = Instance.new("Sparkles")
-			sp.SparkleColor = Color3.new(1, 1, 1)
-			sp.Parent = holder
-		elseif fx == "starfall" or fx == "aurora" then
-			local sp = Instance.new("Sparkles")
-			sp.SparkleColor = c
-			sp.Parent = holder
-		elseif fx == "void" then
-			if holder ~= ball then
-				(holder :: BasePart).Color = Color3.new(0, 0, 0)
-				;(holder :: BasePart).Material = Enum.Material.SmoothPlastic
-			end
-			light.Brightness = 3
-		elseif fx == "geode" and holder ~= ball then
-			(holder :: BasePart).Material = Enum.Material.Neon
-			;(holder :: BasePart).Color = c
-		end
-	end
-	-- Glitter is drawn as flecks in the glass (MarbleArt); only Shiny marbles sparkle outside.
-	if look.shiny then
-		local sp = Instance.new("Sparkles")
-		sp.SparkleColor = Color3.fromRGB(255, 240, 200)
-		sp.Parent = ball
+	if look and look.name ~= "Mib" then
+		MarbleFX.apply(ball, look, radius)
 	end
 end
 

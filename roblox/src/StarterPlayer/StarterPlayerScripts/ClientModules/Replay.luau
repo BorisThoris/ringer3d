@@ -17,6 +17,9 @@ local Replay = {}
 Replay.fast = false
 Replay.onImpact = function(_kind: string, _strength: number, _pos: Vector3) end
 Replay.onCross = function(_pos: Vector3) end
+Replay.onBreak = function(_pos: Vector3) end
+-- Every frame: the marbles' total speed (web units/s), for the rolling sound.
+Replay.onFrame = function(_speed: number) end
 Replay.playing = false
 
 local S = Config.MAP_SCALE
@@ -107,6 +110,11 @@ function Replay.play(state, data, done: () -> ())
 				end
 			end
 		end
+		local speed = 0
+		for _, b in ipairs(sim.bodies) do
+			speed += math.sqrt(b.vx * b.vx + b.vz * b.vz)
+		end
+		Replay.onFrame(if sim.done then 0 else speed)
 		for _, b in ipairs(sim.bodies) do
 			local part = partFor(b.id)
 			if part then
@@ -118,7 +126,15 @@ function Replay.play(state, data, done: () -> ())
 				local part = mapFolder:FindFirstChild("Prop" .. p.i) :: BasePart?
 				if part then
 					if p.broken then
+						if part.LocalTransparencyModifier < 1 then
+							Replay.onBreak(part.Position)
+						end
 						part.LocalTransparencyModifier = 1
+						for _, d in ipairs(part:GetDescendants()) do
+							if d:IsA("BasePart") then
+								d.LocalTransparencyModifier = 1
+							end
+						end
 					elseif p.loose then
 						part.CFrame = Playback.propCFrame(p.piece, p, origin, S)
 					end

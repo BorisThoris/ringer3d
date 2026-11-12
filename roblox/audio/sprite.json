@@ -1,0 +1,566 @@
+{
+ "file": "ringer-sfx.ogg",
+ "length": 178.315,
+ "sounds": {
+  "footstep_carpet_0": {
+   "start": 0.3,
+   "stop": 0.4669,
+   "loop": false
+  },
+  "footstep_carpet_1": {
+   "start": 0.7669,
+   "stop": 0.9088,
+   "loop": false
+  },
+  "footstep_carpet_2": {
+   "start": 1.2088,
+   "stop": 1.3507,
+   "loop": false
+  },
+  "footstep_carpet_3": {
+   "start": 1.6507,
+   "stop": 1.7925,
+   "loop": false
+  },
+  "footstep_carpet_4": {
+   "start": 2.0925,
+   "stop": 2.2344,
+   "loop": false
+  },
+  "footstep_concrete_0": {
+   "start": 2.5344,
+   "stop": 2.6374,
+   "loop": false
+  },
+  "footstep_concrete_1": {
+   "start": 2.9374,
+   "stop": 3.0422,
+   "loop": false
+  },
+  "footstep_concrete_2": {
+   "start": 3.3422,
+   "stop": 3.4521,
+   "loop": false
+  },
+  "footstep_concrete_3": {
+   "start": 3.7521,
+   "stop": 3.8597,
+   "loop": false
+  },
+  "footstep_concrete_4": {
+   "start": 4.1597,
+   "stop": 4.2711,
+   "loop": false
+  },
+  "footstep_grass_0": {
+   "start": 4.5711,
+   "stop": 5.3458,
+   "loop": false
+  },
+  "footstep_grass_1": {
+   "start": 5.6458,
+   "stop": 6.3165,
+   "loop": false
+  },
+  "footstep_grass_2": {
+   "start": 6.6165,
+   "stop": 7.306,
+   "loop": false
+  },
+  "footstep_grass_3": {
+   "start": 7.606,
+   "stop": 8.2724,
+   "loop": false
+  },
+  "footstep_grass_4": {
+   "start": 8.5724,
+   "stop": 9.1598,
+   "loop": false
+  },
+  "footstep_snow_0": {
+   "start": 9.4598,
+   "stop": 9.8311,
+   "loop": false
+  },
+  "footstep_snow_1": {
+   "start": 10.1311,
+   "stop": 10.5024,
+   "loop": false
+  },
+  "footstep_snow_2": {
+   "start": 10.8024,
+   "stop": 11.1737,
+   "loop": false
+  },
+  "footstep_snow_3": {
+   "start": 11.4737,
+   "stop": 11.845,
+   "loop": false
+  },
+  "footstep_snow_4": {
+   "start": 12.145,
+   "stop": 12.5163,
+   "loop": false
+  },
+  "footstep_wood_0": {
+   "start": 12.8163,
+   "stop": 13.0877,
+   "loop": false
+  },
+  "footstep_wood_1": {
+   "start": 13.3877,
+   "stop": 13.6364,
+   "loop": false
+  },
+  "footstep_wood_2": {
+   "start": 13.9364,
+   "stop": 14.1849,
+   "loop": false
+  },
+  "footstep_wood_3": {
+   "start": 14.4849,
+   "stop": 14.7335,
+   "loop": false
+  },
+  "footstep_wood_4": {
+   "start": 15.0335,
+   "stop": 15.2785,
+   "loop": false
+  },
+  "impactGeneric_light_0": {
+   "start": 15.5785,
+   "stop": 15.7396,
+   "loop": false
+  },
+  "impactGeneric_light_1": {
+   "start": 16.0396,
+   "stop": 16.1542,
+   "loop": false
+  },
+  "impactGeneric_light_2": {
+   "start": 16.4542,
+   "stop": 16.6153,
+   "loop": false
+  },
+  "impactGeneric_light_3": {
+   "start": 16.9153,
+   "stop": 17.0504,
+   "loop": false
+  },
+  "impactGeneric_light_4": {
+   "start": 17.3504,
+   "stop": 17.4878,
+   "loop": false
+  },
+  "impactGlass_heavy_0": {
+   "start": 17.7878,
+   "stop": 18.0261,
+   "loop": false
+  },
+  "impactGlass_heavy_1": {
+   "start": 18.3261,
+   "stop": 18.7551,
+   "loop": false
+  },
+  "impactGlass_heavy_2": {
+   "start": 19.0551,
+   "stop": 19.2994,
+   "loop": false
+  },
+  "impactGlass_heavy_3": {
+   "start": 19.5994,
+   "stop": 19.768,
+   "loop": false
+  },
+  "impactGlass_heavy_4": {
+   "start": 20.068,
+   "stop": 20.4643,
+   "loop": false
+  },
+  "impactGlass_light_0": {
+   "start": 20.7643,
+   "stop": 20.9951,
+   "loop": false
+  },
+  "impactGlass_light_1": {
+   "start": 21.2951,
+   "stop": 21.5017,
+   "loop": false
+  },
+  "impactGlass_light_2": {
+   "start": 21.8017,
+   "stop": 22.0084,
+   "loop": false
+  },
+  "impactGlass_light_3": {
+   "start": 22.3084,
+   "stop": 22.5151,
+   "loop": false
+  },
+  "impactGlass_light_4": {
+   "start": 22.8151,
+   "stop": 23.0218,
+   "loop": false
+  },
+  "impactGlass_medium_0": {
+   "start": 23.3218,
+   "stop": 23.8623,
+   "loop": false
+  },
+  "impactGlass_medium_1": {
+   "start": 24.1623,
+   "stop": 24.7027,
+   "loop": false
+  },
+  "impactGlass_medium_2": {
+   "start": 25.0027,
+   "stop": 25.5432,
+   "loop": false
+  },
+  "impactGlass_medium_3": {
+   "start": 25.8432,
+   "stop": 26.3836,
+   "loop": false
+  },
+  "impactGlass_medium_4": {
+   "start": 26.6836,
+   "stop": 27.2241,
+   "loop": false
+  },
+  "impactMining_0": {
+   "start": 27.5241,
+   "stop": 28.4615,
+   "loop": false
+  },
+  "impactMining_1": {
+   "start": 28.7615,
+   "stop": 29.6309,
+   "loop": false
+  },
+  "impactMining_2": {
+   "start": 29.9309,
+   "stop": 30.7356,
+   "loop": false
+  },
+  "impactMining_3": {
+   "start": 31.0356,
+   "stop": 32.0273,
+   "loop": false
+  },
+  "impactMining_4": {
+   "start": 32.3273,
+   "stop": 33.1576,
+   "loop": false
+  },
+  "impactPlate_light_0": {
+   "start": 33.4576,
+   "stop": 34.0,
+   "loop": false
+  },
+  "impactPlate_light_1": {
+   "start": 34.3,
+   "stop": 34.9547,
+   "loop": false
+  },
+  "impactPlate_light_2": {
+   "start": 35.2547,
+   "stop": 35.7435,
+   "loop": false
+  },
+  "impactPlate_light_3": {
+   "start": 36.0435,
+   "stop": 36.5711,
+   "loop": false
+  },
+  "impactPlate_light_4": {
+   "start": 36.8711,
+   "stop": 37.5277,
+   "loop": false
+  },
+  "impactPlate_medium_0": {
+   "start": 37.8277,
+   "stop": 38.437,
+   "loop": false
+  },
+  "impactPlate_medium_1": {
+   "start": 38.737,
+   "stop": 39.3532,
+   "loop": false
+  },
+  "impactPlate_medium_2": {
+   "start": 39.6532,
+   "stop": 40.1685,
+   "loop": false
+  },
+  "impactPlate_medium_3": {
+   "start": 40.4685,
+   "stop": 41.1221,
+   "loop": false
+  },
+  "impactPlate_medium_4": {
+   "start": 41.4221,
+   "stop": 41.9564,
+   "loop": false
+  },
+  "impactPunch_medium_0": {
+   "start": 42.2564,
+   "stop": 42.687,
+   "loop": false
+  },
+  "impactPunch_medium_1": {
+   "start": 42.987,
+   "stop": 43.3887,
+   "loop": false
+  },
+  "impactPunch_medium_2": {
+   "start": 43.6887,
+   "stop": 44.2301,
+   "loop": false
+  },
+  "impactPunch_medium_3": {
+   "start": 44.5301,
+   "stop": 44.9854,
+   "loop": false
+  },
+  "impactPunch_medium_4": {
+   "start": 45.2854,
+   "stop": 45.8283,
+   "loop": false
+  },
+  "impactSoft_heavy_0": {
+   "start": 46.1283,
+   "stop": 46.6551,
+   "loop": false
+  },
+  "impactSoft_heavy_1": {
+   "start": 46.9551,
+   "stop": 47.5242,
+   "loop": false
+  },
+  "impactSoft_heavy_2": {
+   "start": 47.8242,
+   "stop": 48.3936,
+   "loop": false
+  },
+  "impactSoft_heavy_3": {
+   "start": 48.6936,
+   "stop": 49.2349,
+   "loop": false
+  },
+  "impactSoft_heavy_4": {
+   "start": 49.5349,
+   "stop": 50.0329,
+   "loop": false
+  },
+  "impactSoft_medium_0": {
+   "start": 50.3329,
+   "stop": 50.448,
+   "loop": false
+  },
+  "impactSoft_medium_1": {
+   "start": 50.748,
+   "stop": 50.9284,
+   "loop": false
+  },
+  "impactSoft_medium_2": {
+   "start": 51.2284,
+   "stop": 51.3607,
+   "loop": false
+  },
+  "impactSoft_medium_3": {
+   "start": 51.6607,
+   "stop": 51.798,
+   "loop": false
+  },
+  "impactSoft_medium_4": {
+   "start": 52.098,
+   "stop": 52.2423,
+   "loop": false
+  },
+  "impactWood_light_0": {
+   "start": 52.5423,
+   "stop": 52.805,
+   "loop": false
+  },
+  "impactWood_light_1": {
+   "start": 53.105,
+   "stop": 53.3677,
+   "loop": false
+  },
+  "impactWood_light_2": {
+   "start": 53.6677,
+   "stop": 53.9304,
+   "loop": false
+  },
+  "impactWood_light_3": {
+   "start": 54.2304,
+   "stop": 54.4931,
+   "loop": false
+  },
+  "impactWood_light_4": {
+   "start": 54.7931,
+   "stop": 55.0558,
+   "loop": false
+  },
+  "impactWood_medium_0": {
+   "start": 55.3558,
+   "stop": 55.6856,
+   "loop": false
+  },
+  "impactWood_medium_1": {
+   "start": 55.9856,
+   "stop": 56.3153,
+   "loop": false
+  },
+  "impactWood_medium_2": {
+   "start": 56.6153,
+   "stop": 56.9451,
+   "loop": false
+  },
+  "impactWood_medium_3": {
+   "start": 57.2451,
+   "stop": 57.5749,
+   "loop": false
+  },
+  "impactWood_medium_4": {
+   "start": 57.8749,
+   "stop": 58.2046,
+   "loop": false
+  },
+  "chime_capture": {
+   "start": 58.5046,
+   "stop": 59.3146,
+   "loop": false
+  },
+  "chime_win": {
+   "start": 59.6146,
+   "stop": 60.7646,
+   "loop": false
+  },
+  "chime_lose": {
+   "start": 61.0646,
+   "stop": 61.8746,
+   "loop": false
+  },
+  "chime_turn": {
+   "start": 62.1746,
+   "stop": 62.9146,
+   "loop": false
+  },
+  "chime_tap": {
+   "start": 63.2146,
+   "stop": 63.8146,
+   "loop": false
+  },
+  "roll_wood": {
+   "start": 64.1146,
+   "stop": 66.3646,
+   "loop": true
+  },
+  "roll_concrete": {
+   "start": 66.6646,
+   "stop": 68.9146,
+   "loop": true
+  },
+  "roll_grass": {
+   "start": 69.2146,
+   "stop": 71.4646,
+   "loop": true
+  },
+  "roll_sand": {
+   "start": 71.7646,
+   "stop": 74.0146,
+   "loop": true
+  },
+  "roll_ice": {
+   "start": 74.3146,
+   "stop": 76.5646,
+   "loop": true
+  },
+  "roll_gravel": {
+   "start": 76.8646,
+   "stop": 79.1146,
+   "loop": true
+  },
+  "roll_turf": {
+   "start": 79.4146,
+   "stop": 81.6646,
+   "loop": true
+  },
+  "pad_bright": {
+   "start": 81.9646,
+   "stop": 97.9646,
+   "loop": true
+  },
+  "pad_calm": {
+   "start": 98.2646,
+   "stop": 114.2646,
+   "loop": true
+  },
+  "pad_night": {
+   "start": 114.5646,
+   "stop": 130.5646,
+   "loop": true
+  },
+  "pad_cold": {
+   "start": 130.8646,
+   "stop": 146.8646,
+   "loop": true
+  },
+  "pad_ominous": {
+   "start": 147.1646,
+   "stop": 163.1646,
+   "loop": true
+  },
+  "coin": {
+   "start": 163.4646,
+   "stop": 163.9546,
+   "loop": false
+  },
+  "buy": {
+   "start": 164.2546,
+   "stop": 165.0946,
+   "loop": false
+  },
+  "equip": {
+   "start": 165.3946,
+   "stop": 166.2946,
+   "loop": false
+  },
+  "whoosh": {
+   "start": 166.5946,
+   "stop": 167.0446,
+   "loop": false
+  },
+  "tick": {
+   "start": 167.3446,
+   "stop": 167.4046,
+   "loop": false
+  },
+  "charge": {
+   "start": 167.7046,
+   "stop": 169.5046,
+   "loop": true
+  },
+  "reveal_common": {
+   "start": 169.8046,
+   "stop": 171.1846,
+   "loop": false
+  },
+  "reveal_rare": {
+   "start": 171.4846,
+   "stop": 172.9246,
+   "loop": false
+  },
+  "reveal_epic": {
+   "start": 173.2246,
+   "stop": 174.7246,
+   "loop": false
+  },
+  "reveal_legendary": {
+   "start": 175.0246,
+   "stop": 178.0146,
+   "loop": false
+  }
+ }
+}
