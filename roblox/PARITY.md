@@ -146,17 +146,14 @@ where the server's sim did. `tests/think.luau` times the Tower's bots on their r
 | Bot aiming | the aim swings to the bot's shot, then charges | none | fixed |
 | Playback | every peer replays the same shot | Roblox physics replicated | fixed |
 
-## Not verified here
+## Real-client playtest
 
-A Studio playtest with a real client could not run on 2026-11-12: Studio must update to 0.747
-first, and its updater fails in the private window station. The cloud tests (`smoke`, `sim`,
-`client`, `botmatch`, `botstats`, `think`) cover the physics, rules, bot, Tower, the server's
-table and the client's Replay and Aim modules run on a server. Still unchecked on a real client:
+2026-11-12, Studio 0.747 in the private window station, `scripts/playtest/RingerE2ERig.lua`: a real
+client plays a whole match against a Rookie through the game's own Aim module (shot, power, spin)
+and HUD; 21/21 checks. Every shot is replayed on the client and the next turn comes 0.03-0.20 s
+after the replay ends (client at ~15 fps). Published as version 46 (v31 is the last Roblox-physics
+version, for rollback).
 
-- the HUD wiring in `Client.client.luau` (power bar, spin pad, Guide and Fast buttons, the
-  shot and prepare events): it compiles, but has only run on a server;
-- mouse and touch input (drag to aim, drag the taw, pinch) and the camera;
-- replays on a phone: a client's `math.sin`/`cos` may differ from the server's in the last bit,
-  which a break can grow; the server's result is final, so at worst a marble snaps a little at
-  rest. If that shows, send the result layout with the shot and ease to it.
-- `scripts/playtest/RingerE2ERig.lua` was updated for the new shot protocol but has not run.
+Not driven by the rig: real mouse drags, touch and pinch gestures, which go through the same Aim
+functions the rig calls. A client on a phone may differ from the server in the last bit of
+`math.sin`/`cos`; the server's result is final, so at worst a marble snaps a little at rest.
