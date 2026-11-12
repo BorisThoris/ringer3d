@@ -1,8 +1,10 @@
--- Build a marble: a ball for the physics, with a smaller glowing core inside the glassy ones
--- (a cat's eye), plus an optional trail. Used for the ring's marbles and for shop previews.
+-- Build a marble: a ball for the physics, a glass shell with the web game's interior inside it
+-- (MarbleArt: blades, ribbons, flecks, bubbles), plus an optional trail. Used for the ring's
+-- marbles and for shop previews.
 
 local Config = require(script.Parent.Config)
 local Forge = require(script.Parent.Forge)
+local MarbleArt = require(script.Parent.MarbleArt)
 
 local MarbleLook = {}
 
@@ -56,29 +58,77 @@ local function forgedLook(c: Forge.Collectible)
 		effectColor = Color3.fromHex(m.effectColor),
 		shiny = c.shiny,
 		collectible = c,
+		-- MarbleArt's fields (the web game's MarbleLook)
+		pattern = m.pattern,
+		base = Color3.fromHex(m.base),
+		accent = Color3.fromHex(m.accent),
+		clarity = m.clarity,
+		finish = m.finish,
+		shape = m.shape,
+		ui = Color3.fromHex(m.ui),
 	}
+end
+
+-- A named marble with its web-game drawing (Config.ART) folded in.
+local named = {}
+local function namedLook(m)
+	local l = named[m.id]
+	if not l then
+		l = table.clone(m)
+		local a = Config.ART[m.id]
+		if a then
+			for k, v in pairs(a) do
+				l[k] = v
+			end
+		end
+		named[m.id] = l
+	end
+	return l
+end
+
+--- A target marble ("mib") for ring slot `id`: the web's MIB_LOOKS[(id * 5) % 8].
+function MarbleLook.mib(id: number): any
+	local a = Config.MIB_LOOKS[(id * 5) % #Config.MIB_LOOKS + 1]
+	return {
+		id = a.id,
+		name = "Mib",
+		rarity = "Common",
+		shell = a.base,
+		core = a.accent,
+		material = Enum.Material.Glass,
+		transparency = 0.3,
+		glow = a.glow,
+		pattern = a.pattern,
+		base = a.base,
+		accent = a.accent,
+		accent2 = a.accent2,
+		clarity = a.clarity,
+		ui = a.ui,
+	}
+end
+
+--- The colour that stands for a marble in the aim guide and the interface (the web's uiColor).
+function MarbleLook.uiColor(look: any): Color3
+	return look and (look.ui or look.accent) or Color3.fromHex("#2f6bff")
 end
 
 --- The look for any marble id: a named marble from the catalogue, or a generated collectible.
 function MarbleLook.lookFor(id: string?): any
 	if id and Config.MARBLE[id] then
-		return Config.MARBLE[id]
+		return namedLook(Config.MARBLE[id])
 	end
 	local c = id and Forge.fromId(id)
 	if c then
 		return forgedLook(c)
 	end
-	return Config.MARBLE.ember
+	return namedLook(Config.MARBLE.ember)
 end
 
-function MarbleLook.make(look: any, radius: number, physics: { density: number, friction: number, elasticity: number }?): BasePart
+--- `seed` is the slot seed the web game builds the marble with (named marbles vary with it).
+function MarbleLook.make(look: any, radius: number, physics: { density: number, friction: number, elasticity: number }?, seed: number?): BasePart
 	local ball = Instance.new("Part")
 	ball.Shape = Enum.PartType.Ball
 	ball.Size = Vector3.new(radius * 2, radius * 2, radius * 2)
-	ball.Color = look.shell
-	ball.Material = look.material
-	ball.Transparency = look.transparency
-	ball.Reflectance = look.reflect or (look.material == Enum.Material.Glass and 0.15 or 0)
 	ball.TopSurface = Enum.SurfaceType.Smooth
 	ball.BottomSurface = Enum.SurfaceType.Smooth
 	ball.CastShadow = true
@@ -87,33 +137,61 @@ function MarbleLook.make(look: any, radius: number, physics: { density: number, 
 	end
 	ball:SetAttribute("MarbleId", look.id)
 
-	if look.transparency > 0 then
-		local core = Instance.new("Part")
-		core.Name = "Core"
-		core.Shape = Enum.PartType.Ball
-		local r = radius * (if look.collectible then 1.25 else 1.1)
-		core.Size = Vector3.new(r, r, r)
-		core.Color = look.core
-		core.Material = (look.glow > 0.5 or look.collectible) and Enum.Material.Neon or Enum.Material.SmoothPlastic
-		core.CanCollide = false
-		core.CanQuery = false
-		core.CanTouch = false
-		core.Massless = true
-		core.CastShadow = false
-		core.CFrame = ball.CFrame
-		core.Parent = ball
-		local weld = Instance.new("WeldConstraint")
-		weld.Part0 = ball
-		weld.Part1 = core
-		weld.Parent = core
-		if look.glow > 0.3 then
-			local light = Instance.new("PointLight")
-			light.Color = look.core
-			light.Range = radius * 6
-			light.Brightness = look.glow * 1.5
-			light.Shadows = false
-			light.Parent = core
+	local pattern = look.pattern
+	if pattern == "steelie" then
+		-- Polished metal: nothing but reflection.
+		ball.Color = look.base
+		ball.Material = Enum.Material.Metal
+		ball.Reflectance = 0.55
+		ball.Transparency = 0
+	elseif pattern == "solid" or (pattern and look.clarity < 0.05) then
+		-- Clay: matte, speckled.
+		ball.Color = look.base
+		ball.Material = Enum.Material.Concrete
+		ball.Reflectance = 0
+		ball.Transparency = 0
+	elseif pattern then
+		-- Glass round the web game's interior. Roblox draws nothing inside Glass, so the shell is
+		-- smooth, see-through and reflective.
+		local color, transparency, reflect = MarbleArt.glass(look)
+		ball.Color = color
+		ball.Material = Enum.Material.SmoothPlastic
+		ball.Transparency = transparency
+		ball.Reflectance = reflect
+		MarbleArt.build(ball, look, radius, seed)
+		if look.effect and look.effect ~= "none" then
+			-- A phenomenon's holder (MarbleLook.decorate): a small core for its light.
+			local core = Instance.new("Part")
+			core.Name = "Core"
+			core.Shape = Enum.PartType.Ball
+			core.Size = Vector3.one * radius * 0.5
+			core.Color = look.core
+			core.Material = Enum.Material.Neon
+			core.CanCollide = false
+			core.CanQuery = false
+			core.CanTouch = false
+			core.Massless = true
+			core.CastShadow = false
+			core.CFrame = ball.CFrame
+			core.Parent = ball
+			local weld = Instance.new("WeldConstraint")
+			weld.Part0 = ball
+			weld.Part1 = core
+			weld.Parent = core
 		end
+		if (look.glow or 0) > 0.3 then
+			local light = Instance.new("PointLight")
+			light.Color = look.accent
+			light.Range = radius * 6
+			light.Brightness = look.glow * 1.2
+			light.Shadows = false
+			light.Parent = ball
+		end
+	else
+		ball.Color = look.shell
+		ball.Material = look.material
+		ball.Transparency = look.transparency
+		ball.Reflectance = look.reflect or 0
 	end
 	MarbleLook.decorate(ball, look, radius)
 	return ball
@@ -171,9 +249,10 @@ function MarbleLook.decorate(ball: BasePart, look: any, radius: number)
 			;(holder :: BasePart).Color = c
 		end
 	end
-	if look.shiny or (look.sparkle or 0) >= 0.7 then
+	-- Glitter is drawn as flecks in the glass (MarbleArt); only Shiny marbles sparkle outside.
+	if look.shiny then
 		local sp = Instance.new("Sparkles")
-		sp.SparkleColor = if look.shiny then Color3.fromRGB(255, 240, 200) else look.core
+		sp.SparkleColor = Color3.fromRGB(255, 240, 200)
 		sp.Parent = ball
 	end
 end

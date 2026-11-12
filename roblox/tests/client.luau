@@ -101,6 +101,17 @@ local px, pz = Sim.placementPoint(Aim.aim.placeAngle)
 local wantLen = math.sqrt(px * px + pz * pz) - 3 * W.targetSpacing - (W.targetRadius + W.shooterRadius)
 check("guide runs to the first marble", lines[1] and math.abs(lines[1].Size.Z - wantLen * Config.MAP_SCALE) < 0.05, lines[1] and string.format("%.2f vs %.2f", lines[1].Size.Z, wantLen * Config.MAP_SCALE))
 check("guide shows the marble's way out", lines[2] and lines[2].Transparency < 1)
+-- The reticle is the web's ring (reticle.ts): a band 0.99..1.31 r, r = 1.5 taw radii, locked on
+-- the marble it meets (scale 0.9..1.15 as it eases in), not a filled disc.
+local rp, inner, outer = Aim.reticle()
+local R = W.shooterRadius * 1.5
+-- GUI offsets are whole pixels: within two pixels of the 512-pixel canvas (R * 4.4 across).
+local px = R * 4.4 / 512 * 2
+check("reticle band is the web's ring", rp ~= nil and math.abs(inner - R * 0.99) < px and math.abs(outer - R * 1.31) < px, inner and string.format("%.4f..%.4f vs %.4f..%.4f", inner, outer, R * 0.99, R * 1.31))
+local side = rp and rp.Size.X / Config.MAP_SCALE / (R * 2.2 * 2)
+check("reticle drawn at the web's scale", side ~= nil and side > 0.8 and side < 1.25 and rp.Transparency == 1 and rp:FindFirstChildOfClass("SurfaceGui") ~= nil, side)
+check("guide wears the shooter's colour", lines[1].Color == Color3.fromHex("#ff5a2a"), lines[1].Color)
+check("guide lines at the web's opacities", math.abs(lines[1].Transparency - 0.15) < 1e-6 and math.abs(lines[2].Transparency - 0.4) < 1e-6, lines[1].Transparency)
 Aim.rotateAim(0.1)
 Aim.setSpin(-0.5)
 Aim.setPower(0.02)

@@ -118,9 +118,7 @@ function Table.new(opts: {
 	self.marbleFolder = marbles
 	self.parts = {} :: { [number]: BasePart } -- by marble id; the taw is Sim.SHOOTER_ID
 	for _, t in ipairs(self.layout.targets) do
-		local colors = Config.MIB_COLORS[t.id % #Config.MIB_COLORS + 1]
-		local look = { id = "mib", name = "Mib", rarity = "Common", shell = colors[1], core = colors[2], material = Enum.Material.Glass, transparency = 0.3, glow = 0.2 }
-		local ball = MarbleLook.make(look :: any, Config.MIB_R)
+		local ball = MarbleLook.make(MarbleLook.mib(t.id), Config.MIB_R, nil, t.id * 1.37 + 0.5)
 		ball.Name = "Mib" .. t.id
 		ball.Anchored = true
 		ball.CanCollide = false
@@ -257,7 +255,7 @@ function Table:shooterPart(): BasePart
 		ball:Destroy()
 	end
 	local look = MarbleLook.lookFor(seat.marble)
-	ball = MarbleLook.make(look, Config.SHOOTER_R)
+	ball = MarbleLook.make(look, Config.SHOOTER_R, nil, self.current - 1 + 7)
 	ball.Name = "Shooter"
 	ball.Anchored = true
 	ball.CanCollide = false

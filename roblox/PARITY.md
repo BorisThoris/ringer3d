@@ -146,6 +146,23 @@ where the server's sim did. `tests/think.luau` times the Tower's bots on their r
 | Bot aiming | the aim swings to the bot's shot, then charges | none | fixed |
 | Playback | every peer replays the same shot | Roblox physics replicated | fixed |
 
+## Look: marbles and the aim guide (`packages/marble-forge/src/three/marble.ts`, `src/render/reticle.ts`)
+
+Not gameplay, but it is what a player sees of it. Added 2026-11-12 after a playtest ("aiming
+reticle is too fat, all marbles look generic flat").
+
+| Item | Web game | Roblox before | Now |
+| --- | --- | --- | --- |
+| Reticle | ink-outlined ring (band 0.99-1.31 r, r = 1.5 taw radii), four ticks, centre dot; spins free, tightens and pulses locked | a filled disc the size of a marble pair (locked), a dot (free) | fixed (SurfaceGui ring, `tests/client.luau`) |
+| Guide lines, charge ring | shooter's colour, opacity 0.85 / 0.6 / 0.35; charge ring 0.27-0.295, green to red | white/yellow/blue lines; a filled disc | fixed |
+| Marble interiors | real geometry in a glass shell: cat's-eye blades, spiral ribbons, onionskin, galaxy flecks round a deep core, neon ribbons, onyx cracks, opal heart, clearie wisp, glitter, bubbles, seed bubbles and stones | one coloured inner ball | fixed: `Ringer.MarbleArt` builds the same pieces from the same seeds (xorshift and flaws checked in `tests/marbles.luau`) |
+| Targets | `MIB_LOOKS[(id * 5) % 8]`, each its own pattern | eight colour pairs | fixed |
+| Glass | transmissive: refraction, magnification, dispersion, iridescence, milk and clouds, normal maps, caustics | Roblox Glass | **deviation**: Roblox draws nothing inside Glass and has none of these, so the shell is smooth see-through plastic with reflectance and the ribbons are drawn 1.8x wider to stand in for the magnification |
+| Phenomena | shader volumes | Roblox Fire/Smoke/Sparkles | unchanged (Roblox effects) |
+
+Side-by-side renders of the same eight collectibles (JS Forge vs Roblox Studio):
+`D:/agent-work/ringer3d/2026-11-12-marble-art/compare-collectibles-v3.jpg`.
+
 ## Real-client playtest
 
 2026-11-12, Studio 0.747 in the private window station, `scripts/playtest/RingerE2ERig.lua`: a real

@@ -54,8 +54,10 @@ local camera = Workspace.CurrentCamera or Instance.new("Camera")
 local viz: Folder? = nil
 local ghost: BasePart? = nil
 local lines: { Part } = {}
-local reticle: Part? = nil
-local chargeRing: Part? = nil
+local reticle: any = nil -- { part, band frames, ticks, spin, lock }
+local chargeRing: any = nil -- { part, stroke }
+local LINE_T = { 0.15, 0.4, 0.65 } -- the web's guide opacities 0.85 / 0.6 / 0.35
+local INK = Color3.fromHex("#1b1530")
 
 local function wrap(a: number): number
 	return (a + math.pi) % TAU - math.pi
@@ -184,6 +186,139 @@ function Aim.prepare(shot, duration: number)
 end
 
 -- ---- Drawing --------------------------------------------------------------------------------
+-- Flat rings, ticks and dots on the ground, drawn as a SurfaceGui on a clear part: the web game's
+-- RingGeometry and CircleGeometry pieces. Sizes are in web units; `k` turns them into canvas pixels.
+local CANVAS = 512
+local function canvasPart(parent: Instance, name: string): (Part, SurfaceGui)
+	local p = Instance.new("Part")
+	p.Name = name
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p.Transparency = 1
+	p.Size = Vector3.new(1, 0.02, 1)
+	p.Parent = parent
+	local g = Instance.new("SurfaceGui")
+	g.Face = Enum.NormalId.Top
+	g.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
+	g.CanvasSize = Vector2.new(CANVAS, CANVAS)
+	g.LightInfluence = 0
+	g.Brightness = 1.4
+	g.ClipsDescendants = false
+	g.Parent = p
+	return p, g
+end
+local function ringFrame(parent: Instance, k: number, inner: number, outer: number, color: Color3, transparency: number, z: number): UIStroke
+	local f = Instance.new("Frame")
+	f.AnchorPoint = Vector2.new(0.5, 0.5)
+	f.Position = UDim2.fromScale(0.5, 0.5)
+	f.Size = UDim2.fromOffset(inner * 2 * k, inner * 2 * k)
+	f.BackgroundTransparency = 1
+	f.ZIndex = z
+	f.Parent = parent
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0.5, 0)
+	c.Parent = f
+	local st = Instance.new("UIStroke")
+	st.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	st.Thickness = (outer - inner) * k
+	st.Color = color
+	st.Transparency = transparency
+	st.Parent = f
+	return st
+end
+local function dotFrame(parent: Instance, k: number, r: number, color: Color3, transparency: number, z: number): Frame
+	local f = Instance.new("Frame")
+	f.AnchorPoint = Vector2.new(0.5, 0.5)
+	f.Position = UDim2.fromScale(0.5, 0.5)
+	f.Size = UDim2.fromOffset(r * 2 * k, r * 2 * k)
+	f.BackgroundColor3 = color
+	f.BackgroundTransparency = transparency
+	f.BorderSizePixel = 0
+	f.ZIndex = z
+	f.Parent = parent
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0.5, 0)
+	c.Parent = f
+	return f
+end
+
+-- src/render/reticle.ts: an ink-outlined band in the shooter's colour, four outlined ticks on the
+-- diagonals and a centre dot. Free, it floats and turns slowly; locked onto a marble it tightens
+-- round the contact point and pulses.
+local RET_R = W.shooterRadius * 1.5
+local RET_HALF = RET_R * 2.2 -- the canvas reaches past the ticks
+local function makeReticle(parent: Instance)
+	local part, gui = canvasPart(parent, "Reticle")
+	local k = CANVAS / (RET_HALF * 2)
+	local r = RET_R
+	local tint = {}
+	ringFrame(gui, k, r * 0.9, r * 1.4, INK, 0.1, 1)
+	table.insert(tint, ringFrame(gui, k, r * 0.99, r * 1.31, Color3.new(1, 1, 1), 0, 2))
+	local ticks = {}
+	for i = 0, 3 do
+		local th = i * math.pi / 2 + math.pi / 4
+		for j, spec in ipairs({ { r * 0.7, r * 0.36, INK, 0.1, 3 }, { r * 0.56, r * 0.2, Color3.new(1, 1, 1), 0, 4 } }) do
+			local f = Instance.new("Frame")
+			f.AnchorPoint = Vector2.new(0.5, 0.5)
+			f.Rotation = math.deg(th)
+			f.BackgroundColor3 = spec[3]
+			f.BackgroundTransparency = spec[4]
+			f.BorderSizePixel = 0
+			f.ZIndex = spec[5]
+			f.Parent = gui
+			if j == 2 then
+				table.insert(tint, f)
+			end
+			table.insert(ticks, { f = f, th = th, w = spec[1], h = spec[2] })
+		end
+	end
+	dotFrame(gui, k, r * 0.2, INK, 0.15, 5)
+	table.insert(tint, dotFrame(gui, k, r * 0.12, Color3.new(1, 1, 1), 0, 6))
+	return { part = part, k = k, tint = tint, ticks = ticks, spin = 0, lock = 0, color = nil }
+end
+
+local function placeReticle(rt, x: number, z: number, locked: boolean, color: Color3, dt: number)
+	if rt.color ~= color then
+		rt.color = color
+		for _, t in ipairs(rt.tint) do
+			if t:IsA("UIStroke") then
+				t.Color = color
+			else
+				t.BackgroundColor3 = color
+			end
+		end
+	end
+	rt.lock += ((if locked then 1 else 0) - rt.lock) * math.min(1, dt * 14)
+	if not locked then
+		rt.spin += dt * 0.9
+	end
+	local pulse = 1 + math.sin(os.clock() * 7) * 0.06 * rt.lock
+	local sc = (1.15 - rt.lock * 0.25) * pulse
+	-- Ticks pull in toward the contact point when locked.
+	local tk = 1 - rt.lock * 0.18
+	local k, c = rt.k, CANVAS / 2
+	for _, t in ipairs(rt.ticks) do
+		local d = RET_R * 1.72 * tk * k
+		t.f.Position = UDim2.fromOffset(c + math.cos(t.th) * d, c + math.sin(t.th) * d)
+		t.f.Size = UDim2.fromOffset(t.w * tk * k, t.h * tk * k)
+	end
+	local side = RET_HALF * 2 * S * sc
+	rt.part.Size = Vector3.new(side, 0.02, side)
+	rt.part.CFrame = CFrame.new(world(x, 0.02, z)) * CFrame.Angles(0, rt.spin, 0)
+end
+
+-- The charge ring round the taw (GameView's RingGeometry 0.27..0.295): grows and reddens with power.
+local CHARGE_HALF = 0.3
+local function makeChargeRing(parent: Instance)
+	local part, gui = canvasPart(parent, "ChargeRing")
+	local k = CANVAS / (CHARGE_HALF * 2)
+	local st = ringFrame(gui, k, 0.27, 0.295, Color3.new(1, 1, 1), 1, 1)
+	return { part = part, stroke = st }
+end
+
 local function ensureViz()
 	if viz then
 		return
@@ -205,11 +340,9 @@ local function ensureViz()
 		p.Parent = viz
 		return p
 	end
-	lines = { flat(Color3.new(1, 1, 1), 0.1), flat(Color3.fromRGB(255, 220, 90), 0.15), flat(Color3.fromRGB(160, 210, 255), 0.3) }
-	reticle = flat(Color3.new(1, 1, 1), 0.2)
-	reticle.Shape = Enum.PartType.Cylinder
-	chargeRing = flat(Color3.fromRGB(80, 230, 120), 1)
-	chargeRing.Shape = Enum.PartType.Cylinder
+	lines = { flat(Color3.new(1, 1, 1), 1), flat(Color3.new(1, 1, 1), 1), flat(Color3.new(1, 1, 1), 1) }
+	reticle = makeReticle(viz)
+	chargeRing = makeChargeRing(viz)
 end
 
 local function clearViz()
@@ -231,16 +364,32 @@ local function setLine(p: Part, x: number, z: number, ang: number, len: number, 
 		p.Transparency = 1
 		return
 	end
-	p.Transparency = 0.1
+	p.Transparency = LINE_T[table.find(lines, p) or 1]
 	local a = world(x, 0.012, z)
 	local b = world(x + math.cos(ang) * len, 0.012, z + math.sin(ang) * len)
 	p.Size = Vector3.new(width * S, 0.05, len * S)
 	p.CFrame = CFrame.lookAt((a + b) / 2, b)
 end
 
+local lastDraw = os.clock()
+local uiColors: { [string]: Color3 } = {}
 local function drawAim(showGuide: boolean)
 	ensureViz()
 	local s = Aim.state
+	local now = os.clock()
+	local dt = math.min(0.1, now - lastDraw)
+	lastDraw = now
+	-- The aim line, reticle and ring wear the colour of whoever is shooting.
+	local shooterSeat = s.seats[s.current]
+	local mid = shooterSeat and shooterSeat.marble or "ember"
+	local color = uiColors[mid]
+	if not color then
+		color = MarbleLook.uiColor(MarbleLook.lookFor(mid))
+		uiColors[mid] = color
+	end
+	for _, l in ipairs(lines) do
+		l.Color = color
+	end
 	local ox, oz = originXZ()
 	-- The taw, sitting on the line, before a first shot.
 	if s.firstShot then
@@ -279,11 +428,10 @@ local function drawAim(showGuide: boolean)
 	local show = maxLen > 0
 	local len1 = math.min(best, if hx then best else maxLen)
 	setLine(lines[1], ox, oz, aim.aimAngle, if show then math.min(len1, maxLen) else 0, 0.035)
-	local rt = reticle :: Part
 	if hx and best <= maxLen and show then
 		local gx, gz = ox + dx * best, oz + dz * best
-		rt.Size = Vector3.new(0.04, rr * 2 * S, rr * 2 * S)
-		rt.CFrame = CFrame.new(world(gx, 0.02, gz)) * CFrame.Angles(0, 0, math.pi / 2)
+		-- The reticle takes the contact point.
+		placeReticle(reticle, gx, gz, true, color, dt)
 		-- Where the marble goes: from the ghost ball through its centre.
 		local nAng = math.atan2(hz - gz, hx - gx)
 		setLine(lines[2], hx, hz, nAng, math.min(1.6, maxLen * 0.4), 0.03)
@@ -297,19 +445,21 @@ local function drawAim(showGuide: boolean)
 		lines[2].Transparency = 1
 		lines[3].Transparency = 1
 		local reach = if show then math.min(len1, maxLen) else FREE_RETICLE
-		rt.Size = Vector3.new(0.04, 0.18 * S, 0.18 * S)
-		rt.CFrame = CFrame.new(world(ox + dx * reach, 0.02, oz + dz * reach)) * CFrame.Angles(0, 0, math.pi / 2)
+		placeReticle(reticle, ox + dx * reach, oz + dz * reach, false, color, dt)
 	end
 	-- The charge ring round the taw: grows and reddens with power.
-	local cr = chargeRing :: Part
+	local cr = chargeRing
 	if aim.power > 0 then
-		local d = (1 + aim.power * 0.9) * W.shooterRadius * 2.4 * S
-		cr.Transparency = 1 - (0.35 + aim.power * 0.5)
-		cr.Size = Vector3.new(0.03, d, d)
-		cr.Color = Color3.fromHSV(0.33 - aim.power * 0.33, 0.9, 0.95)
-		cr.CFrame = CFrame.new(world(ox, 0.01, oz)) * CFrame.Angles(0, 0, math.pi / 2)
+		local side = (1 + aim.power * 0.9) * CHARGE_HALF * 2 * S
+		cr.stroke.Transparency = 1 - (0.35 + aim.power * 0.5)
+		-- setHSL(0.33 - p * 0.33, 0.9, 0.6)
+		local h, sl, l = 0.33 - aim.power * 0.33, 0.9, 0.6
+		local v = l + sl * math.min(l, 1 - l)
+		cr.stroke.Color = Color3.fromHSV(h, 2 * (1 - l / v), v)
+		cr.part.Size = Vector3.new(side, 0.02, side)
+		cr.part.CFrame = CFrame.new(world(ox, 0.014, oz))
 	else
-		cr.Transparency = 1
+		cr.stroke.Transparency = 1
 	end
 end
 
@@ -425,6 +575,16 @@ end
 --- The guide's drawn lines (for tests): the aim line, the marble's way out, the taw's glance.
 function Aim.guideParts(): { Part }
 	return lines
+end
+--- The reticle (for tests): its part, and the radius of its colour band in web units.
+function Aim.reticle(): (Part?, number?, number?)
+	if not reticle then
+		return nil
+	end
+	local band = reticle.tint[1] :: UIStroke
+	local f = band.Parent :: Frame
+	local inner = f.Size.X.Offset / 2 / reticle.k
+	return reticle.part, inner, inner + band.Thickness / reticle.k
 end
 
 function Aim.start()

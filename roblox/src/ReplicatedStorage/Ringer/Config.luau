@@ -230,16 +230,47 @@ for _, mm in ipairs(Config.MARBLES) do
 	Config.MARBLE[mm.id] = mm
 end
 
--- The colours of the thirteen marbles in the ring.
-Config.MIB_COLORS = {
-	{ rgb(31, 111, 224), rgb(255, 225, 77) },
-	{ rgb(232, 64, 26), rgb(255, 255, 255) },
-	{ rgb(6, 88, 46), rgb(194, 255, 122) },
-	{ rgb(123, 63, 240), rgb(255, 210, 63) },
-	{ rgb(240, 180, 0), rgb(196, 31, 47) },
-	{ rgb(0, 159, 179), rgb(255, 61, 127) },
-	{ rgb(224, 33, 95), rgb(255, 225, 77) },
-	{ rgb(240, 106, 0), rgb(31, 95, 191) },
+-- How each named marble is drawn (src/game/marbles.ts MARBLES): its interior pattern, glass and
+-- colours, for MarbleArt. The web game's nine come straight from it; the Roblox-only marbles
+-- (Golden Taw, Prism, the Limiteds) get the pattern that suits them.
+local function art(pattern, base, accent, accent2, clarity, glow, ui)
+	return { pattern = pattern, base = Color3.fromHex(base), accent = Color3.fromHex(accent), accent2 = Color3.fromHex(accent2), clarity = clarity, glow = glow, ui = Color3.fromHex(ui) }
+end
+Config.ART = {
+	ember = art("catseye", "#ffe3cf", "#ff4d1f", "#ffb000", 0.9, 0.25, "#ff5a2a"),
+	tide = art("swirl", "#cfefff", "#1a7cff", "#e9fbff", 0.85, 0.1, "#1a7cff"),
+	pip = art("solid", "#c98a4b", "#7a4a22", "#e8b27a", 0, 0, "#f08a2c"),
+	jade = art("swirl", "#b8f5d2", "#0f9d58", "#e0ffe9", 0.7, 0.05, "#14c06c"),
+	volt = art("neon", "#1b1530", "#00f0ff", "#ff2bd6", 0.55, 1, "#00d8ff"),
+	rime = art("opal", "#f2f8ff", "#9fd8ff", "#f7c6ff", 0.6, 0.15, "#7cc4ff"),
+	ironside = art("steelie", "#c9ced6", "#8a929e", "#ffffff", 0, 0, "#8c9bb4"),
+	nova = art("galaxy", "#120a2e", "#8b5cff", "#ffd36b", 0.4, 0.8, "#8b5cff"),
+	obsidian = art("onyx", "#0b0b0f", "#ff3d00", "#ffae00", 0.15, 1, "#ff3d00"),
+	gold = art("steelie", "#ffc83c", "#fff0a0", "#ffffff", 0, 0.4, "#ffc83c"),
+	prism = art("opal", "#f0f0ff", "#ff5adc", "#7af0ff", 0.75, 0.9, "#ff5adc"),
+	aurora = art("neon", "#14283c", "#50ffaa", "#7a6bff", 0.55, 1, "#50ffaa"),
+	comet = art("clearie", "#fafaff", "#5aa0ff", "#ffffff", 0.9, 0.9, "#5aa0ff"),
+	ruby = art("swirl", "#96001e", "#ff3c5a", "#ffd0d8", 0.45, 0.7, "#ff3c5a"),
+	moss = art("onionskin", "#506e46", "#c8e696", "#f0f5dc", 0.5, 0.1, "#8cc864"),
+	sunset = art("onionskin", "#ff9646", "#ff3c78", "#ffe08a", 0.6, 0.6, "#ff7a50"),
+}
+
+-- The 13 targets (src/game/marbles.ts MIB_LOOKS): target id t wears MIB_LOOKS[(t * 5) % 8].
+local function mib(id, pattern, base, accent, accent2, clarity, glow)
+	local a = art(pattern, base, accent, accent2, clarity, glow, accent)
+	a.id = id
+	a.name = "Mib"
+	return a
+end
+Config.MIB_LOOKS = {
+	mib("mib-a", "catseye", "#1f6fe0", "#ffe14d", "#ffffff", 0.34, 0.25),
+	mib("mib-b", "catseye", "#e8401a", "#ffffff", "#ffd23f", 0.32, 0.25),
+	mib("mib-c", "catseye", "#06582e", "#ffffff", "#c2ff7a", 0.3, 0.2),
+	mib("mib-d", "swirl", "#7b3ff0", "#ffd23f", "#ff7ad9", 0.34, 0.25),
+	mib("mib-e", "swirl", "#f0b400", "#c41f2f", "#ffffff", 0.3, 0.25),
+	mib("mib-f", "catseye", "#009fb3", "#ff3d7f", "#ffffff", 0.34, 0.25),
+	mib("mib-g", "swirl", "#e0215f", "#ffffff", "#ffe14d", 0.34, 0.25),
+	mib("mib-h", "onionskin", "#f06a00", "#1f5fbf", "#ffffff", 0.3, 0.2),
 }
 
 Config.RARITY_COLOR = {
