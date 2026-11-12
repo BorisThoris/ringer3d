@@ -97,13 +97,19 @@ local Replay = require(me.PlayerScripts.ClientModules:WaitForChild("Replay"))
 local Playback = require(Ringer:WaitForChild("Playback"))
 local state, result, captures = nil, nil, 0
 local shotAt, waits, prepares = nil, {}, 0
+local frames = 0
+game:GetService("RunService").RenderStepped:Connect(function()
+	frames += 1
+end)
 local replays = 0
 Remotes:WaitForChild("TableEvent").OnClientEvent:Connect(function(kind, data)
 	if kind == "state" then
 		state = data
 		if shotAt then
 			-- Time from the shot to the next turn, against how long the replay takes.
-			table.insert(waits, os.clock() - shotAt.t - Playback.duration(shotAt.steps, shotAt.crossStep, false))
+			local w = os.clock() - shotAt.t - Playback.duration(shotAt.steps, shotAt.crossStep, false)
+			table.insert(waits, w)
+			print("[e2e] shot", shotAt.n, "steps", shotAt.steps, "over by", string.format("%.2f", w), "replayDone", shotAt.doneAt and string.format("%.2f", shotAt.doneAt - shotAt.t) or "no", "fps", string.format("%.0f", frames / math.max(0.01, os.clock() - shotAt.t)))
 			shotAt = nil
 		end
 	elseif kind == "result" then
@@ -111,7 +117,17 @@ Remotes:WaitForChild("TableEvent").OnClientEvent:Connect(function(kind, data)
 	elseif kind == "capture" then
 		captures += 1
 	elseif kind == "shot" then
-		shotAt = { t = os.clock(), steps = data.steps, crossStep = data.crossStep }
+		shotAt = { t = os.clock(), steps = data.steps, crossStep = data.crossStep, n = data.n }
+		frames = 0
+		local mine = shotAt
+		task.spawn(function()
+			while mine == shotAt and not mine.doneAt do
+				if not Replay.playing and os.clock() - mine.t > 0.2 then
+					mine.doneAt = os.clock()
+				end
+				task.wait()
+			end
+		end)
 		task.defer(function()
 			if Replay.playing then
 				replays += 1
@@ -135,7 +151,7 @@ while not result and os.clock() < deadline do
 				mySeat = i
 			end
 		end
-		local key = tostring(s.id) .. ":" .. tostring(s.turnEnds)
+		local key = tostring(s.id) .. ":" .. tostring(s.shots) .. ":" .. tostring(s.current)
 		if mySeat and s.current == mySeat and key ~= lastAim then
 			lastAim = key
 			-- From the knuckle-down spot (or where the shooter stopped) at the nearest marble.
