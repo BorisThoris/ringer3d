@@ -185,6 +185,20 @@ check("the flick on ice plays snow", log:find("footstep_snow") ~= nil)
 check("a Mythic plays the legendary sting", log:find("reveal_legendary") ~= nil)
 Sfx.log = nil
 
+-- The uploaded sprite loads, at its full length.
+local Ids = require(Ringer.Ids)
+if Ids.audio and (Ids.audio.sfx or 0) ~= 0 then
+	local snd = Instance.new("Sound")
+	snd.SoundId = "rbxassetid://" .. Ids.audio.sfx
+	snd.Parent = workspace
+	local t0 = os.clock()
+	while not snd.IsLoaded and os.clock() - t0 < 30 do
+		task.wait(0.5)
+	end
+	check("the sound sprite loads from Roblox", snd.IsLoaded and snd.TimeLength > 170, string.format("loaded %s, %.1f s", tostring(snd.IsLoaded), snd.TimeLength))
+	snd:Destroy()
+end
+
 -- 4. Ambience changes the light for a field and gives it back.
 local Lighting = game:GetService("Lighting")
 local before = Lighting.ClockTime
