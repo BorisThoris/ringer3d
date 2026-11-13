@@ -362,6 +362,19 @@ Config.COINS = {
 	pvpWinBonus = 30,
 	daily = { 50, 60, 75, 90, 110, 130, 200 }, -- streak days 1..7, then 200 a day
 }
+-- Coins lying about the lobby lawn: run through one and it's yours; it comes back a while later.
+-- Each player sees and takes their own. A trickle, never a farm: at most `hourCap` coins an hour.
+Config.LOBBY_COIN = { value = 1, respawn = 40, hourCap = 120, reach = 12 }
+Config.LOBBY_COIN_SPOTS = (function()
+	local spots = {}
+	local r = Random.new(2611)
+	for i = 0, 29 do
+		local a = i / 30 * math.pi * 2 + r:NextNumber(-0.08, 0.08)
+		local d = if i % 3 == 0 then 30 + r:NextNumber(0, 8) elseif i % 3 == 1 then 62 + r:NextNumber(0, 8) else 84 + r:NextNumber(0, 14)
+		table.insert(spots, Vector3.new(math.cos(a) * d, 2.4, math.sin(a) * d))
+	end
+	return spots
+end)()
 Config.VIP_MULTIPLIER = 2
 Config.PREMIUM_MULTIPLIER = 1.25
 

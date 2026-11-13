@@ -53,6 +53,11 @@ local function ask(action: string, args: any?)
 	return a, b
 end
 
+-- The lobby's toys: coins on the lawn, bouncy mushrooms, drifting clouds, bobbing balloons.
+task.spawn(require(Modules.LobbyFun).start, ask, Sfx, function()
+	return player.Character
+end)
+
 -- =============================================================================================
 -- Lobby HUD
 -- =============================================================================================
@@ -860,6 +865,9 @@ Replay.onCross = function(pos)
 	Sfx.chime("capture")
 	capturesThisShot += 1
 	Juice.capture(pos, MarbleLook.uiColor(shooterLook()), capturesThisShot)
+	-- Each marble won is coins in the bank (paid at the end of the game): show them now.
+	Juice.coins(pos, Config.COINS.capture)
+	task.delay(0.15, Sfx.play, "coin_fly", 0.6, 1 + math.min(capturesThisShot, 6) * 0.06)
 end
 Replay.onBreak = function(_pos)
 	Sfx.clack(900, "kerb")
@@ -1198,6 +1206,7 @@ Remotes:WaitForChild("TableEvent").OnClientEvent:Connect(function(kind, data, id
 		if data.shot and data.shot.power then
 			Sfx.launch(data.shot.power)
 			Juice.launch(data.shot.power)
+			Juice.speedLines(data.shot.power)
 		end
 		hint.Text = ""
 		if state and state.id == id then

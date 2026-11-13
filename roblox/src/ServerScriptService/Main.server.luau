@@ -246,11 +246,13 @@ for i = 0, 11 do
 	ball.Parent = lobby
 end
 
+require(Server.LobbyWorld).build(lobby)
+
 local spawn = Instance.new("SpawnLocation")
 spawn.Anchored = true
 spawn.Size = Vector3.new(10, 1, 10)
 spawn.CFrame = CFrame.new(0, 0.5, 38)
-spawn.Material = Enum.Material.Neon
+spawn.Material = Enum.Material.SmoothPlastic
 spawn.Color = rgb(255, 205, 50)
 spawn.Duration = 0
 spawn.Parent = lobby
@@ -627,6 +629,44 @@ function handlers.emote(player: Player, e)
 	end
 	return true
 end
+
+-- A coin picked up off the lobby lawn: the player has to be standing at it, each coin comes back
+-- only after its respawn time, and no more than the hourly cap.
+local coinTaken: { [Player]: { [number]: number } } = {}
+local coinHour: { [Player]: { start: number, n: number } } = {}
+function handlers.pickup(player: Player, i)
+	local rule = Config.LOBBY_COIN
+	local spot = typeof(i) == "number" and Config.LOBBY_COIN_SPOTS[i]
+	if not spot or active[player] then
+		return false
+	end
+	local char = player.Character
+	local root = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not root or (root.Position - spot).Magnitude > rule.reach then
+		return false
+	end
+	local taken = coinTaken[player] or {}
+	coinTaken[player] = taken
+	local now = os.clock()
+	if now - (taken[i] or -math.huge) < rule.respawn - 2 then
+		return false
+	end
+	local hour = coinHour[player]
+	if not hour or now - hour.start > 3600 then
+		hour = { start = now, n = 0 }
+		coinHour[player] = hour
+	end
+	if hour.n >= rule.hourCap then
+		return false
+	end
+	taken[i] = now
+	hour.n += 1
+	return true, Economy.give(player, rule.value, "lobby coin")
+end
+Players.PlayerRemoving:Connect(function(p)
+	coinTaken[p] = nil
+	coinHour[p] = nil
+end)
 
 function handlers.equip(player: Player, id)
 	if not (typeof(id) == "string" and Collectibles.holds(player, id)) then

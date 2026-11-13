@@ -323,4 +323,107 @@ function Juice.clear()
 	Juice.fovKick = 0
 end
 
+-- ---- Coins and speed ---------------------------------------------------------------------------
+
+local RunService = game:GetService("RunService")
+local GOLD = Color3.fromRGB(255, 200, 40)
+
+--- A fountain of spinning gold coins where a marble was won, worth `amount` ("+4 🪙").
+function Juice.coins(pos: Vector3, amount: number)
+	local coins = {}
+	for i = 1, math.clamp(amount + 2, 4, 9) do
+		local c = Instance.new("Part")
+		c.Name = "Coin"
+		c.Shape = Enum.PartType.Cylinder
+		c.Size = Vector3.new(0.3, 1.5, 1.5)
+		c.Anchored, c.CanCollide, c.CanQuery, c.CanTouch, c.CastShadow = true, false, false, false, false
+		c.Material = Enum.Material.Metal
+		c.Reflectance = 0.3
+		c.Color = if i % 3 == 0 then Color3.fromRGB(255, 230, 110) else GOLD
+		c.CFrame = CFrame.new(pos)
+		c.Parent = holder()
+		local a = rng:NextNumber() * math.pi * 2
+		local out = rng:NextNumber(4, 9)
+		table.insert(coins, { part = c, v = Vector3.new(math.cos(a) * out, rng:NextNumber(20, 28), math.sin(a) * out), spin = rng:NextNumber(10, 18), at = pos })
+	end
+	local t = 0
+	local conn
+	conn = RunService.Heartbeat:Connect(function(dt)
+		t += dt
+		for _, c in ipairs(coins) do
+			c.v += Vector3.new(0, -60 * dt, 0)
+			c.at += c.v * dt
+			if c.at.Y < pos.Y then
+				-- A bounce on the ground, losing most of it.
+				c.at = Vector3.new(c.at.X, pos.Y, c.at.Z)
+				c.v = Vector3.new(c.v.X * 0.5, -c.v.Y * 0.35, c.v.Z * 0.5)
+			end
+			c.part.CFrame = CFrame.new(c.at) * CFrame.Angles(t * c.spin, t * c.spin * 0.6, 0)
+			if t > 0.9 then
+				c.part.Transparency = math.min(1, (t - 0.9) / 0.4)
+			end
+		end
+		if t > 1.3 then
+			conn:Disconnect()
+			for _, c in ipairs(coins) do
+				c.part:Destroy()
+			end
+		end
+	end)
+	-- "+4 🪙" in gold, under the capture call.
+	local a = anchor(pos + Vector3.new(0, 1, 0), 1.8)
+	local bb = Instance.new("BillboardGui")
+	bb.Size = UDim2.fromOffset(150, 50)
+	bb.AlwaysOnTop = true
+	bb.LightInfluence = 0
+	bb.StudsOffsetWorldSpace = Vector3.new(0, 1, 0)
+	bb.Parent = a
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Size = UDim2.fromScale(1, 1)
+	label.Font = Enum.Font.FredokaOne
+	label.Text = "+" .. amount .. " 🪙"
+	label.TextScaled = true
+	label.TextColor3 = Color3.fromRGB(255, 225, 90)
+	label.TextStrokeTransparency = 0
+	label.TextStrokeColor3 = Color3.fromRGB(30, 22, 40)
+	label.Parent = bb
+	TweenService:Create(bb, TweenInfo.new(1.4, Enum.EasingStyle.Quad), { StudsOffsetWorldSpace = Vector3.new(0, 6, 0) }):Play()
+	task.delay(1, function()
+		TweenService:Create(label, TweenInfo.new(0.4), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+	end)
+end
+
+--- Anime speed lines rushing in from the screen's edges on a hard flick.
+function Juice.speedLines(power: number)
+	local g = Juice.gui
+	if not g or power < 0.55 then
+		return
+	end
+	local frame = Instance.new("Frame")
+	frame.Name = "SpeedLines"
+	frame.BackgroundTransparency = 1
+	frame.Size = UDim2.fromScale(1, 1)
+	frame.ZIndex = 79
+	frame.Active = false
+	frame.Parent = g
+	local n = math.floor(14 + power * 16)
+	for i = 1, n do
+		local a = i / n * math.pi * 2 + rng:NextNumber(-0.1, 0.1)
+		local line = Instance.new("Frame")
+		line.AnchorPoint = Vector2.new(0, 0.5)
+		line.BackgroundColor3 = Color3.new(1, 1, 1)
+		line.BackgroundTransparency = 0.25
+		line.BorderSizePixel = 0
+		-- From just outside the screen's middle third out past its edge.
+		local len = rng:NextNumber(0.25, 0.45)
+		line.Size = UDim2.new(len, 0, 0, rng:NextInteger(2, 5))
+		line.Position = UDim2.fromScale(0.5 + math.cos(a) * 0.32, 0.5 + math.sin(a) * 0.32)
+		line.Rotation = math.deg(a)
+		line.Parent = frame
+		TweenService:Create(line, TweenInfo.new(0.35, Enum.EasingStyle.Quad), { BackgroundTransparency = 1, Position = UDim2.fromScale(0.5 + math.cos(a) * 0.5, 0.5 + math.sin(a) * 0.5) }):Play()
+	end
+	Debris:AddItem(frame, 0.4)
+end
+
 return Juice

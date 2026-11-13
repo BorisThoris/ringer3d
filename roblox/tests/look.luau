@@ -22,6 +22,7 @@ local Ambience = require(client.Ambience)
 -- 1. Fields: each in its own material, with its bank, ring line and scenery.
 local LINE = { string = "String", chalk = "Chalk", drawn = "Groove", etched = "Scratch" }
 local SCENERY = { desk = "Book", culdesac = "Bush", grass = "Tuft", sand = "Rock", ice = "Needles", gravel = "Boulder", minigolf = "Sail" }
+local EXTRA = { desk = "Pencil", culdesac = "LampPost", grass = "Petals", sand = "Canopy", ice = "Snowball", gravel = "Cone", minigolf = "FlagPole" }
 for i, id in ipairs(Config.ARENA_ORDER) do
 	local arena = Config.ARENAS[id]
 	local holder = Instance.new("Model")
@@ -34,7 +35,7 @@ for i, id in ipairs(Config.ARENA_ORDER) do
 	end
 	local f = built.folder
 	local ground = f:FindFirstChild("Ground") :: BasePart
-	local count = { Bank = 0, Line = 0, Scenery = 0 }
+	local count = { Bank = 0, Line = 0, Scenery = 0, Extra = 0 }
 	for _, d in ipairs(f:GetDescendants()) do
 		if d.Name == "Bank" then
 			count.Bank += 1
@@ -42,6 +43,8 @@ for i, id in ipairs(Config.ARENA_ORDER) do
 			count.Line += 1
 		elseif d.Name == SCENERY[id] then
 			count.Scenery += 1
+		elseif d.Name == EXTRA[id] then
+			count.Extra += 1
 		end
 	end
 	check(id .. " ground is " .. arena.material.Name, ground and ground.Material == arena.material, ground and ground.Material.Name)
@@ -49,6 +52,7 @@ for i, id in ipairs(Config.ARENA_ORDER) do
 	check(id .. " ring is " .. arena.ring.style, count.Line == 120, count.Line)
 	check(id .. " has its scenery (" .. SCENERY[id] .. ")", count.Scenery >= 1, count.Scenery)
 	check(id .. " has 2 stands", #built.stands == 2)
+	check(id .. " has its toys (" .. EXTRA[id] .. ")", count.Extra >= 1, count.Extra)
 	-- Nothing of the field stands inside the ring's play area, where marbles roll.
 	local blocking = 0
 	for _, d in ipairs(f:GetDescendants()) do
@@ -216,6 +220,7 @@ local okJ, errJ = pcall(function()
 	Juice.launch(0.8)
 	Juice.pow(p, 900)
 	Juice.flash(p, 2, nil)
+	Juice.coins(p, 4)
 end)
 check("hit, capture and signature effects run", okJ and Juice.trauma > 0 and Juice.fovKick > 0, errJ)
 local frame = Instance.new("Frame")
@@ -265,6 +270,47 @@ end)
 check("the feed and big emotes show on screen", okF, errF)
 local Pets = require(client.Pets)
 check("the floating orb is big enough to read", Pets.RADIUS >= 1.3 and type(Pets.setPlaying) == "function")
+
+-- The lobby park: hills, rainbow, fountains, bouncy mushrooms, coins to pick up.
+-- (Cloud tasks don't run the place's scripts: build it here, as Main does.)
+local lobbyHolder = Instance.new("Model")
+lobbyHolder.Parent = workspace
+local okW, world = pcall(require(game.ServerScriptService.Server.LobbyWorld).build, lobbyHolder)
+if not okW then
+	check("the lobby park builds", false, world)
+	world = nil
+end
+local caps, fountains = 0, 0
+if world then
+	for _, d in ipairs(world:GetDescendants()) do
+		if d:IsA("BasePart") and d:GetAttribute("Bounce") then
+			caps += 1
+		elseif d.Name == "Fountain" then
+			fountains += 1
+		end
+	end
+end
+check("the lobby park is built", world ~= nil and world:FindFirstChild("Rainbow") ~= nil and world:FindFirstChild("Clouds") ~= nil)
+check("4 bouncy mushrooms and 2 fountains", caps == 4 and fountains == 2, caps .. " " .. fountains)
+local hillVox = workspace.Terrain:ReadVoxels(Region3.new(Vector3.new(160, 4, -4), Vector3.new(300, 8, 4)):ExpandToGrid(4), 4)
+local hillCells = 0
+for x = 1, hillVox.Size.X do
+	if hillVox[x][1][1] ~= Enum.Material.Air then
+		hillCells += 1
+	end
+end
+check("hills on the horizon", hillCells >= 3, hillCells)
+check("lobby coins sit clear of the fountains", (function()
+	for _, s in ipairs(Config.LOBBY_COIN_SPOTS) do
+		for _, a in ipairs({ math.rad(18), math.rad(198) }) do
+			if (s - Vector3.new(math.cos(a) * 34, 2.4, math.sin(a) * 34)).Magnitude < 7 then
+				return false
+			end
+		end
+	end
+	return #Config.LOBBY_COIN_SPOTS == 30
+end)())
+check("lobby fun module loads", type(require(client.LobbyFun).start) == "function")
 
 -- 4. Ambience changes the light for a field and gives it back.
 local Lighting = game:GetService("Lighting")

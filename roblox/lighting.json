@@ -91,15 +91,15 @@
       {
         "Intensity": [
           "float",
-          0.35
+          0.18
         ],
         "Size": [
           "float",
-          28
+          22
         ],
         "Threshold": [
           "float",
-          2.4
+          2.9
         ]
       }
     ],
@@ -135,7 +135,7 @@
       {
         "Intensity": [
           "float",
-          0.06
+          0.04
         ],
         "Spread": [
           "float",
