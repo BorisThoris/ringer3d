@@ -1,10 +1,9 @@
-11-13 14:05:06.600  2431  2431 W Capacitor/Console: File: https://localhost/assets/index-DC-pgxxA.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
-11-13 14:05:16.843  2431  2431 W Capacitor/Console: File: https://localhost/assets/index-DC-pgxxA.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
-11-13 14:05:33.616  2431  2431 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-13 14:05:33.637  2431  2431 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-13 14:05:33.772  2431  2431 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-13 14:05:33.774  2431  2431 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-13 14:05:39.144  2431  2431 I Capacitor/Console: File:  - Line 333 - Msg: {}
-11-13 14:05:42.792  2431  2431 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-13 14:05:47.835  2431  2431 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-13 14:05:49.935  2431  2431 I Capacitor/Console: File:  - Line 333 - Msg: undefined
+11-13 15:04:26.000  2394  2394 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
+11-13 15:04:26.000  2394  2394 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
+11-13 15:04:26.000  2394  2394 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
+11-13 15:04:28.218  2394  2394 W Capacitor/Console: File: https://localhost/assets/index-DC-pgxxA.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+11-13 15:04:57.048  2394  2394 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+11-13 15:04:57.067  2394  2394 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+11-13 15:04:57.904  2394  2394 I Capacitor/Console: File:  - Line 333 - Msg: {}
+11-13 15:05:00.515  2394  2394 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+11-13 15:05:05.248  2394  2394 I Capacitor/Console: File:  - Line 333 - Msg: undefined
