@@ -21,6 +21,16 @@ Replay.onBreak = function(_pos: Vector3) end
 -- Every frame: the marbles' total speed (web units/s), for the rolling sound.
 Replay.onFrame = function(_speed: number) end
 Replay.playing = false
+-- Hit-stop: the replay holds still for a blink on big hits (at most HITSTOP_MAX a shot).
+local HITSTOP_MAX = 0.3
+local frozenUntil, frozenTotal = 0, 0
+function Replay.hitStop(seconds: number)
+	local s = math.min(seconds, HITSTOP_MAX - frozenTotal)
+	if s > 0.005 then
+		frozenTotal += s
+		frozenUntil = math.max(frozenUntil, os.clock()) + s
+	end
+end
 
 local S = Config.MAP_SCALE
 local maps = {} -- table id -> pieces
@@ -87,10 +97,11 @@ function Replay.play(state, data, done: () -> ())
 	local clock = Playback.clock()
 	local crossed = false
 	Replay.playing = true
+	frozenUntil, frozenTotal = 0, 0
 	-- RenderStepped on a client; Heartbeat lets tests replay on a server.
 	local frame = if RunService:IsClient() then RunService.RenderStepped else RunService.Heartbeat
 	conn = frame:Connect(function(dt)
-		local n = Playback.advance(clock, math.min(dt, 0.1), Replay.fast, crossed)
+		local n = if os.clock() < frozenUntil then 0 else Playback.advance(clock, math.min(dt, 0.1), Replay.fast, crossed)
 		for _ = 1, n do
 			if sim.done then
 				break

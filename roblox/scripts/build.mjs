@@ -103,6 +103,9 @@ function props(o) {
   const l = JSON.parse(readFileSync(join(root, 'lighting.json'), 'utf8'));
   services += item('Lighting', 'Lighting', props(l.Lighting), l.children.map(([cls, name, p]) => item(cls, name, props(p))).join(''));
 }
+// The 2022 materials: far richer grass, wood, concrete, sand, rock, ice and fabric than the 2019
+// set a place file without a MaterialService falls back to. Not settable from a script.
+services += item('MaterialService', 'MaterialService', props({ Use2022Materials: ['bool', true] }));
 
 // Test builds (CHECK=1) also carry every Script and LocalScript as a ModuleScript under
 // ServerStorage.SyntaxCheck, so a cloud test can compile them all (a cloud server never runs

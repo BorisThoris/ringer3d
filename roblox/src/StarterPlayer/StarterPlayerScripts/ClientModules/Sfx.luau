@@ -19,7 +19,7 @@ local Sfx = {}
 local ASSET = (Ids.audio and Ids.audio.sfx) or 0
 Sfx.enabled = ASSET ~= 0
 Sfx.sfxVolume = 0.8
-Sfx.musicVolume = 0.45
+Sfx.musicVolume = 0.22
 Sfx.log = nil :: { string }? -- tests set a table to see what was played
 
 -- The web game's surface sounds (audio.ts SURFACE_SOUNDS).

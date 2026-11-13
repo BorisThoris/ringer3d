@@ -104,6 +104,21 @@ end
 
 -- Ground: a lawn, a cream plaza, and the sky-blue ring pad in the middle.
 disc("Lawn", 110, -1.1, rgb(85, 200, 75), 2)
+-- Bright toy-box terrain colours, and grass you can see blowing: kids first.
+do
+	local T = workspace.Terrain
+	T:SetMaterialColor(Enum.Material.Grass, rgb(96, 205, 70))
+	T:SetMaterialColor(Enum.Material.Sand, rgb(240, 214, 150))
+	T:SetMaterialColor(Enum.Material.Snow, rgb(245, 250, 255))
+	T:SetMaterialColor(Enum.Material.Ground, rgb(150, 132, 110))
+	pcall(function()
+		(T :: any).Decoration = true
+	end)
+	-- The lobby's lawn in real grass, out past the plaza.
+	T:FillBlock(CFrame.new(0, -2.4, 0), Vector3.new(300, 4, 300), Enum.Material.Grass)
+	-- Not over the lawn and plaza: smooth terrain's surface rounds up past its voxels.
+	T:FillCylinder(CFrame.new(0, 0, 0), 12, 111, Enum.Material.Air)
+end
 disc("Plaza", 46, -0.02, rgb(255, 214, 160))
 disc("PadRim", 25.2, 0, rgb(255, 255, 255))
 disc("Pad", 24, 0.02, rgb(70, 160, 255))

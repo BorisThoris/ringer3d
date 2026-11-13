@@ -55,6 +55,26 @@ local function emit(at: Part, props: { [string]: any }, n: number)
 	e:Emit(n)
 end
 
+Juice.gui = nil :: Instance? -- where screen flashes go (set by the client)
+
+--- A blink of white over the whole screen: an impact frame.
+function Juice.screenFlash(strength: number)
+	local g = Juice.gui
+	if not g then
+		return
+	end
+	local f = Instance.new("Frame")
+	f.BackgroundColor3 = Color3.new(1, 1, 1)
+	f.BackgroundTransparency = 1 - math.clamp(strength, 0, 1) * 0.55
+	f.BorderSizePixel = 0
+	f.Size = UDim2.fromScale(1, 1)
+	f.ZIndex = 80
+	f.Active = false
+	f.Parent = g
+	TweenService:Create(f, TweenInfo.new(0.16), { BackgroundTransparency = 1 }):Play()
+	Debris:AddItem(f, 0.2)
+end
+
 --- Camera trauma, 0..1.
 function Juice.kick(amount: number)
 	Juice.trauma = math.min(1, Juice.trauma + amount)
@@ -109,14 +129,14 @@ function Juice.sparks(pos: Vector3, strength: number, color: Color3?)
 	emit(anchor(pos, 1.2), {
 		Texture = TEX.sparks,
 		Color = ColorSequence.new(Color3.new(1, 1, 1), color or Color3.fromRGB(255, 220, 140)),
-		Size = NumberSequence.new(0.35 * k + 0.1, 0),
+		Size = NumberSequence.new(0.55 * k + 0.15, 0),
 		Lifetime = NumberRange.new(0.15, 0.35),
 		Speed = NumberRange.new(6 * k, 16 * k),
 		Drag = 6,
 		Acceleration = Vector3.new(0, -30, 0),
 		LightEmission = 1,
 		Brightness = 4,
-	}, math.floor(6 + 14 * k))
+	}, math.floor(10 + 26 * k))
 end
 
 --- A captured marble: a burst in its colour, a ring, "+1" rising, and the shooter's call.

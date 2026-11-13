@@ -8,6 +8,7 @@ local MarbleArt = require(script.Parent.MarbleArt)
 local MarbleFX = require(script.Parent.MarbleFX)
 
 local MarbleLook = {}
+MarbleLook.GLASS = true -- real Glass shells for marbles with no inner effects
 
 -- A generated marble's look: its colours, a material for its finish, the clarity of its glass,
 -- and its phenomenon (drawn with Roblox's own Fire, Smoke, Sparkles and lights).
@@ -160,6 +161,13 @@ function MarbleLook.make(look: any, radius: number, physics: { density: number, 
 		ball.Transparency = transparency
 		ball.Reflectance = reflect
 		MarbleArt.build(ball, look, radius, seed)
+		-- Real Glass (refraction, sharp highlights) where nothing see-through lives inside: Glass
+		-- hides see-through things behind it, so marbles with effects keep the plastic shell.
+		if MarbleLook.GLASS and #MarbleFX.forLook(look) == 0 then
+			ball.Material = Enum.Material.Glass
+			ball.Transparency = math.clamp(transparency - 0.05, 0.3, 0.75)
+			ball.Reflectance = math.max(reflect, 0.12)
+		end
 		if (look.glow or 0) > 0.3 then
 			local light = Instance.new("PointLight")
 			light.Color = look.accent

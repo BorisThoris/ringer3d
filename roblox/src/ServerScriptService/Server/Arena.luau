@@ -59,7 +59,12 @@ local GROUND_ART = {
 		local n = math.floor(half * 2 / w)
 		for i = 0, n - 1, 2 do
 			local x = -half + (i + 0.5) * w
-			part({ Name = "Stripe", Size = Vector3.new(w, 0.04, half * 2), CFrame = CFrame.new(origin + Vector3.new(x, 0.01, 0)), Color = Color3.fromRGB(104, 178, 58), Material = Enum.Material.Grass, CastShadow = false, Parent = folder })
+			-- Cut to the field's disc: past it is real grass.
+			local chord = 2 * math.sqrt(math.max(0, (half - 8) ^ 2 - x * x))
+			if chord < 2 then
+				continue
+			end
+			part({ Name = "Stripe", Size = Vector3.new(w, 0.04, chord), CFrame = CFrame.new(origin + Vector3.new(x, 0.01, 0)), Color = Color3.fromRGB(104, 178, 58), Material = Enum.Material.Grass, CastShadow = false, Parent = folder })
 		end
 	end,
 	-- Black ice: white crack lines running across it, and drifts of snow blown onto it.
@@ -77,7 +82,7 @@ local GROUND_ART = {
 			end
 		end
 		for _ = 1, 7 do
-			local d = rng:NextNumber(Config.RING_R * 0.8, half * 0.95)
+			local d = rng:NextNumber(Config.RING_R * 0.8, half - 14)
 			local a = rng:NextNumber() * math.pi * 2
 			local s = rng:NextNumber(4, 9)
 			blob(folder, CFrame.new(origin + Vector3.new(math.cos(a) * d, -0.15, math.sin(a) * d)) * CFrame.Angles(0, rng:NextNumber() * 6, 0), Vector3.new(s * 1.6, 0.5, s), hex("#f2f7fb"), Enum.Material.Snow, "Drift")
@@ -87,7 +92,11 @@ local GROUND_ART = {
 	sand = function(folder: Folder, origin: Vector3, half: number, rng: Random)
 		for i = -12, 12 do
 			local z = i * 6.5 + rng:NextNumber(-1, 1)
-			part({ Name = "Ripple", Size = Vector3.new(half * 2, 0.03, 0.5), CFrame = CFrame.new(origin + Vector3.new(0, 0.01, z)) * CFrame.Angles(0, rng:NextNumber(-0.05, 0.05), 0), Color = hex("#c7ad83"), Material = Enum.Material.Sand, Transparency = 0.6, CastShadow = false, Parent = folder })
+			local chord = 2 * math.sqrt(math.max(0, (half - 8) ^ 2 - z * z))
+			if chord < 2 then
+				continue
+			end
+			part({ Name = "Ripple", Size = Vector3.new(chord, 0.03, 0.5), CFrame = CFrame.new(origin + Vector3.new(0, 0.01, z)) * CFrame.Angles(0, rng:NextNumber(-0.05, 0.05), 0), Color = hex("#c7ad83"), Material = Enum.Material.Sand, Transparency = 0.6, CastShadow = false, Parent = folder })
 		end
 	end,
 	-- The desk: a varnished board, so a soft sheen of the lamp on it.
@@ -351,6 +360,21 @@ local SCENERY = {
 	end,
 }
 
+-- Outdoor fields stand in real terrain: grass grows animated blades, sand and snow lie in drifts.
+local TERRAIN = { grass = Enum.Material.Grass, minigolf = Enum.Material.Grass, sand = Enum.Material.Sand, ice = Enum.Material.Snow, gravel = Enum.Material.Ground }
+Arena.TERRAIN = TERRAIN
+
+local function plot(origin: Vector3): (CFrame, Vector3)
+	local half = Config.TABLE_SPACING / 2
+	return CFrame.new(origin - Vector3.new(0, 2, 0)), Vector3.new(half * 2, 4, half * 2)
+end
+
+--- Take a table's terrain away again.
+function Arena.clear(origin: Vector3)
+	local cf, size = plot(origin)
+	workspace.Terrain:FillBlock(cf, size + Vector3.new(0, 2, 0), Enum.Material.Air)
+end
+
 export type Built = { folder: Folder, origin: Vector3, stands: { CFrame } }
 
 function Arena.build(origin: Vector3, arena: Config.Arena, seats: number, rng: Random, parent: Instance, _hasMap: boolean?): Built
@@ -362,12 +386,23 @@ function Arena.build(origin: Vector3, arena: Config.Arena, seats: number, rng: R
 	local decor = Random.new(math.floor(origin.X * 7 + origin.Z))
 	local _ = rng
 
-	-- Ground: one slab filling the table's plot.
+	-- Ground: the field's own surface; outdoors a disc of it set into real terrain, indoors (the
+	-- desk, the street) one slab filling the table's plot.
 	local half = Config.TABLE_SPACING / 2
+	local terrain = TERRAIN[arena.id]
+	local discR = B + 22
+	if terrain then
+		local cf, size = plot(origin)
+		workspace.Terrain:FillBlock(cf, size, terrain)
+		-- Smooth terrain rounds its surface up past the voxel: carve it out under the field's disc,
+		-- or it grows over the ring, the marbles and the pieces.
+		workspace.Terrain:FillCylinder(CFrame.new(origin), 12, discR - 1, Enum.Material.Air)
+	end
 	part({
 		Name = "Ground",
-		Size = Vector3.new(half * 2, 4, half * 2),
-		CFrame = CFrame.new(origin - Vector3.new(0, 2, 0)),
+		Shape = if terrain then Enum.PartType.Cylinder else Enum.PartType.Block,
+		Size = if terrain then Vector3.new(4, discR * 2, discR * 2) else Vector3.new(half * 2, 4, half * 2),
+		CFrame = CFrame.new(origin - Vector3.new(0, 2, 0)) * (if terrain then CFrame.Angles(0, 0, math.pi / 2) else CFrame.identity),
 		Material = arena.material,
 		Color = arena.color,
 		Reflectance = if arena.id == "ice" then 0.18 else 0,

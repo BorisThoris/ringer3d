@@ -601,6 +601,7 @@ end
 function Table:destroy()
 	self.closed = true
 	self.model:Destroy()
+	Arena.clear(self.origin)
 end
 
 return Table

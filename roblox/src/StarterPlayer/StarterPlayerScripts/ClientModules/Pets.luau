@@ -9,9 +9,11 @@ local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
 local MarbleLook = require(ReplicatedStorage.Ringer.MarbleLook)
+local Config = require(ReplicatedStorage.Ringer.Config)
 
 local Pets = {}
-Pets.RADIUS = 0.9
+Pets.RADIUS = 1.35
+Pets.override = {} :: { [Player]: string } -- the marble a player is playing with right now
 Pets.balls = {} :: { [Player]: BasePart }
 
 local folder = Instance.new("Folder")
@@ -44,7 +46,7 @@ local function burst(at: Vector3, color: Color3)
 end
 
 local function refresh(player: Player)
-	local id = player:GetAttribute("Marble")
+	local id = Pets.override[player] or player:GetAttribute("Marble")
 	if typeof(id) ~= "string" or shown[player] == id then
 		return
 	end
@@ -63,11 +65,32 @@ local function refresh(player: Player)
 	ball.CFrame = if root then root.CFrame * CFrame.new(2.6, 1.2, 1.4) else CFrame.new(0, -500, 0)
 	ball.Parent = folder
 	Pets.balls[player] = ball
+	-- Its name over it, in its rarity's colour: this is YOUR marble.
+	local tier = look.rarity or "Common"
+	local tag = Instance.new("BillboardGui")
+	tag.Name = "Tag"
+	tag.Size = UDim2.fromOffset(200, 44)
+	tag.StudsOffsetWorldSpace = Vector3.new(0, Pets.RADIUS + 1.4, 0)
+	tag.MaxDistance = 60
+	tag.LightInfluence = 0
+	tag.Parent = ball
+	local name = Instance.new("TextLabel")
+	name.BackgroundTransparency = 1
+	name.Size = UDim2.fromScale(1, 0.6)
+	name.Font = Enum.Font.FredokaOne
+	name.TextScaled = true
+	name.Text = look.name or id
+	name.TextColor3 = Color3.new(1, 1, 1)
+	name.TextStrokeTransparency = 0
+	name.Parent = tag
+	local rar = name:Clone()
+	rar.Position = UDim2.fromScale(0, 0.58)
+	rar.Size = UDim2.fromScale(1, 0.42)
+	rar.Text = string.upper(tier)
+	rar.TextColor3 = Config.RARITY_COLOR[tier] or Color3.new(1, 1, 1)
+	rar.Parent = tag
 	if root then
 		burst(ball.Position, MarbleLook.uiColor(look))
-		local s = ball.Size
-		ball.Size = s * 0.2
-		TweenService:Create(ball, TweenInfo.new(0.4, Enum.EasingStyle.Back), { Size = s }):Play()
 	end
 end
 
@@ -76,6 +99,12 @@ local function watch(player: Player)
 	player:GetAttributeChangedSignal("Marble"):Connect(function()
 		refresh(player)
 	end)
+end
+
+--- While a player plays a table, their orb is the marble they play with; nil puts it back.
+function Pets.setPlaying(player: Player, id: string?)
+	Pets.override[player] = id
+	refresh(player)
 end
 
 --- Start drawing every player's marble.

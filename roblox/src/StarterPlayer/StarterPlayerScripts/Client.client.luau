@@ -90,6 +90,7 @@ local function setCoins(n: number)
 end
 
 Rewards.attach(screen, hud, coinPill)
+Juice.gui = screen
 
 -- The live event, under the coins.
 local event = Kit.label(string.format("✨ NEW: every Marble Bag mints a one-of-a-kind marble · %.1f%% hold a phenomenon", Forge.phenomenonOdds()), 20, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 62), Size = UDim2.fromOffset(620, 28), TextColor3 = Color3.fromRGB(255, 170, 60), Parent = hud })
@@ -836,6 +837,11 @@ Replay.onImpact = function(kind, strength, pos)
 			Juice.flash(pos, 1.5, workspace:FindFirstChild("Table" .. s.id))
 		end
 		if strength > 250 then
+			-- Big hits land: a hold, a white frame, a zoom punch.
+			local k = math.clamp((strength - 250) / 1000, 0, 1)
+			Replay.hitStop(0.035 + 0.06 * k)
+			Juice.screenFlash(0.25 + 0.5 * k)
+			Juice.fovKick = math.max(Juice.fovKick, 3 + 6 * k)
 			Juice.pow(pos, strength)
 			Sfx.ui("pop", math.clamp(strength / 900, 0.4, 1))
 		end
@@ -865,9 +871,14 @@ local function leaveTable()
 	Sfx.stopPad()
 	Ambience.leave()
 	Show.clear()
+	Pets.setPlaying(player, nil)
 end
 
 local function onState(state)
+	local me = Aim.mySeat and state.seats[Aim.mySeat]
+	if me and me.marble then
+		Pets.setPlaying(player, me.marble)
+	end
 	local field = Config.ARENAS[state.arena]
 	if field and state.origin then
 		Ambience.enter(state.arena, state.origin, state.id)
@@ -1198,17 +1209,19 @@ Remotes:WaitForChild("TableEvent").OnClientEvent:Connect(function(kind, data, id
 		onResult(data)
 	elseif kind == "capture" then
 		local mine = data.seat == Aim.mySeat
-		banner.Text = mine and "Got one!" or "Captured!"
+		banner.Text = ""
+		local s = Aim.state and Aim.state.seats[data.seat]
+		task.delay(1.6, Show.feed, if mine then "You captured a marble! +1" else (((s and s.name or "They"):gsub(" Bot$", "")) .. " captured one!"), if s then MarbleLook.uiColor(MarbleLook.lookFor(s.marble)) else nil)
 	elseif kind == "shootAgain" then
-		banner.Text = data.seat == Aim.mySeat and "Shoot again!" or "They shoot again"
+		banner.Text = ""
 	elseif kind == "emote" then
 		if Aim.state and Aim.state.id == id then
 			Show.emote(Aim.state, data.seat, data.e)
 		end
 	elseif kind == "seatLost" then
-		toast(data.name .. " left: a bot takes their seat.", "info")
-	elseif kind == "shooterOut" and data.seat == Aim.mySeat then
-		hint.Text = "Your marble left the ring: turn over"
+		Show.feed(data.name .. " left: a bot takes their seat")
+	elseif kind == "shooterOut" then
+		task.delay(1.6, Show.feed, if data.seat == Aim.mySeat then "Your marble flew out! Turn over" else "Their marble flew out!", Color3.fromRGB(255, 150, 120))
 	end
 end)
 

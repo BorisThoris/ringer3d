@@ -195,7 +195,7 @@ for key, minLen in pairs(MIN) do
 		snd.SoundId = "rbxassetid://" .. id
 		snd.Parent = workspace
 		local t0 = os.clock()
-		while not snd.IsLoaded and os.clock() - t0 < 30 do
+		while not snd.IsLoaded and os.clock() - t0 < 60 do
 			task.wait(0.5)
 		end
 		check(key .. " audio loads from Roblox", snd.IsLoaded and snd.TimeLength > minLen, string.format("loaded %s, %.1f s", tostring(snd.IsLoaded), snd.TimeLength))
@@ -238,6 +238,33 @@ check("level 4 at 350 XP", lv == 4 and into == 50 and span == 200, string.format
 for _, n in ipairs({ "pop", "boing", "coin_fly", "levelup", "fanfare" }) do
 	check(n .. " is in the sprite", Index[n] ~= nil)
 end
+
+-- The 2022 materials, and outdoor fields set into terrain that goes again with the table.
+-- (Use2022Materials is set in the place file by build.mjs; scripts may not read it.)
+do
+	local o = Vector3.new(12000, 0, 0)
+	local h = Instance.new("Model")
+	h.Parent = workspace
+	Arena.build(o, Config.ARENAS.grass, 2, Random.new(1), h, true)
+	local mats = workspace.Terrain:ReadVoxels(Region3.new(o + Vector3.new(70, -4, 70), o + Vector3.new(78, 0, 78)):ExpandToGrid(4), 4)
+	check("the lawn stands in real grass", mats[1][1][1] == Enum.Material.Grass, mats[1][1][1])
+	h:Destroy()
+	Arena.clear(o)
+	local after = workspace.Terrain:ReadVoxels(Region3.new(o + Vector3.new(70, -4, 70), o + Vector3.new(78, 0, 78)):ExpandToGrid(4), 4)
+	check("the terrain goes with the table", after[1][1][1] == Enum.Material.Air, after[1][1][1])
+end
+-- The feed, a big emote on screen, and the hit-stop.
+local okF, errF = pcall(function()
+	local fr = Instance.new("Frame")
+	Show.attach(fr)
+	Show.feed("You captured a marble! +1", Color3.new(1, 1, 0))
+	Show.screenEmote("🔥", "Tide", Color3.new(0, 0.5, 1))
+	assert(fr:FindFirstChild("Feed") and #fr.Feed:GetChildren() >= 3, "feed rows")
+	require(client.Replay).hitStop(0.05)
+end)
+check("the feed and big emotes show on screen", okF, errF)
+local Pets = require(client.Pets)
+check("the floating orb is big enough to read", Pets.RADIUS >= 1.3 and type(Pets.setPlaying) == "function")
 
 -- 4. Ambience changes the light for a field and gives it back.
 local Lighting = game:GetService("Lighting")

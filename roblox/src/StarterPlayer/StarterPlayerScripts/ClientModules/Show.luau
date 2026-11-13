@@ -26,6 +26,7 @@ local beacon: BillboardGui? = nil
 local beaconPart: Part? = nil
 local beaconConn: RBXScriptConnection? = nil
 local lastTurnKey = ""
+local feed: Frame? = nil
 
 local function colorOf(seat): Color3
 	return MarbleLook.uiColor(MarbleLook.lookFor(seat and seat.marble))
@@ -38,6 +39,7 @@ end
 --- Where to draw the interface (the match frame).
 function Show.attach(parent: Instance)
 	gui = parent
+	feed = nil
 	pill = Kit.label("", 22, {
 		Name = "TurnPill",
 		AnchorPoint = Vector2.new(0.5, 0),
@@ -237,6 +239,69 @@ function Show.intro(state, mySeat: number?)
 	end)
 end
 
+-- ---- The feed: what just happened, on screen ------------------------------------------------
+
+--- A line sliding in on the left of the screen: "Tide: 🔥", "You captured a marble! +1".
+function Show.feed(text: string, color: Color3?, big: string?)
+	if not gui then
+		return
+	end
+	if not feed or not feed.Parent then
+		feed = Kit.new("Frame", { Name = "Feed", AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 16, 0.55, 0), Size = UDim2.fromOffset(380, 300), BackgroundTransparency = 1, Parent = gui })
+		Kit.new("UIListLayout", { VerticalAlignment = Enum.VerticalAlignment.Bottom, Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder, Parent = feed })
+	end
+	local f = feed :: Frame
+	local row = Kit.new("Frame", { Size = UDim2.fromOffset(380, if big then 64 else 40), BackgroundColor3 = Kit.INK, BackgroundTransparency = 0.25, LayoutOrder = math.floor(os.clock() * 100), Parent = f })
+	Kit.round(row, 14)
+	Kit.stroke(row, color or Color3.new(1, 1, 1), 3)
+	if big then
+		Kit.label(big, 44, { Position = UDim2.fromOffset(6, 0), Size = UDim2.fromOffset(60, 64), Parent = row })
+	end
+	Kit.label(text, 20, { Position = UDim2.fromOffset(if big then 70 else 12, 0), Size = UDim2.new(1, if big then -80 else -24, 1, 0), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = color or Kit.CREAM, Parent = row })
+	local sc = Kit.new("UIScale", { Scale = 0.3, Parent = row })
+	TweenService:Create(sc, TweenInfo.new(0.25, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+	-- Keep the last five.
+	local rows = {}
+	for _, c in ipairs(f:GetChildren()) do
+		if c:IsA("Frame") then
+			table.insert(rows, c)
+		end
+	end
+	table.sort(rows, function(a, b)
+		return a.LayoutOrder < b.LayoutOrder
+	end)
+	for i = 1, #rows - 5 do
+		rows[i]:Destroy()
+	end
+	task.delay(4.5, function()
+		if row.Parent then
+			TweenService:Create(sc, TweenInfo.new(0.3), { Scale = 0 }):Play()
+			task.delay(0.32, function()
+				row:Destroy()
+			end)
+		end
+	end)
+end
+
+--- An emote, big on screen too: it pops up by the middle and floats away.
+function Show.screenEmote(emoji: string, who: string, color: Color3)
+	if not gui then
+		return
+	end
+	local rng = Random.new()
+	local e = Kit.label(emoji, 110, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(rng:NextNumber(0.3, 0.7), 0.62), Size = UDim2.fromOffset(160, 160), ZIndex = 35, Parent = gui })
+	local sc = Kit.new("UIScale", { Scale = 0.2, Parent = e })
+	TweenService:Create(sc, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+	TweenService:Create(e, TweenInfo.new(1.8, Enum.EasingStyle.Quad), { Position = e.Position - UDim2.fromScale(0, 0.2), Rotation = rng:NextNumber(-20, 20) }):Play()
+	task.delay(1.4, function()
+		TweenService:Create(e, TweenInfo.new(0.4), { TextTransparency = 1 }):Play()
+		task.delay(0.45, function()
+			e:Destroy()
+		end)
+	end)
+	Show.feed(who, color, emoji)
+end
+
 -- ---- Emotes ----------------------------------------------------------------------------------
 
 --- A bubble with `emoji` over the seat of whoever sent it.
@@ -265,6 +330,9 @@ function Show.emote(state, seat: number, emoji: string)
 	TweenService:Create(sc, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Scale = 1 }):Play()
 	TweenService:Create(p, TweenInfo.new(2.4, Enum.EasingStyle.Quad), { Position = at + Vector3.new(0, 6, 0) }):Play()
 	Sfx.ui("tick", 0.7)
+	local me = game:GetService("Players").LocalPlayer
+	local s = state.seats[seat]
+	Show.screenEmote(emoji, if s.userId and me and s.userId == me.UserId then "You" else shortName(s), colorOf(s))
 	task.delay(1.9, function()
 		TweenService:Create(sc, TweenInfo.new(0.3), { Scale = 0 }):Play()
 	end)
