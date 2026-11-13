@@ -22,10 +22,12 @@ local Ambience = require(Modules.Ambience)
 local Pets = require(Modules.Pets)
 local Juice = require(Modules.Juice)
 local Show = require(Modules.Show)
+local Rewards = require(Modules.Rewards)
 
 -- Marbles come alive (bolts, moons, auras), and everyone's marble floats beside them.
 MarbleFX.animate()
 Pets.start()
+Sfx.music("lobby")
 
 local player = Players.LocalPlayer
 local Remotes = ReplicatedStorage.Ringer:WaitForChild("Remotes")
@@ -86,6 +88,8 @@ local function setCoins(n: number)
 	end)
 	tw:Play()
 end
+
+Rewards.attach(screen, hud, coinPill)
 
 -- The live event, under the coins.
 local event = Kit.label(string.format("✨ NEW: every Marble Bag mints a one-of-a-kind marble · %.1f%% hold a phenomenon", Forge.phenomenonOdds()), 20, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 62), Size = UDim2.fromOffset(620, 28), TextColor3 = Color3.fromRGB(255, 170, 60), Parent = hud })
@@ -636,6 +640,23 @@ playButton = Kit.button("PLAY", Kit.GREEN, function()
 	end
 	show("play")
 end, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -24), Size = UDim2.fromOffset(260, 80), TextSize = 40, Parent = hud })
+-- PLAY breathes, and a shine sweeps across it now and then: the one thing to press.
+do
+	local pulse = playButton:FindFirstChildOfClass("UIScale") or Kit.new("UIScale", { Parent = playButton })
+	local shine = Kit.new("Frame", { Name = "Shine", BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.55, BorderSizePixel = 0, Size = UDim2.new(0, 26, 1.6, 0), Position = UDim2.new(-0.3, 0, -0.3, 0), Rotation = 20, ZIndex = 5, Parent = playButton })
+	playButton.ClipsDescendants = true
+	task.spawn(function()
+		while playButton.Parent do
+			local t = os.clock()
+			if not queued then
+				pulse.Scale = 1 + 0.045 * math.sin(t * 3.4)
+			end
+			local k = (t % 3.2) / 0.6
+			shine.Position = if k <= 1 then UDim2.new(-0.3 + k * 1.6, 0, -0.3, 0) else UDim2.new(-0.3, 0, -0.3, 0)
+			task.wait(1 / 30)
+		end
+	end)
+end
 
 -- =============================================================================================
 -- In-match HUD
@@ -808,6 +829,19 @@ Replay.onImpact = function(kind, strength, pos)
 	if strength > 260 then
 		Juice.shockwave(pos, strength, if kind == "bumper" then Color3.fromHex("#ffd23f") elseif kind == "kerb" then Color3.fromHex("#ffd9a8") else Color3.new(1, 1, 1))
 	end
+	if kind == "marble" then
+		-- Marble on marble: the two flash, and a hard one gets a comic POW! with a pop.
+		local s = Aim.state
+		if strength > 80 and s then
+			Juice.flash(pos, 1.5, workspace:FindFirstChild("Table" .. s.id))
+		end
+		if strength > 250 then
+			Juice.pow(pos, strength)
+			Sfx.ui("pop", math.clamp(strength / 900, 0.4, 1))
+		end
+	elseif kind == "bumper" and strength > 150 then
+		Sfx.ui("boing", 0.8)
+	end
 	if kind == "marble" and strength > 400 then
 		local look = shooterLook()
 		Juice.signature(pos, table.concat(MarbleFX.forLook(look), ","), MarbleLook.uiColor(look))
@@ -825,6 +859,7 @@ Replay.onBreak = function(_pos)
 	Sfx.clack(900, "kerb")
 end
 local function leaveTable()
+	task.delay(0.5, Sfx.music, "lobby")
 	soundTable = nil
 	lastTurn = ""
 	Sfx.stopPad()
@@ -946,6 +981,9 @@ Kit.button("Lobby", Kit.BLUE, function()
 	hud.Visible = true
 end, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -10, 1, -6), Size = UDim2.new(0.46, 0, 0, 60), Parent = resultBody })
 
+-- Wins in a row this session, for the results and the streak call.
+local streak = 0
+
 local function onResult(r)
 	meterBack.Visible = false
 	hint.Text = ""
@@ -959,8 +997,24 @@ local function onResult(r)
 	banner.Text = ""
 	Sfx.chime(if r.won or r.draw then "win" else "lose")
 	resultTitle.Text = r.abandoned and (r.won and "They left: you win!" or "You left") or r.draw and "Draw!" or r.won and "You win!" or "You lose"
+	if r.won then
+		streak += 1
+	elseif not r.draw then
+		streak = 0
+	end
+	if r.won then
+		local me = Aim.state and Aim.mySeat and Aim.state.seats[Aim.mySeat]
+		Rewards.win(MarbleLook.uiColor(MarbleLook.lookFor(me and me.marble)))
+	end
+	if (r.coins or 0) > 0 then
+		local vp = workspace.CurrentCamera.ViewportSize
+		task.delay(0.6, Rewards.coinsFly, Vector2.new(vp.X / 2, vp.Y / 2), r.coins)
+	end
 	resultTitle.TextColor3 = r.won and Kit.GOLD or Kit.CREAM
-	local lines = { string.format("Score  %s", table.concat(r.scores, " - ")), string.format("+%d coins", r.coins) }
+	local lines = { string.format("Score  %s", table.concat(r.scores, " - ")), string.format("+%d coins   +%d XP", r.coins, if r.won then 25 else 10) }
+	if streak >= 2 then
+		table.insert(lines, string.format("🔥 %d wins in a row!", streak))
+	end
 	if r.mode == "tower" then
 		if r.series and r.wins then
 			local need = r.wins
@@ -1101,6 +1155,7 @@ Remotes:WaitForChild("ProfileSync").OnClientEvent:Connect(function(p)
 	end
 	profile = p
 	setCoins(p.coins)
+	Rewards.update(p)
 	local climb = Config.buildTower(p.towerFighter or "ember")
 	towerLabel.Text = p.tower > #climb and "Conquered!" or string.format("Floor %d of %d: %s", p.tower, #climb, climb[p.tower].name)
 	if not fighterPick then

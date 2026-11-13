@@ -19,7 +19,7 @@ local Sfx = {}
 local ASSET = (Ids.audio and Ids.audio.sfx) or 0
 Sfx.enabled = ASSET ~= 0
 Sfx.sfxVolume = 0.8
-Sfx.musicVolume = 0.35
+Sfx.musicVolume = 0.45
 Sfx.log = nil :: { string }? -- tests set a table to see what was played
 
 -- The web game's surface sounds (audio.ts SURFACE_SOUNDS).
@@ -168,9 +168,46 @@ function Sfx.chime(kind: string)
 	Sfx.play("chime_" .. kind, 1)
 end
 
+-- ---- Music: upbeat tracks (ACE-Step, roblox/audio) for the lobby and the match ----------------
+local track: Sound? = nil
+local trackName: string? = nil
+--- Play the lobby or match music, crossfading from whatever played. False if it has no asset.
+function Sfx.music(name: string): boolean
+	local id = Ids.audio and Ids.audio[name]
+	if not id or id == 0 then
+		return false
+	end
+	note("music_" .. name)
+	if trackName == name and track then
+		return true
+	end
+	if track then
+		local old = track
+		TweenService:Create(old, TweenInfo.new(1.2), { Volume = 0 }):Play()
+		task.delay(1.3, function()
+			old:Destroy()
+		end)
+	end
+	local m = Instance.new("Sound")
+	m.Name = "Music_" .. name
+	m.SoundId = "rbxassetid://" .. id
+	m.Looped = true
+	m.Volume = 0
+	m.SoundGroup = musicGroup
+	m.Parent = SoundService
+	m:Play()
+	TweenService:Create(m, TweenInfo.new(1.5), { Volume = 1 }):Play()
+	track, trackName = m, name
+	return true
+end
+
 --- The field's ambient pad: bright, calm, night, cold, ominous.
 function Sfx.startPad(mood: string)
 	Sfx.stopPad()
+	-- Upbeat match music when it is there; the pad is the fallback.
+	if Sfx.music("match") then
+		return
+	end
 	note("pad_" .. mood)
 	if not Sfx.enabled then
 		return

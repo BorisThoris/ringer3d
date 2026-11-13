@@ -206,6 +206,52 @@ def reveal(rarity):
     return norm(x, 0.85)
 
 
+def pop():
+    """A bubbly cartoon pop: a quick downward blip with a click."""
+    sec = 0.18
+    x = t(sec)
+    f = 900 * np.exp(-x * 18) + 300
+    w = np.sin(2 * np.pi * np.cumsum(f) / SR) * env(len(x), 0.002, 0.15)
+    return norm(w + filt(noise(sec), 'highpass', 3000) * env(len(x), 0, 0.02) * 0.4, 0.8)
+
+
+def boing():
+    """A springy boing for the bumpers: a wobbling pitch on a twangy tone."""
+    sec = 0.5
+    x = t(sec)
+    f = 220 + 180 * np.exp(-x * 5) * np.sin(2 * np.pi * 14 * x) + 120 * np.exp(-x * 3)
+    ph = 2 * np.pi * np.cumsum(f) / SR
+    w = (np.sin(ph) + 0.4 * np.sin(2 * ph)) * env(len(x), 0.003, 0.45)
+    return norm(w, 0.75)
+
+
+def coin_fly():
+    """Coins flying to the counter: a quick rising sparkle run."""
+    notes = [1046.5, 1318.5, 1568, 2093, 2637]
+    x = seq(notes, 0.045, 'bell', 0.18, tail=0.3)
+    return norm(x + sparkle(len(x) / SR, 30, 3000, 7000) * 0.3, 0.7)
+
+
+def levelup():
+    """Level up: a bright rising fanfare with a sparkle tail."""
+    x = seq([523.3, 659.3, 784, 1046.5], 0.09, 'triangle', 0.35, tail=0.3)
+    chord = sum(tone(f, 1.2, 'triangle', 1.0, 0.01) for f in [523.3, 659.3, 784, 1046.5])
+    out = np.concatenate([x, chord * 0.35])
+    out = out + sparkle(len(out) / SR, 50, 2500, 8000)[: len(out)] * 0.3
+    return norm(out, 0.85)
+
+
+def fanfare():
+    """The win: a cheerful brass-like fanfare (detuned saws through a lowpass)."""
+    def brass(f, sec):
+        x = t(sec)
+        w = sum(2 * ((f * 2 ** (d / 1200) * x) % 1) - 1 for d in (-7, 0, 7))
+        return filt(w, 'lowpass', 2400) * env(len(x), 0.02, sec * 1.1)
+    parts = [(392, 0.14), (392, 0.14), (392, 0.14), (523.3, 0.5), (659.3, 0.2), (784, 0.9)]
+    out = np.concatenate([brass(f, d) for f, d in parts])
+    return norm(out + sparkle(len(out) / SR, 40, 3000, 8000) * 0.2, 0.85)
+
+
 def tick():
     return norm(tone(2400, 0.06, 'sine', 0.03) + filt(noise(0.06), 'highpass', 4000) * env(int(0.06 * SR), 0, 0.02) * 0.3, 0.5)
 
@@ -233,6 +279,7 @@ def main():
         sounds.append((f'roll_{k}', roll(k), True))
     for k in PADS:
         sounds.append((f'pad_{k}', pad(k), True))
+    sounds += [('pop', pop(), False), ('boing', boing(), False), ('coin_fly', coin_fly(), False), ('levelup', levelup(), False), ('fanfare', fanfare(), False)]
     sounds += [('coin', coin(), False), ('buy', buy(), False), ('equip', equip(), False), ('whoosh', whoosh(), False), ('tick', tick(), False), ('charge', charge(), True)]
     for r in ('common', 'rare', 'epic', 'legendary'):
         sounds.append((f'reveal_{r}', reveal(r), False))

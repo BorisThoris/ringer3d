@@ -179,6 +179,105 @@ function Juice.signature(pos: Vector3, fx: string?, color: Color3)
 	end
 end
 
+-- ---- Cartoon hits: POW! BONK! and a flash on the marbles that met -----------------------------
+
+local WORDS = { "POW!", "BONK!", "WHAM!", "BAM!", "CLACK!", "BOOM!", "SMASH!", "ZAP!" }
+local WORD_COLORS = { Color3.fromRGB(255, 220, 40), Color3.fromRGB(255, 120, 40), Color3.fromRGB(80, 220, 255), Color3.fromRGB(255, 90, 200), Color3.fromRGB(140, 255, 90) }
+local lastPow = 0
+local rng = Random.new()
+
+--- A comic-book word over a spiky star where a hard hit lands.
+function Juice.pow(pos: Vector3, strength: number)
+	local now = os.clock()
+	if now - lastPow < 0.22 then
+		return
+	end
+	lastPow = now
+	local k = math.clamp((strength - 250) / 1200, 0, 1)
+	local a = anchor(pos + Vector3.new(0, 1.5, 0), 1.2)
+	local bb = Instance.new("BillboardGui")
+	local px = math.floor(120 + 90 * k)
+	bb.Size = UDim2.fromOffset(px * 2, px)
+	bb.AlwaysOnTop = true
+	bb.LightInfluence = 0
+	bb.StudsOffsetWorldSpace = Vector3.new(0, 2.5, 0)
+	bb.Parent = a
+	local color = WORD_COLORS[rng:NextInteger(1, #WORD_COLORS)]
+	-- The spiky star: squares turned round a centre, like a comic burst.
+	local star = Instance.new("Frame")
+	star.AnchorPoint = Vector2.new(0.5, 0.5)
+	star.Position = UDim2.fromScale(0.5, 0.5)
+	star.Size = UDim2.fromOffset(px * 0.9, px * 0.9)
+	star.BackgroundTransparency = 1
+	star.Parent = bb
+	for i = 0, 3 do
+		local sq = Instance.new("Frame")
+		sq.AnchorPoint = Vector2.new(0.5, 0.5)
+		sq.Position = UDim2.fromScale(0.5, 0.5)
+		sq.Size = UDim2.fromScale(0.72, 0.72)
+		sq.Rotation = i * 22.5
+		sq.BackgroundColor3 = Color3.new(1, 1, 1)
+		sq.BorderSizePixel = 0
+		sq.Parent = star
+		local st = Instance.new("UIStroke")
+		st.Color = color
+		st.Thickness = 4
+		st.Parent = sq
+	end
+	local word = Instance.new("TextLabel")
+	word.BackgroundTransparency = 1
+	word.Size = UDim2.fromScale(1, 1)
+	word.Font = Enum.Font.FredokaOne
+	word.Text = WORDS[rng:NextInteger(1, #WORDS)]
+	word.TextScaled = true
+	word.TextColor3 = color
+	word.TextStrokeTransparency = 0
+	word.TextStrokeColor3 = Color3.fromRGB(30, 22, 40)
+	word.Rotation = rng:NextNumber(-14, 14)
+	word.ZIndex = 2
+	word.Parent = bb
+	local stroke = Instance.new("UIStroke")
+	stroke.Thickness = 4
+	stroke.Color = Color3.fromRGB(30, 22, 40)
+	stroke.Parent = word
+	local scale = Instance.new("UIScale")
+	scale.Scale = 0.1
+	scale.Parent = star
+	local s2 = Instance.new("UIScale")
+	s2.Scale = 0.1
+	s2.Parent = word
+	TweenService:Create(scale, TweenInfo.new(0.18, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+	TweenService:Create(s2, TweenInfo.new(0.22, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+	TweenService:Create(star, TweenInfo.new(0.6), { Rotation = 45 }):Play()
+	task.delay(0.55, function()
+		TweenService:Create(scale, TweenInfo.new(0.2), { Scale = 0 }):Play()
+		TweenService:Create(s2, TweenInfo.new(0.2), { Scale = 0 }):Play()
+	end)
+	-- Cartoon stars flying off.
+	emit(a, { Texture = TEX.sparkle, Color = ColorSequence.new(color, Color3.new(1, 1, 1)), Size = NumberSequence.new(1.1, 0), Lifetime = NumberRange.new(0.3, 0.6), Speed = NumberRange.new(10, 20), Drag = 4, Acceleration = Vector3.new(0, -25, 0), LightEmission = 1, Brightness = 5, RotSpeed = NumberRange.new(-300, 300) }, 12)
+end
+
+--- The marbles that met flash white for a blink.
+function Juice.flash(pos: Vector3, within: number, tableModel: Instance?)
+	local marbles = tableModel and tableModel:FindFirstChild("Marbles")
+	if not marbles then
+		return
+	end
+	for _, m in ipairs(marbles:GetChildren()) do
+		if m:IsA("BasePart") and (m.Position - pos).Magnitude < within + m.Size.X then
+			local hl = Instance.new("Highlight")
+			hl.FillColor = Color3.new(1, 1, 1)
+			hl.FillTransparency = 0.2
+			hl.OutlineColor = Color3.fromRGB(255, 240, 150)
+			hl.OutlineTransparency = 0
+			hl.DepthMode = Enum.HighlightDepthMode.Occluded
+			hl.Parent = m
+			TweenService:Create(hl, TweenInfo.new(0.22), { FillTransparency = 1, OutlineTransparency = 1 }):Play()
+			Debris:AddItem(hl, 0.3)
+		end
+	end
+end
+
 --- Shake the camera about the pose the rig gave it, and the zoom punch. Call after placing it.
 local clock = 0
 function Juice.apply(camera: Camera, target: Vector3, baseFov: number, dt: number)

@@ -185,18 +185,22 @@ check("the flick on ice plays snow", log:find("footstep_snow") ~= nil)
 check("a Mythic plays the legendary sting", log:find("reveal_legendary") ~= nil)
 Sfx.log = nil
 
--- The uploaded sprite loads, at its full length.
+-- The uploaded audio loads: the sprite at its full length, and the music.
 local Ids = require(Ringer.Ids)
-if Ids.audio and (Ids.audio.sfx or 0) ~= 0 then
-	local snd = Instance.new("Sound")
-	snd.SoundId = "rbxassetid://" .. Ids.audio.sfx
-	snd.Parent = workspace
-	local t0 = os.clock()
-	while not snd.IsLoaded and os.clock() - t0 < 30 do
-		task.wait(0.5)
+local MIN = { sfx = 180, lobby = 55, match = 60 }
+for key, minLen in pairs(MIN) do
+	local id = Ids.audio and Ids.audio[key]
+	if id and id ~= 0 then
+		local snd = Instance.new("Sound")
+		snd.SoundId = "rbxassetid://" .. id
+		snd.Parent = workspace
+		local t0 = os.clock()
+		while not snd.IsLoaded and os.clock() - t0 < 30 do
+			task.wait(0.5)
+		end
+		check(key .. " audio loads from Roblox", snd.IsLoaded and snd.TimeLength > minLen, string.format("loaded %s, %.1f s", tostring(snd.IsLoaded), snd.TimeLength))
+		snd:Destroy()
 	end
-	check("the sound sprite loads from Roblox", snd.IsLoaded and snd.TimeLength > 170, string.format("loaded %s, %.1f s", tostring(snd.IsLoaded), snd.TimeLength))
-	snd:Destroy()
 end
 
 -- Feel: the hit, capture and signature effects, the turn banner, the intro and emotes all run.
@@ -210,6 +214,8 @@ local okJ, errJ = pcall(function()
 	Juice.capture(p, Color3.new(1, 0.5, 0), 3)
 	Juice.signature(p, "flames,lightning,galaxy,snow", Color3.new(0, 1, 1))
 	Juice.launch(0.8)
+	Juice.pow(p, 900)
+	Juice.flash(p, 2, nil)
 end)
 check("hit, capture and signature effects run", okJ and Juice.trauma > 0 and Juice.fovKick > 0, errJ)
 local frame = Instance.new("Frame")
@@ -224,6 +230,14 @@ check("intro, turn banner and emote run", okS, errS)
 check("the turn banner names the shooter", frame:FindFirstChild("TurnBanner") ~= nil and (frame.TurnBanner:FindFirstChildOfClass("TextLabel") :: TextLabel).Text == "TIDE'S TURN", frame:FindFirstChild("TurnBanner") and (frame.TurnBanner:FindFirstChildOfClass("TextLabel") :: TextLabel).Text)
 check("the pill says who is shooting", (frame:FindFirstChild("TurnPill") :: TextLabel).Text:find("Tide") ~= nil)
 Show.clear()
+
+local Rewards = require(client.Rewards)
+check("levels: 0 games is level 1, 50 XP is level 2", Rewards.level(0, 0) == 1 and Rewards.level(5, 0) == 2 and Rewards.level(3, 2) == 2, Rewards.level(5, 0))
+local lv, into, span = Rewards.level(20, 10)
+check("level 4 at 350 XP", lv == 4 and into == 50 and span == 200, string.format("%d %d %d", lv, into, span))
+for _, n in ipairs({ "pop", "boing", "coin_fly", "levelup", "fanfare" }) do
+	check(n .. " is in the sprite", Index[n] ~= nil)
+end
 
 -- 4. Ambience changes the light for a field and gives it back.
 local Lighting = game:GetService("Lighting")

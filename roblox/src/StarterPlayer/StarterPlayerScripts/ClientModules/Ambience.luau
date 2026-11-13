@@ -32,7 +32,7 @@ local function save()
 		Ambient = Lighting.Ambient,
 		OutdoorAmbient = Lighting.OutdoorAmbient,
 		atm = atm and { Density = atm.Density, Color = atm.Color, Decay = atm.Decay, Haze = atm.Haze, Offset = atm.Offset },
-		cc = cc and { TintColor = cc.TintColor, Saturation = cc.Saturation },
+		cc = cc and { TintColor = cc.TintColor, Saturation = cc.Saturation, Contrast = cc.Contrast, Brightness = cc.Brightness },
 	}
 end
 
@@ -99,18 +99,19 @@ function Ambience.enter(arenaId: string, origin: Vector3, tableId: number?)
 	local indoor = arenaId == "desk"
 	tween(Lighting, {
 		ClockTime = arena.sun.clock,
-		Brightness = arena.sun.brightness,
+		Brightness = arena.sun.brightness * 1.15,
 		Ambient = lerp(arena.ambient, Color3.new(0.45, 0.45, 0.5), 0.5),
 		OutdoorAmbient = lerp(arena.sky.bottom, arena.ambient, 0.35),
 	})
 	local atm = Lighting:FindFirstChildOfClass("Atmosphere")
 	if atm then
 		-- The web game's fog: indoors the far desk melts into warm haze; outside, the sky's blue.
-		tween(atm, { Density = if indoor then 0.5 else 0.3, Color = arena.fog, Decay = if indoor then arena.sky.bottom else arena.sky.top, Haze = if indoor then 2.6 else 1.2, Offset = 0.05 })
+		tween(atm, { Density = if indoor then 0.36 else 0.24, Color = arena.fog, Decay = if indoor then arena.sky.bottom else arena.sky.top, Haze = if indoor then 1.6 else 0.6, Offset = 0.05 })
 	end
 	local cc = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
 	if cc then
-		tween(cc, { TintColor = lerp(Color3.new(1, 1, 1), arena.sun.color, 0.5), Saturation = if arenaId == "ice" then 0.08 else 0.22 })
+		-- Bright and punchy, toy-box colours: kids first.
+		tween(cc, { TintColor = lerp(Color3.new(1, 1, 1), arena.sun.color, 0.35), Saturation = if arenaId == "ice" then 0.25 else 0.4, Contrast = 0.12, Brightness = 0.03 })
 	end
 	if air then
 		air:Destroy()

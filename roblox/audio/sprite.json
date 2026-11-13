@@ -1,6 +1,6 @@
 {
  "file": "ringer-sfx.ogg",
- "length": 178.315,
+ "length": 184.9,
  "sounds": {
   "footstep_carpet_0": {
    "start": 0.3,
@@ -512,54 +512,79 @@
    "stop": 163.1646,
    "loop": true
   },
-  "coin": {
+  "pop": {
    "start": 163.4646,
-   "stop": 163.9546,
+   "stop": 163.6446,
+   "loop": false
+  },
+  "boing": {
+   "start": 163.9446,
+   "stop": 164.4446,
+   "loop": false
+  },
+  "coin_fly": {
+   "start": 164.7446,
+   "stop": 165.2696,
+   "loop": false
+  },
+  "levelup": {
+   "start": 165.5696,
+   "stop": 167.4296,
+   "loop": false
+  },
+  "fanfare": {
+   "start": 167.7296,
+   "stop": 169.7496,
+   "loop": false
+  },
+  "coin": {
+   "start": 170.0496,
+   "stop": 170.5396,
    "loop": false
   },
   "buy": {
-   "start": 164.2546,
-   "stop": 165.0946,
+   "start": 170.8396,
+   "stop": 171.6796,
    "loop": false
   },
   "equip": {
-   "start": 165.3946,
-   "stop": 166.2946,
+   "start": 171.9796,
+   "stop": 172.8796,
    "loop": false
   },
   "whoosh": {
-   "start": 166.5946,
-   "stop": 167.0446,
+   "start": 173.1796,
+   "stop": 173.6296,
    "loop": false
   },
   "tick": {
-   "start": 167.3446,
-   "stop": 167.4046,
+   "start": 173.9296,
+   "stop": 173.9896,
    "loop": false
   },
   "charge": {
-   "start": 167.7046,
-   "stop": 169.5046,
+   "start": 174.2896,
+   "stop": 176.0896,
    "loop": true
   },
   "reveal_common": {
-   "start": 169.8046,
-   "stop": 171.1846,
+   "start": 176.3896,
+   "stop": 177.7696,
    "loop": false
   },
   "reveal_rare": {
-   "start": 171.4846,
-   "stop": 172.9246,
+   "start": 178.0696,
+   "stop": 179.5096,
    "loop": false
   },
   "reveal_epic": {
-   "start": 173.2246,
-   "stop": 174.7246,
+   "start": 179.8096,
+   "stop": 181.3096,
    "loop": false
   },
   "reveal_legendary": {
-   "start": 175.0246,
-   "stop": 178.0146,
+   "start": 181.6096,
+   "stop": 184.5996,
    "loop": false
   }
  }
