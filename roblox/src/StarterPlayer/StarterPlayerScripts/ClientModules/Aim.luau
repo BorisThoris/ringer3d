@@ -16,6 +16,7 @@ local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Ringer.Config)
+local Juice = require(script.Parent.Juice)
 local Rules = require(ReplicatedStorage.Ringer.Rules)
 local Sim = require(ReplicatedStorage.Ringer.Sim)
 local MarbleLook = require(ReplicatedStorage.Ringer.MarbleLook)
@@ -464,27 +465,138 @@ local function drawAim(showGuide: boolean)
 end
 
 -- ---- Camera -------------------------------------------------------------------------------
-local function updateCamera()
+-- The web game's rig (GameView.updateCamera): an orbit about a target point (yaw, pitch,
+-- distance) that eases toward what the moment wants, frame-rate independent, swinging the short
+-- way round, with a hand on it (slow sway), a bank into turns, and Juice's shake and zoom punch.
+-- Turns hand over with a smooth swing round the ring instead of a cut.
+--   aim:     over the shooter's shoulder along the aim (yours, or a bot's prepared shot)
+--   follow:  ride behind the shooter while it flies, then rise and watch the scatter settle
+--   watch:   from your side of the ring while someone else lines up
+--   intro:   a crane round the field before the first shot (Aim.introUntil)
+Aim.introUntil = 0
+Aim.baseFov = 70
+local rig = { tx = 0, ty = 0, tz = 0, yaw = 0, pitch = 0.9, dist = 120, roll = 0, lastYaw = 0, init = false }
+local chaseLast: Vector3? = nil
+local elapsed = 0
+
+local function shooterPart(): BasePart?
+	local s = Aim.state
+	local model = s and Workspace:FindFirstChild("Table" .. s.id)
+	local marbles = model and model:FindFirstChild("Marbles")
+	return marbles and marbles:FindFirstChild("Shooter") :: BasePart?
+end
+
+local function updateCamera(dt: number)
 	local s = Aim.state
 	camera.CameraType = Enum.CameraType.Scriptable
-	local want: CFrame
-	if Aim.topView then
-		want = CFrame.lookAt(s.origin + Vector3.new(0, 78 * zoom, 0.01), s.origin)
-	elseif s.phase == "aim" and (myTurn() or prepared) then
-		-- Behind the taw, looking along the aim.
-		local ox, oz = originXZ()
-		local o = world(ox, 0, oz)
-		local dir = Vector3.new(math.cos(aim.aimAngle), 0, math.sin(aim.aimAngle))
-		local dist = 26 * zoom
-		local eye = o - dir * math.cos(pitch) * dist + Vector3.new(0, math.sin(pitch) * dist + 2, 0)
-		want = CFrame.lookAt(eye, o + dir * 8)
-	else
-		-- Overview from your side of the ring.
-		local a = Rules.seatAngle(Aim.mySeat or s.current, #s.seats)
-		local back = Vector3.new(math.cos(a), 0, math.sin(a))
-		want = CFrame.lookAt(s.origin + back * (Config.RING_R + 22) * zoom + Vector3.new(0, 36 * zoom, 0), s.origin - back * 4)
+	elapsed += dt
+	local o = s.origin
+	if not rig.init then
+		rig.init = true
+		rig.tx, rig.ty, rig.tz = o.X, o.Y, o.Z
+		rig.yaw, rig.pitch, rig.dist = Rules.seatAngle(Aim.mySeat or s.current, #s.seats), 1.1, 150
 	end
-	camera.CFrame = camera.CFrame:Lerp(want, 0.12)
+	local want = { tx = o.X, ty = o.Y, tz = o.Z, yaw = rig.yaw, pitch = 0.76, dist = 44 }
+	local mode = "watch"
+	local rate = 3
+	if os.clock() < Aim.introUntil then
+		-- The crane: a slow arc round the whole field, high to low.
+		mode = "intro"
+		local left = Aim.introUntil - os.clock()
+		want.yaw = rig.yaw + dt * 0.45
+		want.pitch = 0.5 + left * 0.12
+		want.dist = 70 + left * 10
+		rate = 2.2
+	elseif Aim.topView then
+		mode = "top"
+		want.yaw = aim.aimAngle + math.pi
+		want.pitch = 1.42
+		want.dist = 78 * zoom
+		rate = 6
+	elseif s.phase == "aim" and (myTurn() or prepared) then
+		mode = "aim"
+		local ox, oz = originXZ()
+		local dir = Vector3.new(math.cos(aim.aimAngle), 0, math.sin(aim.aimAngle))
+		local t = world(ox, 0, oz) + dir * 8
+		want.tx, want.ty, want.tz = t.X, t.Y, t.Z
+		want.yaw = aim.aimAngle + math.pi
+		want.pitch = pitch
+		want.dist = 34 * zoom
+		-- Snappy while you aim yourself; a calmer swing when the turn has just passed.
+		rate = if myTurn() then 9 else 4
+	elseif s.phase == "rolling" then
+		mode = "follow"
+		local sp = shooterPart()
+		local v = Vector3.zero
+		if sp then
+			if chaseLast and dt > 0 then
+				v = (sp.Position - chaseLast) / dt
+			end
+			chaseLast = sp.Position
+		end
+		local flat = Vector3.new(v.X, 0, v.Z)
+		if sp and flat.Magnitude > 10 then
+			-- Low and close behind the flying shooter, looking where it goes.
+			local u = flat.Unit
+			local t = sp.Position + u * 6
+			want.tx, want.ty, want.tz = t.X, o.Y, t.Z
+			want.yaw = math.atan2(-u.Z, -u.X)
+			want.pitch = 0.5
+			want.dist = 30
+			rig.lastYaw = want.yaw
+		else
+			-- Then rise and watch the scatter settle.
+			want.yaw = rig.lastYaw + dt * 0.05
+			rig.lastYaw = want.yaw
+			want.pitch = 0.82
+			want.dist = 42
+			if sp then
+				want.tx, want.tz = o.X + (sp.Position.X - o.X) * 0.4, o.Z + (sp.Position.Z - o.Z) * 0.4
+			end
+		end
+	else
+		-- Someone else's turn, or between turns: a slow dolly from your side of the ring.
+		chaseLast = nil
+		local a = Rules.seatAngle(Aim.mySeat or s.current, #s.seats)
+		want.yaw = a + math.sin(elapsed * 0.1) * 0.25
+		want.pitch = 0.76
+		want.dist = (46 + math.sin(elapsed * 0.21) * 4) * zoom
+		rate = 2.5
+	end
+	if mode ~= "follow" then
+		rig.lastYaw = want.yaw
+		if mode ~= "aim" then
+			chaseLast = nil
+		end
+	end
+	local k = 1 - math.exp(-dt * rate)
+	local dy = math.atan2(math.sin(want.yaw - rig.yaw), math.cos(want.yaw - rig.yaw))
+	rig.yaw += dy * k
+	rig.pitch += (want.pitch - rig.pitch) * k
+	rig.dist += (want.dist - rig.dist) * k
+	rig.tx += (want.tx - rig.tx) * k
+	rig.ty += (want.ty - rig.ty) * k
+	rig.tz += (want.tz - rig.tz) * k
+	-- A hand on the camera: barely there while aiming, more while watching.
+	local sway = if mode == "aim" then 0.15 elseif mode == "top" then 0 else 1
+	local t = elapsed
+	local ox = (math.sin(t * 0.37) + math.sin(t * 0.83 + 1.3) * 0.5) * 0.7 * sway
+	local oz = (math.sin(t * 0.29 + 2.1) + math.sin(t * 0.71) * 0.5) * 0.7 * sway
+	local p = rig.pitch + math.sin(t * 0.23 + 0.7) * 0.025 * sway
+	local y = rig.yaw + math.sin(t * 0.17 + 1.9) * 0.03 * sway
+	local target = Vector3.new(rig.tx + ox, rig.ty, rig.tz + oz)
+	local eye = target + Vector3.new(math.cos(y) * math.cos(p), math.sin(p), math.sin(y) * math.cos(p)) * rig.dist
+	-- Bank into turns, like a camera on a dolly track.
+	local yawRate = if dt > 0 then dy * k / dt else 0
+	local wantRoll = math.clamp(-yawRate * 0.05, -0.07, 0.07) + math.sin(t * 0.19) * 0.012 * sway
+	rig.roll += (wantRoll - rig.roll) * (1 - math.exp(-dt * 2))
+	camera.CFrame = CFrame.lookAt(eye, target) * CFrame.Angles(0, 0, if mode == "top" then 0 else rig.roll)
+	Juice.apply(camera, target, Aim.baseFov, dt)
+end
+
+--- Where the camera looks (for tests and the intro).
+function Aim.cameraRig()
+	return rig
 end
 
 local function update(dt: number)
@@ -493,7 +605,7 @@ local function update(dt: number)
 		return
 	end
 	if s.phase ~= "over" then
-		updateCamera()
+		updateCamera(dt)
 	end
 
 	-- A prepared shot (bot or other player): swing the aim to it, then charge.
@@ -747,9 +859,10 @@ function Aim.set(state)
 		end
 	end
 	if not was or was.id ~= state.id then
-		-- A new table: start the camera from above it.
+		-- A new table: the rig starts high over it and cranes in.
 		camera.CameraType = Enum.CameraType.Scriptable
-		camera.CFrame = CFrame.lookAt(state.origin + Vector3.new(0, 90, 40), state.origin)
+		rig.init = false
+		Juice.clear()
 		clearViz()
 	end
 	if state.phase == "aim" then
@@ -781,6 +894,9 @@ function Aim.stop()
 	Aim.state = nil
 	Aim.mySeat = nil
 	camera.CameraType = Enum.CameraType.Custom
+	camera.FieldOfView = Aim.baseFov
+	Juice.clear()
+	rig.init = false
 	local me = Players.LocalPlayer
 	local hum = me and me.Character and me.Character:FindFirstChildOfClass("Humanoid")
 	if hum then

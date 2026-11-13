@@ -199,6 +199,32 @@ if Ids.audio and (Ids.audio.sfx or 0) ~= 0 then
 	snd:Destroy()
 end
 
+-- Feel: the hit, capture and signature effects, the turn banner, the intro and emotes all run.
+local Juice = require(client.Juice)
+local Show = require(client.Show)
+local okJ, errJ = pcall(function()
+	local p = Vector3.new(7000, 1, 0)
+	Juice.sparks(p, 600)
+	Juice.shockwave(p, 900, Color3.new(1, 1, 1))
+	Juice.capture(p, Color3.new(1, 0.5, 0), 1)
+	Juice.capture(p, Color3.new(1, 0.5, 0), 3)
+	Juice.signature(p, "flames,lightning,galaxy,snow", Color3.new(0, 1, 1))
+	Juice.launch(0.8)
+end)
+check("hit, capture and signature effects run", okJ and Juice.trauma > 0 and Juice.fovKick > 0, errJ)
+local frame = Instance.new("Frame")
+Show.attach(frame)
+local st = { id = 999, origin = Vector3.new(7000, 0, 0), arena = "grass", seats = { { name = "You", marble = "dragon", userId = 1 }, { name = "Tide Bot", marble = "tide" } }, current = 2, phase = "aim", firstShot = true, shots = 0 }
+local okS, errS = pcall(function()
+	Show.intro(st, 1)
+	Show.turn(st, 1)
+	Show.emote(st, 2, "🔥")
+end)
+check("intro, turn banner and emote run", okS, errS)
+check("the turn banner names the shooter", frame:FindFirstChild("TurnBanner") ~= nil and (frame.TurnBanner:FindFirstChildOfClass("TextLabel") :: TextLabel).Text == "TIDE'S TURN", frame:FindFirstChild("TurnBanner") and (frame.TurnBanner:FindFirstChildOfClass("TextLabel") :: TextLabel).Text)
+check("the pill says who is shooting", (frame:FindFirstChild("TurnPill") :: TextLabel).Text:find("Tide") ~= nil)
+Show.clear()
+
 -- 4. Ambience changes the light for a field and gives it back.
 local Lighting = game:GetService("Lighting")
 local before = Lighting.ClockTime

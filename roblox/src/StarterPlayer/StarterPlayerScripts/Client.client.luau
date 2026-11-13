@@ -20,6 +20,8 @@ local Replay = require(Modules.Replay)
 local Sfx = require(Modules.Sfx)
 local Ambience = require(Modules.Ambience)
 local Pets = require(Modules.Pets)
+local Juice = require(Modules.Juice)
+local Show = require(Modules.Show)
 
 -- Marbles come alive (bolts, moons, auras), and everyone's marble floats beside them.
 MarbleFX.animate()
@@ -639,10 +641,11 @@ end, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -24), 
 -- In-match HUD
 -- =============================================================================================
 local match = Kit.new("Frame", { Name = "Match", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = false, Parent = screen })
+Show.attach(match)
 local cards = Kit.new("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 8), Size = UDim2.fromOffset(620, 70), BackgroundTransparency = 1, Parent = match })
 Kit.new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, Padding = UDim.new(0, 16), Parent = cards })
 local banner = Kit.label("", 30, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 92), Size = UDim2.new(0.8, 0, 0, 40), Parent = match })
-local hint = Kit.label("", 20, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -20), Size = UDim2.new(0.8, 0, 0, 30), Parent = match })
+local hint = Kit.label("", 20, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -76), Size = UDim2.new(0.8, 0, 0, 30), Parent = match })
 -- The power bar, the web game's: press it, pull down, let go to shoot. A button, so a touch on it
 -- never turns the aim. Hold Space to charge with a keyboard.
 local meterBack = Kit.new("TextButton", { Text = "", AutoButtonColor = false, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -24, 0.5, 0), Size = UDim2.fromOffset(70, 300), BackgroundColor3 = Kit.PANEL, Visible = false, Parent = match })
@@ -686,6 +689,20 @@ UserInputService.InputEnded:Connect(Aim.powerBar.ended)
 Kit.button("Leave", Kit.RED, function()
 	ask("leave")
 end, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -16, 1, -16), Size = UDim2.fromOffset(120, 48), Parent = match })
+-- Emotes: a tap sends a bubble over your seat for everyone at the table.
+local emoteBar = Kit.new("Frame", { Name = "Emotes", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -12), Size = UDim2.fromOffset(6 * 62, 56), BackgroundTransparency = 1, Parent = match })
+Kit.new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, Padding = UDim.new(0, 6), Parent = emoteBar })
+local emoteReady = 0
+for _, e in ipairs(Show.EMOTES) do
+	local b = Kit.button(e, Color3.fromRGB(255, 255, 255), function()
+		if os.clock() < emoteReady then
+			return
+		end
+		emoteReady = os.clock() + 1.5
+		task.spawn(ask, "emote", e)
+	end, { Size = UDim2.fromOffset(56, 56), TextSize = 32, Parent = emoteBar })
+	b.BackgroundTransparency = 0.25
+end
 Kit.button("View", Kit.BLUE, function()
 	Aim.topView = not Aim.topView
 end, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -146, 1, -16), Size = UDim2.fromOffset(110, 48), Parent = match })
@@ -771,14 +788,38 @@ local resultPanelRef: Frame? = nil
 -- The field's light, air and sound follow the table this client watches.
 local soundTable: number? = nil
 local lastTurn = ""
-Replay.onImpact = function(kind, strength, _pos)
+-- The shooter's marble and colour, for its signature hit and the capture celebration.
+local function shooterLook()
+	local s = Aim.state
+	local seat = s and s.seats[s.current]
+	return MarbleLook.lookFor(seat and seat.marble)
+end
+local capturesThisShot = 0
+Replay.onImpact = function(kind, strength, pos)
 	Sfx.clack(strength, kind)
+	-- The web game's hit feedback: a jolt for hard hits, a shockwave for harder ones; sparks on
+	-- every real clack, and the shooter's own effect thrown out when it hits hard.
+	if strength > 60 then
+		Juice.sparks(pos, strength, if kind == "bumper" then Color3.fromRGB(255, 210, 63) else nil)
+	end
+	if strength >= 120 then
+		Juice.kick(math.min(if kind == "marble" then 0.45 else 0.25, strength / 2400))
+	end
+	if strength > 260 then
+		Juice.shockwave(pos, strength, if kind == "bumper" then Color3.fromHex("#ffd23f") elseif kind == "kerb" then Color3.fromHex("#ffd9a8") else Color3.new(1, 1, 1))
+	end
+	if kind == "marble" and strength > 400 then
+		local look = shooterLook()
+		Juice.signature(pos, table.concat(MarbleFX.forLook(look), ","), MarbleLook.uiColor(look))
+	end
 end
 Replay.onFrame = function(speed)
 	Sfx.setRolling(speed)
 end
-Replay.onCross = function(_pos)
+Replay.onCross = function(pos)
 	Sfx.chime("capture")
+	capturesThisShot += 1
+	Juice.capture(pos, MarbleLook.uiColor(shooterLook()), capturesThisShot)
 end
 Replay.onBreak = function(_pos)
 	Sfx.clack(900, "kerb")
@@ -788,6 +829,7 @@ local function leaveTable()
 	lastTurn = ""
 	Sfx.stopPad()
 	Ambience.leave()
+	Show.clear()
 end
 
 local function onState(state)
@@ -800,12 +842,23 @@ local function onState(state)
 			Sfx.startPad(field.mood)
 		end
 	end
-	if state.phase == "aim" and state.firstShot then
-		local key = tostring(state.id) .. ":" .. tostring(state.current) .. ":" .. tostring(state.scores and table.concat(state.scores, ","))
-		if key ~= lastTurn then
-			lastTurn = key
-			Sfx.chime("turn")
+	-- A new table: the intro first, then whose turn it is.
+	local fresh = soundTable == state.id and lastTurn ~= tostring(state.id)
+	if fresh then
+		lastTurn = tostring(state.id)
+		if (state.shots or 0) == 0 then
+			Show.intro(state, Aim.mySeat)
 		end
+	end
+	if os.clock() < Aim.introUntil then
+		local s = state
+		task.delay(Aim.introUntil - os.clock() + 0.05, function()
+			if Aim.state == s then
+				Show.turn(s, Aim.mySeat)
+			end
+		end)
+	else
+		Show.turn(state, Aim.mySeat)
 	end
 	if resultPanelRef and resultPanelRef.Visible and state.phase ~= "over" then
 		resultPanelRef.Visible = false
@@ -832,7 +885,8 @@ local function onState(state)
 	meterBack.Visible = spinPad.Visible
 	Aim.onPower(0)
 	if state.phase == "aim" then
-		banner.Text = mine and (state.firstShot and "Your turn!" or "Shoot again!") or (state.seats[state.current].name .. "'s turn")
+		-- Whose turn it is: Show's swoop, pill and beacon; the line here keeps the series score.
+		banner.Text = ""
 		local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 		if not mine then
 			hint.Text = ""
@@ -842,7 +896,7 @@ local function onState(state)
 			hint.Text = if state.firstShot then "Drag your marble along the line (A/D), drag or arrows to aim, hold Space or pull the bar to shoot" else "Drag or arrows to aim, hold Space or pull the bar to shoot"
 		end
 		if state.series and state.wins and state.wins > 1 then
-			banner.Text ..= string.format("   -   Best of %d: %d-%d", state.wins * 2 - 1, state.series[1], state.series[2])
+			banner.Text = string.format("Best of %d: %d-%d", state.wins * 2 - 1, state.series[1], state.series[2])
 		end
 	end
 	if timerConn then
@@ -1074,8 +1128,10 @@ Remotes:WaitForChild("TableEvent").OnClientEvent:Connect(function(kind, data, id
 	elseif kind == "shot" then
 		local state = Aim.state
 		Aim.shotStarted()
+		capturesThisShot = 0
 		if data.shot and data.shot.power then
 			Sfx.launch(data.shot.power)
+			Juice.launch(data.shot.power)
 		end
 		hint.Text = ""
 		if state and state.id == id then
@@ -1090,6 +1146,10 @@ Remotes:WaitForChild("TableEvent").OnClientEvent:Connect(function(kind, data, id
 		banner.Text = mine and "Got one!" or "Captured!"
 	elseif kind == "shootAgain" then
 		banner.Text = data.seat == Aim.mySeat and "Shoot again!" or "They shoot again"
+	elseif kind == "emote" then
+		if Aim.state and Aim.state.id == id then
+			Show.emote(Aim.state, data.seat, data.e)
+		end
 	elseif kind == "seatLost" then
 		toast(data.name .. " left: a bot takes their seat.", "info")
 	elseif kind == "shooterOut" and data.seat == Aim.mySeat then

@@ -374,15 +374,49 @@ function Table:play(shot): boolean
 	return self:resolve(after, holed)
 end
 
+-- Bots react like players do, once the shot has played out on the clients: pleased with a
+-- capture, impressed by a big one from someone else, glum when their marble flies out.
+local BOT_EMOTES = { mine = { "🔥", "😎", "👏" }, theirs = { "😮", "👏" }, out = { "😭", "😂" } }
+function Table:botReactions(seat: number, took: number, shooterOut: boolean)
+	-- Its own dice, so reactions never shift the game's.
+	self.emoteRng = self.emoteRng or Random.new((self.seed or 1) + 7919)
+	local rng = self.emoteRng
+	local picks = {}
+	for i, s in ipairs(self.seats) do
+		if s.kind == "bot" then
+			local list = nil
+			if i == seat and took > 0 and rng:NextNumber() < 0.55 then
+				list = BOT_EMOTES.mine
+			elseif i == seat and shooterOut and rng:NextNumber() < 0.3 then
+				list = BOT_EMOTES.out
+			elseif i ~= seat and took >= 2 and rng:NextNumber() < 0.5 then
+				list = BOT_EMOTES.theirs
+			end
+			if list then
+				table.insert(picks, { seat = i, e = list[rng:NextInteger(1, #list)] })
+			end
+		end
+	end
+	if #picks > 0 then
+		task.delay(2.4, function()
+			for _, p in ipairs(picks) do
+				self:broadcast("emote", p)
+			end
+		end)
+	end
+end
+
 --- Score the shot and decide whose turn it is (the web game's Match.resolve).
 function Table:resolve(after, holed): boolean
 	local seat = self.current
 	self.dryShots += 1
 	local kept = {}
+	local took = 0
 	for _, t in ipairs(after.targets) do
 		if Sim.isOutsideRing(t.x, t.z) then
 			self.dryShots = 0
 			self.scores[seat] += 1
+			took += 1
 			table.insert(self.captured[seat], "Mib" .. t.id)
 			local part = self.parts[t.id]
 			local cup = holed[t.id]
@@ -405,6 +439,7 @@ function Table:resolve(after, holed): boolean
 		self:broadcast("shooterOut", { seat = seat })
 	end
 	self.layout = after
+	self:botReactions(seat, took, shooterOut)
 
 	local winners = Rules.gameOver(self.scores, #after.targets, self.dryShots)
 	if winners then

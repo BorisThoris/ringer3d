@@ -594,6 +594,25 @@ function handlers.leave(player: Player)
 	return true
 end
 
+-- Emotes at the table: one of the six, at most one every 1.2 s.
+local EMOTES = { ["😂"] = true, ["🔥"] = true, ["😎"] = true, ["😮"] = true, ["😭"] = true, ["👏"] = true }
+local lastEmote: { [Player]: number } = {}
+function handlers.emote(player: Player, e)
+	local tbl = active[player]
+	if not (tbl and typeof(e) == "string" and EMOTES[e]) then
+		return false
+	end
+	if os.clock() - (lastEmote[player] or 0) < 1.2 then
+		return false
+	end
+	lastEmote[player] = os.clock()
+	local seat = tbl:seatOf(player)
+	if seat then
+		tbl:broadcast("emote", { seat = seat, e = e })
+	end
+	return true
+end
+
 function handlers.equip(player: Player, id)
 	if not (typeof(id) == "string" and Collectibles.holds(player, id)) then
 		return false
