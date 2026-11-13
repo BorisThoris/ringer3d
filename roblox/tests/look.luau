@@ -45,8 +45,8 @@ for i, id in ipairs(Config.ARENA_ORDER) do
 		end
 	end
 	check(id .. " ground is " .. arena.material.Name, ground and ground.Material == arena.material, ground and ground.Material.Name)
-	check(id .. " has its bank", count.Bank >= 96 * (#arena.bank.profile - 2), count.Bank)
-	check(id .. " ring is " .. arena.ring.style, count.Line == 160, count.Line)
+	check(id .. " has its bank", count.Bank >= 64 * (#arena.bank.profile - 2), count.Bank)
+	check(id .. " ring is " .. arena.ring.style, count.Line == 120, count.Line)
 	check(id .. " has its scenery (" .. SCENERY[id] .. ")", count.Scenery >= 1, count.Scenery)
 	check(id .. " has 2 stands", #built.stands == 2)
 	-- Nothing of the field stands inside the ring's play area, where marbles roll.
@@ -90,17 +90,19 @@ for _, m in ipairs(Config.MARBLES) do
 			emitters += 1
 		elseif d:IsA("Beam") then
 			beams += 1
+		elseif d.Name:match("^Bolt%d_") then
+			beams += 1
 		elseif d.Name:match("^Moon") then
 			moons += 1
 		end
 	end
 	local alive = #want == 0 or emitters + beams + moons > 0 or ball:FindFirstChildOfClass("PointLight") ~= nil
-	check(m.id .. " effects: " .. table.concat(want, ","), alive, string.format("%d emitters %d beams %d moons", emitters, beams, moons))
+	check(m.id .. " effects: " .. table.concat(want, ","), alive, string.format("%d emitters %d bolt segments %d moons", emitters, beams, moons))
 	if m.tagline then
 		check(m.id .. " (Premium) is alive inside and described", #want >= 1 and MarbleFX.describe(look) ~= "")
 	end
 	if table.find(want, "lightning") then
-		check(m.id .. " has 3 bolts", beams == 3, beams)
+		check(m.id .. " has 3 bolts of 4 neon segments", beams == 12, beams)
 	end
 	if table.find(want, "orbit") then
 		check(m.id .. " has 3 moons", moons == 3, moons)

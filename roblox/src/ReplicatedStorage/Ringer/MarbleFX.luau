@@ -27,6 +27,7 @@ local TEX = {
 	square = "rbxasset://textures/particles/SquareParticle.png",
 }
 MarbleFX.TEX = TEX
+MarbleFX.RATE = 0.7 -- every emitter's share of its full rate
 
 -- What each effect is called on a card ("✦ Lightning inside").
 MarbleFX.LABEL = {
@@ -178,6 +179,8 @@ local function emitter(parent: Instance, props: { [string]: any }): ParticleEmit
 	for k, v in pairs(props) do
 		(e :: any)[k] = v
 	end
+	-- Kept light: phones draw these too.
+	e.Rate = e.Rate * MarbleFX.RATE
 	e.Parent = parent
 	return e
 end
@@ -216,8 +219,28 @@ local BUILD = {}
 
 BUILD.flames = function(ball, r, look)
 	local v = inner(ball, r, 0.55)
-	emitter(v, { Name = "Flames", Texture = TEX.fire, Color = seq(Color3.fromRGB(255, 240, 160), look.accent, Color3.fromRGB(180, 20, 0)), Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, r * 0.42), NumberSequenceKeypoint.new(1, r * 0.08) }), Transparency = fade(0.15, 0.15, 0.6), Lifetime = NumberRange.new(0.3, 0.45), Rate = 40, Speed = NumberRange.new(r * 0.2, r * 0.45), EmissionDirection = Enum.NormalId.Top, Acceleration = Vector3.new(0, r * 0.5, 0), RotSpeed = NumberRange.new(-90, 90), Rotation = NumberRange.new(0, 360), LightEmission = 0.9, Brightness = 3 })
+	emitter(v, { Name = "Flames", Texture = TEX.fire, Color = seq(Color3.fromRGB(255, 240, 160), look.accent, Color3.fromRGB(180, 20, 0)), Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, r * 0.42), NumberSequenceKeypoint.new(1, r * 0.08) }), Transparency = fade(0.15, 0.15, 0.6), Lifetime = NumberRange.new(0.5, 0.8), Rate = 30, Speed = NumberRange.new(r * 0.15, r * 0.3), EmissionDirection = Enum.NormalId.Top, Acceleration = Vector3.new(0, r * 0.5, 0), RotSpeed = NumberRange.new(-90, 90), Rotation = NumberRange.new(0, 360), LightEmission = 0.9, Brightness = 3 })
 	neonCore(ball, r, look.accent, 0.28)
+	-- A neon flame tongue standing on the core, so the fire reads even where particles thin out.
+	for k = 0, 2 do
+		local f = Instance.new("Part")
+		f.Name = "Flame"
+		f.Size = Vector3.new(r * (0.3 - k * 0.08), r * (0.45 - k * 0.1), r * (0.3 - k * 0.08))
+		f.Color = look.accent:Lerp(Color3.fromRGB(255, 230, 120), k * 0.4)
+		f.Material = Enum.Material.Neon
+		f.Transparency = 0.15
+		f.CanCollide, f.CanQuery, f.CanTouch, f.Massless, f.CastShadow = false, false, false, true, false
+		local m = Instance.new("SpecialMesh")
+		m.MeshType = Enum.MeshType.Sphere
+		m.Parent = f
+		local off = CFrame.new(0, r * (0.18 + k * 0.16), 0)
+		f.CFrame = ball.CFrame * off
+		local w = Instance.new("Weld")
+		w.Part0, w.Part1, w.C0 = ball, f, off
+		w.Parent = f
+		f.Parent = ball
+	end
+	ball:SetAttribute("FxPulse", 1)
 	light(ball, look.accent, r * 9, 2.2)
 end
 
@@ -234,37 +257,65 @@ BUILD.lava = function(ball, r, look)
 	ball:SetAttribute("FxPulse", 1)
 end
 
+-- A bolt: a zig-zag of thin neon segments from near the centre to the glass. `seed` picks its path.
+local BOLT_SEGS = 4
+local function boltPath(r: number, rng: Random): { Vector3 }
+	local dir = rng:NextUnitVector()
+	local side = dir:Cross(Vector3.yAxis)
+	if side.Magnitude < 0.1 then
+		side = dir:Cross(Vector3.xAxis)
+	end
+	side = side.Unit
+	local up = dir:Cross(side)
+	local pts = { dir * r * 0.08 }
+	for k = 1, BOLT_SEGS do
+		local f = k / BOLT_SEGS
+		local jitter = if k == BOLT_SEGS then Vector3.zero else (side * rng:NextNumber(-1, 1) + up * rng:NextNumber(-1, 1)) * r * 0.16
+		table.insert(pts, dir * r * (0.08 + f * 0.74) + jitter)
+	end
+	return pts
+end
+MarbleFX.boltPath = boltPath
+
+local function placeBolt(ball: BasePart, i: number, pts: { Vector3 })
+	for k = 1, BOLT_SEGS do
+		local seg = ball:FindFirstChild("Bolt" .. i .. "_" .. k) :: BasePart?
+		if seg then
+			local p0, p1 = pts[k], pts[k + 1]
+			local len = (p1 - p0).Magnitude
+			seg.Size = Vector3.new(seg.Size.X, seg.Size.Y, len + seg.Size.X)
+			local w = seg:FindFirstChildOfClass("Weld")
+			if w then
+				w.C0 = CFrame.lookAt((p0 + p1) / 2, p1)
+			end
+		end
+	end
+end
+MarbleFX.placeBolt = placeBolt
+
 BUILD.lightning = function(ball, r, look)
-	-- Bolts: beams between points inside the glass, re-struck by the animator.
+	-- Bolts: zig-zags of neon inside the glass, re-struck by the animator.
 	local col = look.accent
+	local rng = Random.new(#tostring(look.id) * 17 + 3)
 	for i = 1, 3 do
-		local a0 = Instance.new("Attachment")
-		a0.Name = "Bolt" .. i .. "a"
-		a0.Parent = ball
-		-- A first strike, so the bolt shows before the animator moves it.
-		local dir = Vector3.new(math.cos(i * 2.1), math.sin(i * 1.3) * 0.6, math.sin(i * 2.1)).Unit
-		a0.Position = -dir * r * 0.1
-		local a1 = Instance.new("Attachment")
-		a1.Position = dir * r * 0.82
-		a1.Name = "Bolt" .. i .. "b"
-		a1.Parent = ball
-		local b = Instance.new("Beam")
-		b.Name = "Bolt" .. i
-		b.Attachment0, b.Attachment1 = a0, a1
-		b.Color = seq(white, col)
-		b.LightEmission = 1
-		b.LightInfluence = 0
-		b.Brightness = 6
-		b.Width0, b.Width1 = r * 0.09, r * 0.04
-		b.Segments = 6
-		b.CurveSize0, b.CurveSize1 = r * 0.4, -r * 0.4
-		b.FaceCamera = true
-		b.Transparency = NumberSequence.new(0)
-		b.Parent = ball
+		for k = 1, BOLT_SEGS do
+			local seg = Instance.new("Part")
+			seg.Name = "Bolt" .. i .. "_" .. k
+			seg.Size = Vector3.new(r * 0.08, r * 0.08, r * 0.2)
+			seg.Color = if k == 1 then Color3.new(1, 1, 1) else col:Lerp(Color3.new(1, 1, 1), 0.35)
+			seg.Material = Enum.Material.Neon
+			seg.CanCollide, seg.CanQuery, seg.CanTouch, seg.Massless, seg.CastShadow = false, false, false, true, false
+			seg.CFrame = ball.CFrame
+			local w = Instance.new("Weld")
+			w.Part0, w.Part1 = ball, seg
+			w.Parent = seg
+			seg.Parent = ball
+		end
+		placeBolt(ball, i, boltPath(r, rng))
 	end
 	ball:SetAttribute("FxBolts", 3)
 	ball:SetAttribute("FxRadius", r)
-	neonCore(ball, r, white, 0.14)
+	neonCore(ball, r, Color3.new(1, 1, 1), 0.16)
 	light(ball, col, r * 9, 2.4)
 end
 
@@ -440,6 +491,19 @@ function MarbleFX.apply(ball: BasePart, look: any, r: number): { string }
 			b(ball, r, l)
 		end
 	end
+	-- Roblox sorts a see-through shell over whatever is inside it, so particles and bolts inside
+	-- the glass would vanish: draw them a marble's radius nearer the camera, which puts them in
+	-- front of the shell without moving them out of it on screen.
+	for _, d in ipairs(ball:GetDescendants()) do
+		if d:IsA("Beam") then
+			d.ZOffset = r * 1.1
+		elseif d:IsA("ParticleEmitter") and d.Parent and d.Parent.Name:match("^FxVolume") then
+			local scale = tonumber(d.Parent.Name:match("%d+")) or 100
+			if scale < 100 and d.ZOffset == 0 then
+				d.ZOffset = r * 1.1
+			end
+		end
+	end
 	ball:SetAttribute("Fx", table.concat(list, ","))
 	CollectionService:AddTag(ball, "MarbleFX")
 	return list
@@ -471,18 +535,15 @@ function MarbleFX.animate()
 			local bolts = ball:GetAttribute("FxBolts")
 			if bolts and strike then
 				for i = 1, bolts do
-					local a0 = ball:FindFirstChild("Bolt" .. i .. "a") :: Attachment?
-					local a1 = ball:FindFirstChild("Bolt" .. i .. "b") :: Attachment?
-					local beam = ball:FindFirstChild("Bolt" .. i) :: Beam?
-					if a0 and a1 and beam then
-						local show = rng:NextNumber() < 0.7
-						beam.Enabled = show
-						if show then
-							a0.Position = rng:NextUnitVector() * r * 0.15
-							a1.Position = rng:NextUnitVector() * r * 0.82
-							beam.CurveSize0 = rng:NextNumber(-r, r) * 0.6
-							beam.CurveSize1 = rng:NextNumber(-r, r) * 0.6
+					local show = rng:NextNumber() < 0.75
+					for k = 1, BOLT_SEGS do
+						local seg = ball:FindFirstChild("Bolt" .. i .. "_" .. k) :: BasePart?
+						if seg then
+							seg.LocalTransparencyModifier = if show then 0 else 1
 						end
+					end
+					if show then
+						placeBolt(ball, i, boltPath(r, rng))
 					end
 				end
 			end

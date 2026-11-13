@@ -101,7 +101,7 @@ local GROUND_ART = {
 local function bank(folder: Folder, origin: Vector3, arena: Config.Arena)
 	local B = Config.BOUND_R
 	local prof = arena.bank.profile
-	local segs = 96
+	local segs = 64
 	for i = 0, segs - 1 do
 		local a = (i + 0.5) / segs * math.pi * 2
 		local dir = Vector3.new(math.cos(a), 0, math.sin(a))
@@ -150,7 +150,7 @@ end
 local function ringLine(folder: Folder, origin: Vector3, arena: Config.Arena)
 	local R = Config.RING_R
 	local style = arena.ring.style
-	local n = 160
+	local n = 120
 	local len = 2 * math.pi * R / n * 1.04
 	for i = 0, n - 1 do
 		local a = i / n * math.pi * 2
@@ -270,7 +270,7 @@ local SCENERY = {
 				light.Range = 60
 				light.Brightness = 2.5
 				light.Color = hex("#ffe6c4")
-				light.Shadows = true
+				light.Shadows = false
 				light.Parent = shade
 				local glow = Instance.new("PointLight")
 				glow.Range = 14
