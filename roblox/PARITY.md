@@ -176,7 +176,7 @@ no sound effects"). Not gameplay: shots still roll on `Ringer.Sim`.
 | Scenery | books and the lamp, hedges, tufts and shrubs, marram grass and rocks, snowy pines, boulders, a turning windmill | lollipop trees | ported; the windmill turns on the client |
 | Light and air | per-field sun, fog, sky; dust motes on the desk, snow on the lake | one midday | `ClientModules/Ambience` sets the field's light, fog and particles while watching a table |
 | Map pieces | modelled books with page blocks, sharpened pencils, paper clips, mugs, pen pots, cones, logs, rocks, sandcastles, shells, rails, bumpers with ring and cap, pads with chevrons, ruled paper, coffee stains, cups with flags | coloured primitives | ported part by part (`Pieces.luau`); details are welded so moving props carry them |
-| Sound | Kenney CC0 impacts by surface, synthesised roll, chimes, ambient pad | none | all of it rendered into one sprite (`audio/build_sprite.py`), played as PlaybackRegions (`ClientModules/Sfx`); clacks, flick, roll, captures, breaks, turn, win/lose, pad, plus shop and bag sounds. **Needs the audio asset uploaded** (`store/ids.json` `audio.sfx`); silent until then |
+| Sound | Kenney CC0 impacts by surface, synthesised roll, chimes, ambient pad | none | all of it rendered into one sprite (`audio/build_sprite.py`), played as PlaybackRegions (`ClientModules/Sfx`); clacks, flick, roll, captures, breaks, turn, win/lose, pad, plus shop and bag sounds. live since version 60: asset 111741361055836 (`store/ids.json` `audio.sfx`), approved and loading at 178.3 s (`tests/look.luau`) |
 
 ## Marble effects and the shop (`Ringer.MarbleFX`, `Kit.showcase`, `ClientModules/Pets`)
 
