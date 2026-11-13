@@ -250,11 +250,41 @@ BUILD.embers = function(ball, r, look)
 end
 
 BUILD.lava = function(ball, r, look)
-	neonCore(ball, r, look.accent, 0.42, "Lava")
-	local v = inner(ball, r, 0.5)
-	emitter(v, { Name = "LavaBlobs", Texture = TEX.glow, Color = seq(Color3.fromRGB(255, 200, 60), look.accent, Color3.fromRGB(120, 10, 0)), Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, r * 0.2), NumberSequenceKeypoint.new(0.5, r * 0.45), NumberSequenceKeypoint.new(1, r * 0.15) }), Transparency = fade(0, 0.25, 0.7), Lifetime = NumberRange.new(1.2, 2), Rate = 10, Speed = NumberRange.new(r * 0.25, r * 0.4), EmissionDirection = Enum.NormalId.Top, LightEmission = 0.8, Brightness = 3 })
+	-- Blobs of glowing wax that rise and sink (the animator moves them), over a warm base.
+	local rng = Random.new(#tostring(look.id) * 7 + 1)
+	for k = 1, 6 do
+		local blob = Instance.new("Part")
+		blob.Name = "LavaBlob" .. k
+		local s = r * rng:NextNumber(0.2, 0.36)
+		blob.Size = Vector3.new(s, s * rng:NextNumber(1.1, 1.6), s)
+		blob.Color = if k % 2 == 0 then look.accent:Lerp(Color3.fromRGB(230, 40, 50), 0.35) else look.accent:Lerp(Color3.fromRGB(200, 20, 90), 0.6)
+		blob.Material = Enum.Material.Neon
+		blob.CanCollide, blob.CanQuery, blob.CanTouch, blob.Massless, blob.CastShadow = false, false, false, true, false
+		local m = Instance.new("SpecialMesh")
+		m.MeshType = Enum.MeshType.Sphere
+		m.Parent = blob
+		local a = rng:NextNumber() * math.pi * 2
+		local d = r * rng:NextNumber(0, 0.35)
+		blob:SetAttribute("X", math.cos(a) * d)
+		blob:SetAttribute("Z", math.sin(a) * d)
+		blob:SetAttribute("Phase", rng:NextNumber() * 6.28)
+		blob:SetAttribute("Speed", rng:NextNumber(0.35, 0.6))
+		local off = CFrame.new(math.cos(a) * d, r * rng:NextNumber(-0.5, 0.5), math.sin(a) * d)
+		blob.CFrame = ball.CFrame * off
+		local w = Instance.new("Weld")
+		w.Part0, w.Part1, w.C0 = ball, blob, off
+		w.Parent = blob
+		blob.Parent = ball
+	end
+	local base = neonCore(ball, r, look.accent, 0.5, "LavaPool")
+	base.Size = Vector3.new(r * 1.1, r * 0.25, r * 1.1)
+	local bw = base:FindFirstChildOfClass("Weld")
+	if bw then
+		bw.C0 = CFrame.new(0, -r * 0.72, 0)
+	end
 	light(ball, look.accent, r * 8, 2)
-	ball:SetAttribute("FxPulse", 1)
+	ball:SetAttribute("FxLava", r)
+	ball:SetAttribute("FxPulse", 0.5)
 end
 
 -- A bolt: a zig-zag of thin neon segments from near the centre to the glass. `seed` picks its path.
@@ -302,7 +332,7 @@ BUILD.lightning = function(ball, r, look)
 			local seg = Instance.new("Part")
 			seg.Name = "Bolt" .. i .. "_" .. k
 			seg.Size = Vector3.new(r * 0.08, r * 0.08, r * 0.2)
-			seg.Color = if k == 1 then Color3.new(1, 1, 1) else col:Lerp(Color3.new(1, 1, 1), 0.35)
+			seg.Color = if k == 1 then Color3.new(1, 1, 1) else col
 			seg.Material = Enum.Material.Neon
 			seg.CanCollide, seg.CanQuery, seg.CanTouch, seg.Massless, seg.CastShadow = false, false, false, true, false
 			seg.CFrame = ball.CFrame
@@ -544,6 +574,17 @@ function MarbleFX.animate()
 					end
 					if show then
 						placeBolt(ball, i, boltPath(r, rng))
+					end
+				end
+			end
+			local lava = ball:GetAttribute("FxLava")
+			if lava then
+				for k = 1, 6 do
+					local blob = ball:FindFirstChild("LavaBlob" .. k) :: BasePart?
+					local w = blob and blob:FindFirstChildOfClass("Weld")
+					if blob and w then
+						local y = math.sin(t * (blob:GetAttribute("Speed") or 0.5) + (blob:GetAttribute("Phase") or 0)) * lava * 0.55
+						w.C0 = CFrame.new(blob:GetAttribute("X") or 0, y, blob:GetAttribute("Z") or 0)
 					end
 				end
 			end
