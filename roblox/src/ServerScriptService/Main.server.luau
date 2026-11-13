@@ -267,7 +267,8 @@ local queue: { { player: Player, since: number } } = {}
 local function slotOrigin(slot: number): Vector3
 	local col = (slot - 1) % 8
 	local row = math.floor((slot - 1) / 8)
-	return Vector3.new((col + 1) * Config.TABLE_SPACING, 0, (row - 3) * Config.TABLE_SPACING)
+	-- Out past the lobby's hills (LobbyWorld reaches 370 studs), so no field ever lands in them.
+	return Vector3.new((col + 3) * Config.TABLE_SPACING, 0, (row - 3) * Config.TABLE_SPACING)
 end
 
 local function freeSlot(): number

@@ -22,6 +22,7 @@ local Ambience = require(client.Ambience)
 -- 1. Fields: each in its own material, with its bank, ring line and scenery.
 local LINE = { string = "String", chalk = "Chalk", drawn = "Groove", etched = "Scratch" }
 local SCENERY = { desk = "Book", culdesac = "Bush", grass = "Tuft", sand = "Rock", ice = "Needles", gravel = "Boulder", minigolf = "Sail" }
+local BACKDROP = { desk = "BigBook", culdesac = "House", grass = "Crown", sand = "Frond", ice = "Needles", gravel = "BigBoulder", minigolf = "Crown" }
 local EXTRA = { desk = "Pencil", culdesac = "LampPost", grass = "Petals", sand = "Canopy", ice = "Snowball", gravel = "Cone", minigolf = "FlagPole" }
 for i, id in ipairs(Config.ARENA_ORDER) do
 	local arena = Config.ARENAS[id]
@@ -53,6 +54,16 @@ for i, id in ipairs(Config.ARENA_ORDER) do
 	check(id .. " has its scenery (" .. SCENERY[id] .. ")", count.Scenery >= 1, count.Scenery)
 	check(id .. " has 2 stands", #built.stands == 2)
 	check(id .. " has its toys (" .. EXTRA[id] .. ")", count.Extra >= 1, count.Extra)
+	local back = f:FindFirstChild("Backdrop", true)
+	local backN = 0
+	if back then
+		for _, d in ipairs(back:GetDescendants()) do
+			if d.Name == BACKDROP[id] then
+				backN += 1
+			end
+		end
+	end
+	check(id .. " is ringed by its backdrop (" .. BACKDROP[id] .. ")", backN >= 10, backN)
 	-- Nothing of the field stands inside the ring's play area, where marbles roll.
 	local blocking = 0
 	for _, d in ipairs(f:GetDescendants()) do

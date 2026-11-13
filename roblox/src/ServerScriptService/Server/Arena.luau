@@ -520,15 +520,26 @@ local function mug(parent: Instance, at: Vector3)
 	part({ Name = "Handle", Size = Vector3.new(0.6, 3.4, 0.9), CFrame = CFrame.new(at + Vector3.new(3.3, 3, 0)), Color = hex("#ff6b8a"), Parent = parent })
 end
 
+-- Toys are built at toy size, then scaled up so they read from the shooter's seat.
+local TOY_SCALE = 1.6
+local function big(f: Instance, build: (...any) -> ...any, at: Vector3, ...)
+	local m = Instance.new("Model")
+	m.Name = "Toy"
+	build(m, at, ...)
+	m.WorldPivot = CFrame.new(at)
+	m:ScaleTo(TOY_SCALE)
+	m.Parent = f
+end
+
 local EXTRAS = {
 	desk = function(f: Folder, origin: Vector3, mids: { number }, rng: Random)
 		for k, a in ipairs(mids) do
 			local d = Config.BOUND_R + rng:NextNumber(4.5, 6) * S
 			local at = origin + Vector3.new(math.cos(a) * d, 0, math.sin(a) * d)
 			if k % 3 == 1 then
-				mug(f, at)
+				big(f, mug, at)
 			else
-				pencil(f, at, rng)
+				big(f, pencil, at, rng)
 			end
 		end
 	end,
@@ -537,18 +548,18 @@ local EXTRAS = {
 			local d = Config.BOUND_R + rng:NextNumber(3, 4) * S
 			local at = origin + Vector3.new(math.cos(a) * d, 0, math.sin(a) * d)
 			if k % 3 == 1 then
-				streetLamp(f, at, origin)
+				big(f, streetLamp, at, origin)
 			elseif k % 3 == 2 then
-				mailbox(f, at)
+				big(f, mailbox, at)
 			else
-				hydrant(f, at)
+				big(f, hydrant, at)
 			end
 		end
 	end,
 	grass = function(f: Folder, origin: Vector3, mids: { number }, rng: Random)
 		for _, a in ipairs(mids) do
 			local d = Config.BOUND_R + rng:NextNumber(3.5, 5) * S
-			flowers(f, origin + Vector3.new(math.cos(a) * d, 0, math.sin(a) * d), rng, 7)
+			big(f, flowers, origin + Vector3.new(math.cos(a) * d, 0, math.sin(a) * d), rng, 7)
 		end
 	end,
 	sand = function(f: Folder, origin: Vector3, mids: { number }, rng: Random)
@@ -556,11 +567,11 @@ local EXTRAS = {
 			local d = Config.BOUND_R + rng:NextNumber(4, 5.5) * S
 			local at = origin + Vector3.new(math.cos(a) * d, 0, math.sin(a) * d)
 			if k == 1 then
-				umbrella(f, at, rng)
+				big(f, umbrella, at, rng)
 			elseif k % 2 == 0 then
-				bucket(f, at)
+				big(f, bucket, at)
 			else
-				starfish(f, at, rng)
+				big(f, starfish, at, rng)
 			end
 		end
 	end,
@@ -569,7 +580,7 @@ local EXTRAS = {
 			local d = Config.BOUND_R + rng:NextNumber(4, 5) * S
 			local at = origin + Vector3.new(math.cos(a) * d, 0, math.sin(a) * d)
 			if k == 1 then
-				snowman(f, at, origin - at)
+				big(f, snowman, at, origin - at)
 			else
 				local s = rng:NextNumber(3, 6)
 				blob(f, CFrame.new(at + Vector3.new(0, s * 0.2, 0)), Vector3.new(s * 2, s * 0.8, s * 1.6), hex("#f4f8fc"), Enum.Material.Snow, "Drift")
@@ -581,9 +592,9 @@ local EXTRAS = {
 			local d = Config.BOUND_R + rng:NextNumber(3, 4.5) * S
 			local at = origin + Vector3.new(math.cos(a) * d, 0, math.sin(a) * d)
 			if k % 2 == 1 then
-				trafficCone(f, at)
+				big(f, trafficCone, at)
 			else
-				tyre(f, at, rng)
+				big(f, tyre, at, rng)
 			end
 		end
 	end,
@@ -592,13 +603,123 @@ local EXTRAS = {
 			local d = Config.BOUND_R + rng:NextNumber(3.5, 4.5) * S
 			local at = origin + Vector3.new(math.cos(a) * d, 0, math.sin(a) * d)
 			if k == 1 then
-				golfFlag(f, at)
+				big(f, golfFlag, at)
 			else
-				flowers(f, at, rng, 5)
+				big(f, flowers, at, rng, 5)
 			end
 		end
 	end,
 }
+
+-- ---- The backdrop: a tall ring out at the plot's edge, so each field is a place of its own and
+-- no other table floats in the sky behind it. None behind a seat, where the camera sits.
+
+local PASTEL = { hex("#ffb3c7"), hex("#ffe08a"), hex("#a8e6a1"), hex("#9fd4ff"), hex("#d3b8ff"), hex("#ffc999") }
+
+local function toyTree(parent: Instance, at: Vector3, rng: Random)
+	local h = rng:NextNumber(10, 16)
+	cylinder(parent, at + Vector3.new(0, h / 2, 0), 1.3, h, hex("#9a6235"), Enum.Material.Wood, "Trunk")
+	local c = rng:NextNumber(14, 20)
+	local colors = { hex("#5ccf4a"), hex("#3fbf6a"), hex("#8bdc3f"), hex("#ff9fcf"), hex("#ffd34d") }
+	local col = colors[rng:NextInteger(1, #colors)]
+	blob(parent, CFrame.new(at + Vector3.new(0, h + c * 0.3, 0)), Vector3.new(c, c * 0.9, c), col, Enum.Material.SmoothPlastic, "Crown")
+	blob(parent, CFrame.new(at + Vector3.new(c * 0.25, h + c * 0.62, -c * 0.1)), Vector3.new(c * 0.6, c * 0.55, c * 0.6), col:Lerp(Color3.new(1, 1, 1), 0.15), Enum.Material.SmoothPlastic, "Crown")
+end
+
+local function palm(parent: Instance, at: Vector3, rng: Random)
+	local lean = Vector3.new(rng:NextNumber(-1, 1), 0, rng:NextNumber(-1, 1)).Unit * 0.35
+	local p = at
+	for i = 1, 8 do
+		local q = p + Vector3.new(0, 2.8, 0) + lean * (i / 4)
+		part({ Name = "PalmTrunk", Size = Vector3.new(1.5 - i * 0.05, 1.5 - i * 0.05, (q - p).Magnitude + 0.3), CFrame = CFrame.lookAt((p + q) / 2, q), Color = if i % 2 == 0 then hex("#b0814f") else hex("#9c6f40"), Material = Enum.Material.Wood, Parent = parent })
+		p = q
+	end
+	for k = 0, 6 do
+		local a = k / 7 * math.pi * 2 + rng:NextNumber(-0.2, 0.2)
+		local dir = Vector3.new(math.cos(a), 0, math.sin(a))
+		local mid = p + dir * 4 + Vector3.new(0, -0.8, 0)
+		part({ Name = "Frond", Size = Vector3.new(2.6, 0.25, 9), CFrame = CFrame.lookAt(mid, mid + dir) * CFrame.Angles(math.rad(-18), 0, 0), Color = if k % 2 == 0 then hex("#3faf4a") else hex("#2f9a3f"), Material = Enum.Material.LeafyGrass, Parent = parent })
+	end
+	for k = 0, 2 do
+		blob(parent, CFrame.new(p + Vector3.new(math.cos(k * 2.1) * 0.9, -1, math.sin(k * 2.1) * 0.9)), Vector3.new(1.2, 1.2, 1.2), hex("#6b4a2a"), Enum.Material.SmoothPlastic, "Coconut")
+	end
+end
+
+local function house(parent: Instance, at: Vector3, toward: Vector3, rng: Random)
+	local w, d, h = rng:NextNumber(16, 22), 14, rng:NextNumber(10, 13)
+	local face = CFrame.lookAt(at, Vector3.new(toward.X, at.Y, toward.Z))
+	local color = PASTEL[rng:NextInteger(1, #PASTEL)]
+	part({ Name = "House", Size = Vector3.new(w, h, d), CFrame = face * CFrame.new(0, h / 2, 0), Color = color, Parent = parent })
+	-- A gable roof: two wedges back to back.
+	local roof = ({ hex("#d1453b"), hex("#3a5fd1"), hex("#6b4a30") })[rng:NextInteger(1, 3)]
+	for _, s in ipairs({ -1, 1 }) do
+		local wd = Instance.new("WedgePart")
+		wd.Anchored, wd.CanCollide, wd.CanTouch, wd.CanQuery = true, false, false, false
+		wd.Size = Vector3.new(w + 1.4, 6, d / 2 + 0.7)
+		wd.CFrame = face * CFrame.new(0, h + 3, s * (d / 4 + 0.35)) * CFrame.Angles(0, if s < 0 then 0 else math.pi, 0)
+		wd.Color = roof
+		wd.Name = "Roof"
+		wd.Parent = parent
+	end
+	-- The door and two lit windows, on the face toward the field (-Z of `face`).
+	part({ Name = "Door", Size = Vector3.new(3, 6, 0.3), CFrame = face * CFrame.new(0, 3, -d / 2 - 0.1), Color = hex("#7a4a2a"), Parent = parent })
+	for _, x in ipairs({ -w / 3.2, w / 3.2 }) do
+		part({ Name = "Window", Size = Vector3.new(3.2, 3.2, 0.3), CFrame = face * CFrame.new(x, h * 0.6, -d / 2 - 0.1), Color = hex("#fff1b8"), Material = Enum.Material.Neon, Parent = parent })
+	end
+	cylinder(parent, (face * CFrame.new(w / 3, h + 4, d / 5)).Position, 1, 4, hex("#b0543a"), Enum.Material.Brick, "Chimney")
+end
+
+local function bookTower(parent: Instance, at: Vector3, rng: Random)
+	local y = 0
+	for _ = 1, rng:NextInteger(5, 9) do
+		local hgt = rng:NextNumber(2.2, 3.4)
+		local L, T = rng:NextNumber(13, 17), rng:NextNumber(9, 11)
+		local cf = CFrame.new(at + Vector3.new(0, y + hgt / 2, 0)) * CFrame.Angles(0, rng:NextNumber(-0.25, 0.25), 0)
+		local cover = ({ hex("#e5323f"), hex("#2f6fd6"), hex("#3faa4a"), hex("#ffb627"), hex("#9b59d0"), hex("#ff6b8a") })[rng:NextInteger(1, 6)]
+		part({ Name = "BigBook", Size = Vector3.new(L, hgt, T), CFrame = cf, Color = cover, Material = Enum.Material.Fabric, Parent = parent })
+		part({ Name = "Pages", Size = Vector3.new(L * 0.96, hgt * 0.8, T * 1.01), CFrame = cf * CFrame.new(L * 0.02, 0, 0), Color = hex("#f3ead4"), Parent = parent })
+		y += hgt
+	end
+end
+
+local BACKDROP = {
+	desk = function(f, at, _o, rng) bookTower(f, at, rng) end,
+	culdesac = function(f, at, o, rng) house(f, at, o, rng) end,
+	grass = function(f, at, _o, rng) toyTree(f, at, rng) end,
+	minigolf = function(f, at, _o, rng) toyTree(f, at, rng) end,
+	sand = function(f, at, _o, rng) palm(f, at, rng) end,
+	ice = function(f, at, _o, rng) pine(f, at, rng:NextNumber(24, 34), true) end,
+	gravel = function(f, at, _o, rng)
+		local s = rng:NextNumber(10, 16)
+		blob(f, CFrame.new(at + Vector3.new(0, s * 0.35, 0)) * CFrame.Angles(rng:NextNumber(), rng:NextNumber() * 6, 0), Vector3.new(s * 1.6, s * 1.2, s * 1.4), ({ hex("#8f877d"), hex("#7d766d"), hex("#9c9286") })[rng:NextInteger(1, 3)], Enum.Material.Rock, "BigBoulder")
+	end,
+}
+
+local function backdrop(parent: Instance, origin: Vector3, arenaId: string, seatAngles: { number }, rng: Random)
+	local build = BACKDROP[arenaId]
+	if not build then
+		return
+	end
+	local folder = Instance.new("Folder")
+	folder.Name = "Backdrop"
+	-- Just inside the plot: past it there is no ground under them.
+	local r = Config.TABLE_SPACING / 2 - 3
+	local n = 30
+	for k = 0, n - 1 do
+		local a = k / n * math.pi * 2 + rng:NextNumber(-0.06, 0.06)
+		local clear = true
+		for _, sa in ipairs(seatAngles) do
+			if math.abs(math.atan2(math.sin(a - sa), math.cos(a - sa))) < 0.42 then
+				clear = false
+			end
+		end
+		if clear then
+			local d = r + rng:NextNumber(-1.5, 1.5)
+			build(folder, origin + Vector3.new(math.cos(a) * d, 0, math.sin(a) * d), origin, rng)
+		end
+	end
+	folder.Parent = parent
+end
 
 -- Outdoor fields stand in real terrain: grass grows animated blades, sand and snow lie in drifts.
 local TERRAIN = { grass = Enum.Material.Grass, minigolf = Enum.Material.Grass, sand = Enum.Material.Sand, ice = Enum.Material.Snow, gravel = Enum.Material.Ground }
@@ -725,6 +846,7 @@ function Arena.build(origin: Vector3, arena: Config.Arena, seats: number, rng: R
 	if extras then
 		extras(scenery, origin, mids, decor)
 	end
+	backdrop(scenery, origin, arena.id, seatAngles, decor)
 	scenery.Parent = folder
 
 	folder.Parent = parent
