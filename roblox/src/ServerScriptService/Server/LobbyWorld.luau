@@ -306,6 +306,69 @@ local function butterflies(parent: Instance)
 	e.Parent = p
 end
 
+-- A giant marble run: a rainbow track spiralling three times round a clear lift tube. The client
+-- rolls marbles down it and lifts them back up the tube, forever (ClientModules/LobbyFun).
+LobbyWorld.RUN = { centre = Vector3.new(math.cos(math.rad(-42)) * 110, 0, math.sin(math.rad(-42)) * 110), radius = 7, top = 29, bottom = 3, turns = 3 }
+local function marbleRun(parent: Instance)
+	local run = LobbyWorld.RUN
+	local m = Instance.new("Model")
+	m.Name = "MarbleRun"
+	local c = run.centre
+	-- The lift tube and its base and cap.
+	part(m, { Name = "Tube", Shape = Enum.PartType.Cylinder, Size = Vector3.new(run.top + 3, 3.4, 3.4), CFrame = CFrame.new(c + Vector3.new(0, (run.top + 3) / 2, 0)) * CFrame.Angles(0, 0, math.pi / 2), Color = rgb(200, 235, 255), Transparency = 0.65, CanCollide = true })
+	part(m, { Name = "Base", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.2, 22, 22), CFrame = CFrame.new(c + Vector3.new(0, 0.6, 0)) * CFrame.Angles(0, 0, math.pi / 2), Color = rgb(255, 255, 255), CanCollide = true })
+	part(m, { Name = "Cap", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.4, 5, 5), CFrame = CFrame.new(c + Vector3.new(0, run.top + 3.6, 0)) * CFrame.Angles(0, 0, math.pi / 2), Color = rgb(255, 90, 150) })
+	ball(m, c + Vector3.new(0, run.top + 5.2, 0), Vector3.new(3, 3, 3), rgb(255, 220, 60), "Topper", Enum.Material.Neon)
+	-- The spiral track in rainbow colours, banked a little inward, with a rail on the outside.
+	local segs = run.turns * 22
+	local rainbowColors = { rgb(255, 80, 80), rgb(255, 160, 60), rgb(255, 225, 70), rgb(90, 210, 100), rgb(70, 160, 255), rgb(160, 100, 255) }
+	local function at(s: number): Vector3
+		local a = s * run.turns * math.pi * 2
+		return c + Vector3.new(math.cos(a) * run.radius, run.top - s * (run.top - run.bottom), math.sin(a) * run.radius)
+	end
+	for i = 0, segs - 1 do
+		local p1, p2 = at(i / segs), at((i + 1) / segs)
+		local mid = (p1 + p2) / 2
+		local out = Vector3.new(mid.X - c.X, 0, mid.Z - c.Z).Unit
+		local color = rainbowColors[math.floor(i / segs * #rainbowColors * 2) % #rainbowColors + 1]
+		local cf = CFrame.lookAt(mid, p2, Vector3.new(0, 1, 0) - out * 0.2)
+		part(m, { Name = "Track", Size = Vector3.new(2.8, 0.4, (p2 - p1).Magnitude + 0.15), CFrame = cf, Color = color, CanCollide = true })
+		part(m, { Name = "Rail", Size = Vector3.new(0.35, 0.9, (p2 - p1).Magnitude + 0.15), CFrame = cf * CFrame.new(if cf.RightVector:Dot(out) > 0 then 1.4 else -1.4, 0.6, 0), Color = rgb(255, 255, 255) })
+		-- Struts down to the base every few segments.
+		if i % 6 == 0 then
+			local foot = Vector3.new(mid.X, 1.2, mid.Z)
+			part(m, { Name = "Strut", Size = Vector3.new(0.35, 0.35, (mid - foot).Magnitude), CFrame = CFrame.lookAt((mid + foot) / 2, mid), Color = rgb(255, 255, 255) })
+		end
+	end
+	-- A little sign over it.
+	local sign = part(m, { Name = "RunSign", Size = Vector3.one, CFrame = CFrame.new(c + Vector3.new(0, run.top + 10, 0)), Transparency = 1 })
+	local gui = Instance.new("BillboardGui")
+	gui.Size = UDim2.fromScale(16, 3.2)
+	gui.LightInfluence = 0
+	gui.MaxDistance = 220
+	gui.Parent = sign
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Size = UDim2.fromScale(1, 1)
+	label.Font = Enum.Font.FredokaOne
+	label.TextScaled = true
+	label.Text = "MARBLE RUN"
+	label.TextColor3 = rgb(255, 255, 255)
+	label.Parent = gui
+	local stroke = Instance.new("UIStroke")
+	stroke.Thickness = 3
+	stroke.Color = rgb(30, 22, 40)
+	stroke.Parent = label
+	local grad = Instance.new("UIGradient")
+	grad.Color = ColorSequence.new(rgb(255, 230, 90), rgb(255, 110, 180))
+	grad.Rotation = 90
+	grad.Parent = label
+	for k, v in pairs(run) do
+		m:SetAttribute(k, v)
+	end
+	m.Parent = parent
+end
+
 -- The park's edge: a ring of walls nobody can see or climb, out on the lawn before the hills.
 LobbyWorld.EDGE_R = 135
 local function edge(parent: Instance)
@@ -371,6 +434,7 @@ function LobbyWorld.build(lobby: Instance)
 		balloons(world, Vector3.new(x, 0, 45), rng)
 	end
 	butterflies(world)
+	marbleRun(world)
 	edge(world)
 	mist(world)
 	world.Parent = lobby

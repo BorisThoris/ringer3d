@@ -44,6 +44,24 @@ check("remotes created", Ringer:FindFirstChild("Remotes") ~= nil)
 check("lobby built", workspace:FindFirstChild("Lobby") ~= nil)
 local mascotBody = workspace:FindFirstChild("Lobby") and workspace.Lobby:FindFirstChild("Mascot") and workspace.Lobby.Mascot:FindFirstChild("Body")
 check("the mascot has a solid body you can see", mascotBody ~= nil and mascotBody.Transparency == 0 and mascotBody.Size.X >= 12, mascotBody and mascotBody.Transparency)
+local Mascot = require(game.StarterPlayer.StarterPlayerScripts.ClientModules.Mascot)
+local okM, errM = pcall(function()
+	Mascot.start({ Character = nil, DisplayName = "Tester" } :: any)
+	for name in pairs(Mascot.EXPRESSIONS) do
+		Mascot.express(name, 5)
+		for _ = 1, 4 do
+			Mascot.step(1 / 30)
+		end
+		assert(Mascot.expression == name, "expression " .. name)
+	end
+end)
+local lips = 0
+for _, d in ipairs(workspace.Lobby.Mascot:GetChildren()) do
+	if d.Name == "Lip" then
+		lips += 1
+	end
+end
+check("the mascot smiles, grins, gasps, winks and yawns", okM and lips == 11, if okM then lips else errM)
 
 -- 3. Rules.
 local cross = Rules.startingCross()

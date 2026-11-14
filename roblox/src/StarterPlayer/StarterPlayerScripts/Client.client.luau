@@ -65,8 +65,10 @@ task.spawn(Mascot.start, player)
 LobbyFun.onChain = function(n)
 	if n == 4 then
 		Mascot.cheer("Coin streak! 🪙🪙🪙")
+		Mascot.express("love", 2.5)
 	elseif n == 8 then
 		Mascot.cheer("You're a coin magnet! 🤑")
+		Mascot.express("grin", 2.5)
 	end
 end
 

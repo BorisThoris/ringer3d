@@ -14,6 +14,9 @@ local LobbyFun = {}
 LobbyFun.coins = {} :: { { part: BasePart, spot: Vector3, readyAt: number } }
 LobbyFun.collected = 0
 LobbyFun.onChain = function(_n: number) end -- a run of coins picked up quickly
+LobbyFun.runPos = function(_u: number): Vector3
+	return Vector3.zero
+end
 
 local GOLD = Color3.fromRGB(255, 200, 40)
 
@@ -254,6 +257,46 @@ function LobbyFun.start(ask: (string, any) -> (boolean, any), sfx: any, characte
 		})
 	end
 
+	-- The marble run: marbles roll down the spiral, drop into the tube, ride up it and set off again.
+	local runner = {}
+	local run = world and world:FindFirstChild("MarbleRun")
+	if run then
+		local c = run:GetAttribute("centre") :: Vector3
+		local R, top, bottom, turns = run:GetAttribute("radius") :: number, run:GetAttribute("top") :: number, run:GetAttribute("bottom") :: number, run:GetAttribute("turns") :: number
+		local colors = { Color3.fromRGB(255, 80, 120), Color3.fromRGB(255, 200, 40), Color3.fromRGB(80, 200, 255), Color3.fromRGB(120, 230, 110), Color3.fromRGB(190, 110, 255), Color3.fromRGB(255, 140, 60), Color3.fromRGB(255, 255, 255), Color3.fromRGB(60, 220, 200) }
+		local helix = function(s: number): Vector3
+			local a = s * turns * math.pi * 2
+			return c + Vector3.new(math.cos(a) * R, top - s * (top - bottom) + 1.05, math.sin(a) * R)
+		end
+		for i, col in ipairs(colors) do
+			local b = Instance.new("Part")
+			b.Name = "RunMarble"
+			b.Shape = Enum.PartType.Ball
+			b.Size = Vector3.new(1.7, 1.7, 1.7)
+			b.Anchored, b.CanCollide, b.CanQuery, b.CanTouch = true, false, false, false
+			b.Material = Enum.Material.SmoothPlastic
+			b.Reflectance = 0.15
+			b.Color = col
+			b.Parent = run
+			table.insert(runner, { part = b, phase = (i - 1) / #colors })
+		end
+		LobbyFun.runPos = function(u: number): Vector3
+			-- 0..0.72 down the spiral, ..0.78 across into the tube, ..0.96 up the tube, ..1 out to the top.
+			if u < 0.72 then
+				return helix(u / 0.72)
+			elseif u < 0.78 then
+				local k = (u - 0.72) / 0.06
+				return helix(1):Lerp(c + Vector3.new(0, bottom + 1.2, 0), k)
+			elseif u < 0.96 then
+				local k = (u - 0.78) / 0.18
+				return c + Vector3.new(0, bottom + 1.2 + k * (top + 1 - bottom), 0)
+			else
+				local k = (u - 0.96) / 0.04
+				return (c + Vector3.new(0, top + 2.2, 0)):Lerp(helix(0), k) + Vector3.new(0, math.sin(k * math.pi) * 1.2, 0)
+			end
+		end
+	end
+
 	local t = 0
 	local frame = 0
 	RunService.RenderStepped:Connect(function(dt)
@@ -280,6 +323,14 @@ function LobbyFun.start(ask: (string, any) -> (boolean, any), sfx: any, characte
 					b.mesh.Scale = Vector3.new(1 + s * 0.025, 1 - s * 0.035, 1 + s * 0.025)
 				end
 			end
+		end
+		for _, m in ipairs(runner) do
+			local u = (t / 14 + m.phase) % 1
+			local p = LobbyFun.runPos(u)
+			-- Rolling: turn about the direction it's going.
+			local ahead = LobbyFun.runPos((u + 0.002) % 1) - p
+			local axis = if ahead.Magnitude > 0.001 then ahead.Unit:Cross(Vector3.new(0, 1, 0)) else Vector3.new(1, 0, 0)
+			m.part.CFrame = CFrame.new(p) * CFrame.fromAxisAngle(if axis.Magnitude > 0.01 then axis.Unit else Vector3.new(1, 0, 0), -t * 6)
 		end
 		for _, s in ipairs(spinners) do
 			s.part.CFrame = s.base * CFrame.new(0, math.sin(t * 2) * 0.3, 0) * CFrame.Angles(0, t * 1.5, 0)

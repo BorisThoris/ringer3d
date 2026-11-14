@@ -50,6 +50,17 @@ local function cylinder(parent: Instance, at: Vector3, radius: number, height: n
 	})
 end
 
+--- A book: two boards and a spine in the cover colour, the pages set clearly inside them (no two
+--- faces in the same place, so no flicker and no shadow acne).
+local function book(parent: Instance, cf: CFrame, L: number, h: number, T: number, cover: Color3, pages: Color3, name: string)
+	local b = math.clamp(h * 0.12, 0.12, 0.35)
+	part({ Name = name, Size = Vector3.new(L, b, T), CFrame = cf * CFrame.new(0, -h / 2 + b / 2, 0), Color = cover, Material = Enum.Material.Fabric, Parent = parent })
+	part({ Name = "Cover", Size = Vector3.new(L, b, T), CFrame = cf * CFrame.new(0, h / 2 - b / 2, 0), Color = cover, Material = Enum.Material.Fabric, Parent = parent })
+	part({ Name = "Spine", Size = Vector3.new(b, h - 2 * b, T), CFrame = cf * CFrame.new(-L / 2 + b / 2, 0, 0), Color = cover:Lerp(Color3.new(0, 0, 0), 0.12), Material = Enum.Material.Fabric, Parent = parent })
+	local inset = math.max(0.08, T * 0.012)
+	part({ Name = "Pages", Size = Vector3.new(L - b - inset, h - 2 * b - 0.02, T - 2 * inset), CFrame = cf * CFrame.new(b / 2 - inset / 2, 0, 0), Color = pages, Material = Enum.Material.SmoothPlastic, Parent = parent })
+end
+
 -- ---- The ground's own marks (groundArt.ts) ----------------------------------------------------
 
 local GROUND_ART = {
@@ -64,13 +75,13 @@ local GROUND_ART = {
 			if chord < 2 then
 				continue
 			end
-			part({ Name = "Stripe", Size = Vector3.new(w, 0.04, chord), CFrame = CFrame.new(origin + Vector3.new(x, 0.01, 0)), Color = Color3.fromRGB(104, 178, 58), Material = Enum.Material.Grass, CastShadow = false, Parent = folder })
+			part({ Name = "Stripe", Size = Vector3.new(w, 0.04, chord), CFrame = CFrame.new(origin + Vector3.new(x, 0.05, 0)), Color = Color3.fromRGB(104, 178, 58), Material = Enum.Material.Grass, CastShadow = false, Parent = folder })
 		end
 	end,
 	-- Black ice: white crack lines running across it, and drifts of snow blown onto it.
 	ice = function(folder: Folder, origin: Vector3, half: number, rng: Random)
 		for _ = 1, 9 do
-			local at = Vector3.new(rng:NextNumber(-half, half) * 0.8, 0.015, rng:NextNumber(-half, half) * 0.8)
+			local at = Vector3.new(rng:NextNumber(-half, half) * 0.8, 0.06, rng:NextNumber(-half, half) * 0.8)
 			local a = rng:NextNumber() * math.pi * 2
 			for _ = 1, rng:NextInteger(4, 7) do
 				a += rng:NextNumber(-0.7, 0.7)
@@ -96,12 +107,12 @@ local GROUND_ART = {
 			if chord < 2 then
 				continue
 			end
-			part({ Name = "Ripple", Size = Vector3.new(chord, 0.03, 0.5), CFrame = CFrame.new(origin + Vector3.new(0, 0.01, z)) * CFrame.Angles(0, rng:NextNumber(-0.05, 0.05), 0), Color = hex("#c7ad83"), Material = Enum.Material.Sand, Transparency = 0.6, CastShadow = false, Parent = folder })
+			part({ Name = "Ripple", Size = Vector3.new(chord, 0.03, 0.5), CFrame = CFrame.new(origin + Vector3.new(0, 0.06, z)) * CFrame.Angles(0, rng:NextNumber(-0.05, 0.05), 0), Color = hex("#c7ad83"), Material = Enum.Material.Sand, Transparency = 0.6, CastShadow = false, Parent = folder })
 		end
 	end,
 	-- The desk: a varnished board, so a soft sheen of the lamp on it.
 	desk = function(folder: Folder, origin: Vector3, half: number, _rng: Random)
-		part({ Name = "Varnish", Size = Vector3.new(half * 2, 0.02, half * 2), CFrame = CFrame.new(origin + Vector3.new(0, 0.005, 0)), Color = Color3.fromRGB(160, 98, 55), Material = Enum.Material.Glass, Transparency = 0.85, Reflectance = 0.08, CastShadow = false, Parent = folder })
+		part({ Name = "Varnish", Size = Vector3.new(half * 2, 0.02, half * 2), CFrame = CFrame.new(origin + Vector3.new(0, 0.03, 0)), Color = Color3.fromRGB(160, 98, 55), Material = Enum.Material.Glass, Transparency = 0.85, Reflectance = 0.08, CastShadow = false, Parent = folder })
 	end,
 }
 
@@ -171,13 +182,13 @@ local function ringLine(folder: Folder, origin: Vector3, arena: Config.Arena)
 			part({ Name = "String", Shape = Enum.PartType.Cylinder, Size = Vector3.new(len, 0.36, 0.36), CFrame = face + Vector3.new(0, 0.16, 0), Color = arena.ring.color, Material = Enum.Material.Fabric, Parent = folder })
 		elseif style == "drawn" then
 			-- A groove drawn with a finger: wide, shadowed sand.
-			part({ Name = "Groove", Size = Vector3.new(len, 0.03, 1.2), CFrame = face + Vector3.new(0, 0.012, 0), Color = arena.ring.color, Material = Enum.Material.Sand, Transparency = 0.35, CastShadow = false, Parent = folder })
+			part({ Name = "Groove", Size = Vector3.new(len, 0.03, 1.2), CFrame = face + Vector3.new(0, 0.07, 0), Color = arena.ring.color, Material = Enum.Material.Sand, Transparency = 0.35, CastShadow = false, Parent = folder })
 		elseif style == "etched" then
 			-- A skate's scratch in the ice.
-			part({ Name = "Scratch", Size = Vector3.new(len, 0.03, 0.32), CFrame = face + Vector3.new(0, 0.012, 0), Color = arena.ring.color, Material = Enum.Material.SmoothPlastic, Transparency = 0.15, CastShadow = false, Parent = folder })
+			part({ Name = "Scratch", Size = Vector3.new(len, 0.03, 0.32), CFrame = face + Vector3.new(0, 0.07, 0), Color = arena.ring.color, Material = Enum.Material.SmoothPlastic, Transparency = 0.15, CastShadow = false, Parent = folder })
 		else
 			-- Chalk (spray paint on the gravel).
-			part({ Name = "Chalk", Size = Vector3.new(len, 0.03, 0.44), CFrame = face + Vector3.new(0, 0.012, 0), Color = arena.ring.color, Material = Enum.Material.Sand, Transparency = 0.05, CastShadow = false, Parent = folder })
+			part({ Name = "Chalk", Size = Vector3.new(len, 0.03, 0.44), CFrame = face + Vector3.new(0, 0.07, 0), Color = arena.ring.color, Material = Enum.Material.Sand, Transparency = 0.05, CastShadow = false, Parent = folder })
 		end
 	end
 end
@@ -294,9 +305,8 @@ local SCENERY = {
 					local cf = CFrame.new(at + Vector3.new(0, y + h / 2, 0)) * CFrame.Angles(0, a + turn, 0)
 					local cover = ({ hex("#a8322d"), hex("#244c7a"), hex("#2f6b3a"), hex("#c99a2e") })[rng:NextInteger(1, 4)]
 					local L, T = rng:NextNumber(2.6, 3.4) * S, rng:NextNumber(1.8, 2.2) * S
-					part({ Name = "Book", Size = Vector3.new(L, h, T), CFrame = cf, Color = cover, Material = Enum.Material.Fabric, Parent = f })
-					part({ Name = "Pages", Size = Vector3.new(L * 0.96, h * 0.82, T * 1.01), CFrame = cf * CFrame.new(L * 0.02, 0, 0), Color = hex("#efe6cf"), Material = Enum.Material.SmoothPlastic, Parent = f })
-					y += h
+					book(f, cf, L, h, T, cover, hex("#efe6cf"), "Book")
+					y += h + 0.03
 				end
 			end
 		end
@@ -676,9 +686,8 @@ local function bookTower(parent: Instance, at: Vector3, rng: Random)
 		local L, T = rng:NextNumber(13, 17), rng:NextNumber(9, 11)
 		local cf = CFrame.new(at + Vector3.new(0, y + hgt / 2, 0)) * CFrame.Angles(0, rng:NextNumber(-0.25, 0.25), 0)
 		local cover = ({ hex("#e5323f"), hex("#2f6fd6"), hex("#3faa4a"), hex("#ffb627"), hex("#9b59d0"), hex("#ff6b8a") })[rng:NextInteger(1, 6)]
-		part({ Name = "BigBook", Size = Vector3.new(L, hgt, T), CFrame = cf, Color = cover, Material = Enum.Material.Fabric, Parent = parent })
-		part({ Name = "Pages", Size = Vector3.new(L * 0.96, hgt * 0.8, T * 1.01), CFrame = cf * CFrame.new(L * 0.02, 0, 0), Color = hex("#f3ead4"), Parent = parent })
-		y += hgt
+		book(parent, cf, L, hgt, T, cover, hex("#f3ead4"), "BigBook")
+		y += hgt + 0.04
 	end
 end
 

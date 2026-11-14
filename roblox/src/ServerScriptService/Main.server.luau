@@ -205,7 +205,13 @@ for _, side in ipairs({ -1, 1 }) do
 	facePart({ Name = "Shine", Shape = Enum.PartType.Ball, Size = Vector3.new(0.7, 0.7, 0.7), CFrame = CFrame.new(side * 2.4 + 0.5, 2.1, 8.3), Material = Enum.Material.Neon, Color = rgb(255, 255, 255), CanCollide = false })
 	facePart({ Name = "Cheek", Shape = Enum.PartType.Ball, Size = Vector3.new(1.6, 1, 0.6), CFrame = CFrame.new(side * 4.3, -0.9, 5.7), Color = rgb(255, 120, 150), CanCollide = false })
 end
-facePart({ Name = "Smile", Shape = Enum.PartType.Ball, Size = Vector3.new(4.4, 1.5, 1.4), CFrame = CFrame.new(0, -1.9, 6.4), Color = rgb(60, 20, 30), CanCollide = false })
+-- Its mouth, brows and expressions are drawn by each client (ClientModules/Mascot); this is
+-- the resting smile it wears until they take over.
+for i = 0, 8 do
+	local x = (i - 4) * 0.62
+	local y = -1.6 - (1 - (x / 2.6) ^ 2) * 0.9
+	facePart({ Name = "Smile", Size = Vector3.new(0.75, 0.5, 0.5), CFrame = CFrame.new(x, y, math.sqrt(math.max(0, 49 - x * x - y * y)) + 0.05), Color = rgb(60, 20, 30), CanCollide = false })
+end
 -- The face looks at +Z (the spawn). Built about the origin, then set in place; each client brings
 -- it to life (ClientModules/Mascot: it watches you, blinks, hops and talks), so the server only
 -- places it once.

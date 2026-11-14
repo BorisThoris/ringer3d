@@ -339,7 +339,49 @@ check("lobby coins sit clear of the fountains", (function()
 	end
 	return #Config.LOBBY_COIN_SPOTS == 30
 end)())
+local runModel = world and world:FindFirstChild("MarbleRun")
+local tracks = 0
+if runModel then
+	for _, d in ipairs(runModel:GetChildren()) do
+		if d.Name == "Track" then
+			tracks += 1
+		end
+	end
+end
+check("the marble run spirals three times round its tube", runModel ~= nil and tracks == 66 and runModel:GetAttribute("turns") == 3, tracks)
 check("lobby fun module loads", type(require(client.LobbyFun).start) == "function")
+
+-- Books have no faces in the same place (they flickered and broke shadows on the desk).
+local okB, errB = pcall(function()
+	local bm = Instance.new("Model")
+	bm.Parent = workspace
+	local b = Arena.build(Vector3.new(14000, 0, 0), Config.ARENAS.desk, 2, Random.new(1), bm, true)
+	local bad = 0
+	for _, d in ipairs(b.folder:GetDescendants()) do
+		if d.Name == "Pages" and d:IsA("BasePart") then
+			local L = d.Parent
+			-- Every page block must sit inside its book's boards: smaller in all three sizes than
+			-- a board next to it would allow. Find the nearest cover.
+			local best, bd = nil, math.huge
+			for _, c in ipairs(L:GetChildren()) do
+				if (c.Name == "Book" or c.Name == "BigBook") and c:IsA("BasePart") then
+					local dd = (c.Position - d.Position).Magnitude
+					if dd < bd then
+						best, bd = c, dd
+					end
+				end
+			end
+			if best then
+				local pz = d.Size.Z
+				if pz > best.Size.Z - 0.1 then
+					bad += 1
+				end
+			end
+		end
+	end
+	assert(bad == 0, bad .. " page blocks reach their covers' faces")
+end)
+check("desk books have no flickering faces", okB, errB)
 
 -- The fields answer the marbles: kick-up while rolling, tracks in sand, bank bursts, smashed props.
 local Ground = require(client.Ground)

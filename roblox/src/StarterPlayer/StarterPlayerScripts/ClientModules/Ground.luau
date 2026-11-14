@@ -201,7 +201,7 @@ function Ground.roll(bodies: { any }, origin: Vector3, dt: number)
 				local p = Instance.new("Part")
 				p.Anchored, p.CanCollide, p.CanQuery, p.CanTouch, p.CastShadow = true, false, false, false, false
 				p.Size = Vector3.new(b.r * S * (if Ground.surface == "ice" then 0.35 else 1.1), 0.04, (at - prev).Magnitude + 0.1)
-				p.CFrame = CFrame.lookAt((at + prev) / 2 - Vector3.new(0, 0.12, 0), at - Vector3.new(0, 0.12, 0))
+				p.CFrame = CFrame.lookAt((at + prev) / 2 - Vector3.new(0, 0.05, 0), at - Vector3.new(0, 0.05, 0))
 				p.Color = kick.track
 				p.Material = if Ground.surface == "ice" then Enum.Material.SmoothPlastic else Enum.Material.Sand
 				p.Transparency = 0.45
