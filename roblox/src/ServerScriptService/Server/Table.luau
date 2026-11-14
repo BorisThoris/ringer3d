@@ -309,6 +309,9 @@ function Table:play(shot): boolean
 		layout = before,
 		steps = sim.steps,
 		crossStep = crossStep,
+		-- Where it all ended on the server, so each client can check its replay matched exactly.
+		result = after,
+		hash = Playback.layoutHash(after),
 	})
 
 	-- The players watch it: until each has replayed it, or as long as it takes at full speed.

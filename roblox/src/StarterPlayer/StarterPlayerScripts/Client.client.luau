@@ -55,6 +55,17 @@ local function ask(action: string, args: any?)
 	return a, b
 end
 
+-- The stats overlay (F3 / 📊): frame rate, ping, memory, and the per-shot replay check.
+local Stats = require(Modules.Stats)
+Stats.attach(screen, screen)
+Replay.onVerified = Stats.verified
+-- First-time coaching, for a player's very first game.
+local Coach = require(Modules.Coach)
+Coach.attach(screen)
+local function newbie(): boolean
+	return profile ~= nil and profile.played == 0
+end
+
 -- The lobby's toys: coins on the lawn, bouncy mushrooms, drifting clouds, bobbing balloons.
 local LobbyFun = require(Modules.LobbyFun)
 local Mascot = require(Modules.Mascot)
@@ -900,6 +911,10 @@ Replay.onCross = function(pos)
 	Sfx.chime("capture")
 	capturesThisShot += 1
 	Juice.capture(pos, MarbleLook.uiColor(shooterLook()), capturesThisShot)
+	if newbie() and capturesThisShot == 1 then
+		Coach.hide()
+		Coach.tip("capture", "Yes! You won a marble. Most marbles wins the game! 🏆", "🏆", 4)
+	end
 	Ground.lineFlash(pos, Color3.fromRGB(255, 225, 80))
 	-- Each marble won is coins in the bank (paid at the end of the game): show them now.
 	Juice.coins(pos, Config.COINS.capture)
@@ -999,6 +1014,13 @@ local function onState(state)
 	spinLabel.Visible = spinPad.Visible
 	meterBack.Visible = spinPad.Visible
 	Aim.onPower(0)
+	if Coach.current == "lobby" then
+		Coach.hide()
+	end
+	if state.phase == "aim" and mine and newbie() then
+		local touchOnly = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+		Coach.tip("aim", if touchOnly then "Drag to aim, pull the power bar down and let go to flick!" else "Drag back from your marble to aim, then let go to flick!", "👆")
+	end
 	if state.phase == "aim" then
 		-- Whose turn it is: Show's swoop, pill and beacon; the line here keeps the series score.
 		banner.Text = ""
@@ -1235,6 +1257,11 @@ Remotes:WaitForChild("ProfileSync").OnClientEvent:Connect(function(p)
 	end
 	profile = p
 	setCoins(p.coins)
+	if newbie() and not inMatch then
+		if Coach.tip("lobby", "Welcome! Press PLAY, or walk into a world gate, to flick your first marble!", "🎯") then
+			task.delay(2, Mascot.say, "New here? Let's play! 🎯")
+		end
+	end
 	Rewards.update(p)
 	local climb = Config.buildTower(p.towerFighter or "ember")
 	towerLabel.Text = p.tower > #climb and "Conquered!" or string.format("Floor %d of %d: %s", p.tower, #climb, climb[p.tower].name)
@@ -1264,6 +1291,10 @@ Remotes:WaitForChild("TableEvent").OnClientEvent:Connect(function(kind, data, id
 		local state = Aim.state
 		Aim.shotStarted()
 		capturesThisShot = 0
+		if Coach.current == "aim" then
+			Coach.hide()
+			task.delay(1.2, Coach.tip, "goal", "Knock marbles OUT of the ring to win them! 💥", "💥", 5)
+		end
 		if data.shot and data.shot.power then
 			Sfx.launch(data.shot.power)
 			Juice.launch(data.shot.power)

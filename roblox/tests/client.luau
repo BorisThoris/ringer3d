@@ -69,6 +69,7 @@ local res = t:run()
 check("bot game finished", #res.winners >= 1, table.concat(res.scores, "-") .. " in " .. res.shots .. " shots")
 check("every shot replayed", replayed == res.shots, string.format("%d/%d", replayed, res.shots))
 check("replays end exactly where the server's sim did", #mismatches == 0 and exact > 0, string.format("%d exact, mismatched shots: %s", exact, table.concat(mismatches, ",")))
+check("every replay fingerprint-matches the server's (the stats overlay's check)", (Replay.checks or 0) == res.shots and Replay.matches == Replay.checks, string.format("%s/%s", tostring(Replay.matches), tostring(Replay.checks)))
 local worst = 0
 for _, d in ipairs(timing) do
 	worst = math.max(worst, math.abs(d))

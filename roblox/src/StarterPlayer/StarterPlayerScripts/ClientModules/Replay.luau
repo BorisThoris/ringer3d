@@ -19,6 +19,9 @@ Replay.onImpact = function(_kind: string, _strength: number, _pos: Vector3) end
 Replay.onCross = function(_pos: Vector3) end
 -- A marble that had gone over the line rolled back into the ring.
 Replay.onReenter = function(_pos: Vector3) end
+-- After each replay: did this client's result match the server's (Playback.layoutHash)?
+Replay.verified = nil :: any
+Replay.onVerified = function(_v: any) end
 -- The shot has played out: where the shooter rests (nil if it left the ring), and how many target
 -- marbles are still inside.
 Replay.onSettled = function(_shooterAt: Vector3?, _inside: number) end
@@ -181,6 +184,15 @@ function Replay.play(state, data, done: () -> ())
 		if sim.done then
 			Replay.stop()
 			Replay.lastLayout = sim:resultLayout()
+			-- Proof the replay is the server's shot: same fingerprint, no drift.
+			if data.hash then
+				local mine = Playback.layoutHash(Replay.lastLayout)
+				local drift = if data.result then Playback.drift(data.result, Replay.lastLayout) else 0
+				Replay.verified = { ok = mine == data.hash, hash = mine, server = data.hash, drift = drift, steps = sim.steps }
+				Replay.checks = (Replay.checks or 0) + 1
+				Replay.matches = (Replay.matches or 0) + (if mine == data.hash then 1 else 0)
+				Replay.onVerified(Replay.verified)
+			end
 			-- Where things came to rest: the shooter (world), and how many targets are still in.
 			local shooterAt, inside = nil, 0
 			for _, b in ipairs(sim.bodies) do

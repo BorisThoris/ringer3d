@@ -102,4 +102,52 @@ function Playback.propCFrame(p, state, origin: Vector3, scale: number?): CFrame
 	return CFrame.new(origin + Vector3.new(state.x * S, h / 2, state.z * S)) * CFrame.Angles(0, -state.a, 0) * CFrame.Angles(0, 0, math.pi / 2)
 end
 
+--- A fingerprint of where a shot left everything (FNV-1a over the quantized positions), so a
+--- client can prove its replay landed exactly where the server's did.
+function Playback.layoutHash(layout): string
+	local parts = {}
+	local function add(m)
+		if m then
+			table.insert(parts, string.format("%d:%.5f:%.5f:%.5f", m.id or 0, m.x, m.y, m.z))
+		end
+	end
+	for _, m in ipairs(layout.targets or {}) do
+		add(m)
+	end
+	add(layout.shooter)
+	table.sort(parts)
+	local h = 2166136261
+	for _, ch in ipairs({ string.byte(table.concat(parts, ";"), 1, -1) }) do
+		h = bit32.bxor(h, ch)
+		-- h * 16777619 (= 2^24 + 403), kept exact in 32 bits.
+		h = (bit32.lshift(h, 24) + h * 403) % 4294967296
+	end
+	return string.format("%08x", h)
+end
+
+--- The furthest any marble ended from where the other layout put it (web units).
+function Playback.drift(a, b): number
+	local where = {}
+	for _, m in ipairs(a.targets or {}) do
+		where[m.id] = m
+	end
+	if a.shooter then
+		where[a.shooter.id or -1] = a.shooter
+	end
+	local worst = 0
+	local function check(m)
+		local o = m and where[m.id or -1]
+		if o then
+			worst = math.max(worst, math.sqrt((o.x - m.x) ^ 2 + (o.y - m.y) ^ 2 + (o.z - m.z) ^ 2))
+		elseif m then
+			worst = math.huge
+		end
+	end
+	for _, m in ipairs(b.targets or {}) do
+		check(m)
+	end
+	check(b.shooter)
+	return worst
+end
+
 return Playback
