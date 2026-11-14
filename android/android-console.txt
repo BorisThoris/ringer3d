@@ -1,9 +1,9 @@
-11-14 12:01:48.276  3136  3136 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
-11-14 12:01:48.320  3136  3136 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
-11-14 12:01:48.444  3136  3136 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
-11-14 12:01:50.377  3136  3136 W Capacitor/Console: File: https://localhost/assets/index-DC-pgxxA.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
-11-14 12:02:05.244  3136  3136 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-14 12:02:05.268  3136  3136 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-14 12:02:09.991  3136  3136 I Capacitor/Console: File:  - Line 333 - Msg: {}
-11-14 12:02:11.569  3136  3136 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-14 12:02:12.315  3136  3136 I Capacitor/Console: File:  - Line 333 - Msg: undefined
+11-14 17:20:26.406  2591  2591 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
+11-14 17:20:26.407  2591  2591 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
+11-14 17:20:26.407  2591  2591 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
+11-14 17:20:28.492  2591  2591 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+11-14 17:20:28.873  2591  2591 W Capacitor/Console: File: https://localhost/assets/index-DC-pgxxA.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+11-14 17:20:45.323  2591  2591 I Capacitor/Console: File:  - Line 333 - Msg: undefined
+11-14 17:20:45.761  2591  2591 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+11-14 17:20:45.762  2591  2591 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+11-14 17:20:50.651  2591  2591 I Capacitor/Console: File:  - Line 333 - Msg: {}
