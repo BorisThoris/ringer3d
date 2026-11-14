@@ -31,6 +31,7 @@ const LOBBY = [
   ['out-e', [0, 10, 0], [400, 10, 0], 75],
   ['out-s', [0, 10, 0], [0, 10, 400], 75],
   ['out-w', [0, 10, 0], [-400, 10, 0], 75],
+  ['race-gate', [20, 14, -40], [55, 12, -100], 65],
 ];
 function camerasFor(scene, dump) {
   if (scene === 'lobby') return LOBBY;

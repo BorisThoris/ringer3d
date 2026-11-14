@@ -127,7 +127,7 @@ Juice.gui = screen
 local event = Kit.label(string.format("✨ NEW: every Marble Bag mints a one-of-a-kind marble · %.1f%% hold a phenomenon", Forge.phenomenonOdds()), 20, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 62), Size = UDim2.fromOffset(620, 28), TextColor3 = Color3.fromRGB(255, 170, 60), Parent = hud })
 event.TextWrapped = false
 
-local side = Kit.new("Frame", { Position = UDim2.new(0, 12, 0.5, -205), Size = UDim2.fromOffset(150, 410), BackgroundTransparency = 1, Parent = hud })
+local side = Kit.new("Frame", { Position = UDim2.new(0, 12, 0.5, -240), Size = UDim2.fromOffset(150, 480), BackgroundTransparency = 1, Parent = hud })
 Kit.new("UIListLayout", { Padding = UDim.new(0, 10), Parent = side })
 
 local playButton = nil
@@ -723,6 +723,93 @@ Kit.button("🏔️ Race", Kit.BLUE, function()
 		RaceClient.begin()
 	end
 end, { Size = UDim2.fromOffset(150, 58), Parent = side })
+-- Playtime gifts (Server/Social): six boxes across the first hour, the next one counting down
+-- on its button.
+local giftPanel, giftBody = Kit.panel(screen, "Free Gifts", UDim2.fromOffset(620, 400))
+panels.gifts = giftPanel
+local giftList: any = nil
+local giftAt = 0
+local function fmtLeft(sec: number): string
+	return string.format("%d:%02d", math.floor(sec / 60), sec % 60)
+end
+local function refreshGifts()
+	local ok, list = ask("gifts")
+	if ok and typeof(list) == "table" then
+		giftList = list
+		giftAt = os.clock()
+	end
+	for _, c in ipairs(giftBody:GetChildren()) do
+		c:Destroy()
+	end
+	if not giftList then
+		return
+	end
+	Kit.new("UIGridLayout", { CellSize = UDim2.fromOffset(180, 140), CellPadding = UDim2.fromOffset(14, 14), HorizontalAlignment = Enum.HorizontalAlignment.Center, Parent = giftBody })
+	for i, g in ipairs(giftList) do
+		local left = math.max(0, g.left - (os.clock() - giftAt))
+		local ready = left <= 0 and not g.claimed
+		local tile = Kit.new("Frame", { BackgroundColor3 = if g.claimed then Color3.fromRGB(150, 160, 180) elseif ready then Kit.GOLD else Kit.CREAM, Parent = giftBody })
+		Kit.round(tile, 18)
+		Kit.stroke(tile, Kit.INK, 3)
+		Kit.label(if g.reward == "bag" then "🎒" else "🎁", 46, { Size = UDim2.new(1, 0, 0, 56), Position = UDim2.fromOffset(0, 6), Parent = tile })
+		Kit.label(if g.reward == "bag" then "Marble Bag" else ("🪙 " .. g.reward), 20, { Size = UDim2.new(1, 0, 0, 26), Position = UDim2.fromOffset(0, 62), TextColor3 = Kit.INK, Parent = tile })
+		local text = if g.claimed then "Opened" elseif ready then "OPEN!" else fmtLeft(math.ceil(left))
+		Kit.button(text, if ready then Kit.GREEN else Kit.BLUE, function()
+			if not ready then
+				return
+			end
+			local okC, got = ask("claimGift", i)
+			if okC and typeof(got) == "table" then
+				Sfx.ui("buy", 0.9)
+				if got.bag then
+					giftPanel.Visible = false
+					onBag(got.bag)
+				else
+					local vp = workspace.CurrentCamera.ViewportSize
+					Rewards.coinsFly(Vector2.new(vp.X / 2, vp.Y / 2), got.coins or 0)
+					toast(string.format("Gift opened! +%d coins", got.coins or 0), "good")
+				end
+				refreshGifts()
+			else
+				toast(typeof(got) == "string" and got or "Not yet!", "info")
+			end
+		end, { Size = UDim2.new(1, -20, 0, 40), Position = UDim2.new(0, 10, 1, -48), Parent = tile })
+	end
+end
+local giftButton = Kit.button("🎁 Gifts", Kit.PURPLE, function()
+	refreshGifts()
+	show("gifts")
+end, { Size = UDim2.fromOffset(150, 58), Parent = side })
+local giftBadge = Kit.label("!", 24, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(1, -4, 0, 4), Size = UDim2.fromOffset(30, 30), BackgroundTransparency = 0, BackgroundColor3 = Kit.RED, Visible = false, ZIndex = 5, Parent = giftButton })
+Kit.round(giftBadge, 15)
+Kit.stroke(giftBadge, Kit.INK, 2)
+-- The button counts down to the next gift and lights up when one is ready.
+task.spawn(function()
+	task.wait(3)
+	local ok, list = ask("gifts")
+	if ok and typeof(list) == "table" then
+		giftList, giftAt = list, os.clock()
+	end
+	while true do
+		task.wait(1)
+		if giftList then
+			local nextLeft, readyCount = nil, 0
+			for _, g in ipairs(giftList) do
+				local left = g.left - (os.clock() - giftAt)
+				if not g.claimed then
+					if left <= 0 then
+						readyCount += 1
+					elseif not nextLeft or left < nextLeft then
+						nextLeft = left
+					end
+				end
+			end
+			giftBadge.Visible = readyCount > 0
+			giftButton.Text = if readyCount > 0 then "🎁 Open!" elseif nextLeft then ("🎁 " .. fmtLeft(math.ceil(nextLeft))) else "🎁 Gifts"
+		end
+	end
+end)
+
 local questButton = Kit.button("📜 Quests", Kit.ORANGE, function()
 	refreshQuests()
 	show("quests")

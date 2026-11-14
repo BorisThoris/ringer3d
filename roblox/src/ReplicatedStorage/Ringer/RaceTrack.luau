@@ -121,7 +121,11 @@ local WATERFALL = {
 	{ 1172, 266, 1700, 26 },
 	{ 1185, 225, 1735, 22 },
 	{ 1230, 165, 1745, 20 },
-	{ 1300, 100, 1660, W },
+	-- Run alongside the valley track before joining it, so the merge is a gentle angle.
+	{ 1310, 122, 1722, 22 },
+	{ 1400, 90, 1690, 24 },
+	{ 1470, 70, 1665, 26 },
+	{ 1540, 55, 1650, W },
 }
 RaceTrack.FINISH_S_FROM_END = 220 -- the finish line, this far before the main path's end
 

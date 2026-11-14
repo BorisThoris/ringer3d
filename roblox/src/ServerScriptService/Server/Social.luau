@@ -14,6 +14,7 @@ local Config = require(ReplicatedStorage.Ringer.Config)
 local MarbleLook = require(ReplicatedStorage.Ringer.MarbleLook)
 local Data = require(script.Parent.Data)
 local Economy = require(script.Parent.Economy)
+local Collectibles = require(script.Parent.Collectibles)
 
 local Social = {}
 
@@ -77,7 +78,7 @@ local function plate(player: Player)
 	if not gui then
 		local g = Instance.new("BillboardGui")
 		g.Name = "Nameplate"
-		g.Size = UDim2.fromOffset(220, 58)
+		g.Size = UDim2.fromOffset(220, 80)
 		g.StudsOffset = Vector3.new(0, 2.6, 0)
 		g.MaxDistance = 80
 		g.LightInfluence = 0
@@ -94,8 +95,9 @@ local function plate(player: Player)
 			l.TextStrokeTransparency = 0.1
 			l.Parent = g
 		end
-		line("Title", 0, 0.5)
-		line("Best", 0.5, 0.42)
+		line("Title", 0, 0.36)
+		line("Best", 0.36, 0.3)
+		line("RaceTime", 0.66, 0.3)
 		gui = g
 		-- Roblox's own name stays; ours sits above it.
 	end
@@ -108,6 +110,11 @@ local function plate(player: Player)
 	local best = (gui :: BillboardGui):FindFirstChild("Best") :: TextLabel
 	best.Text = if name then "✨ " .. name else ""
 	best.TextColor3 = Config.RARITY_COLOR[rarity or "Common"] or Color3.new(1, 1, 1)
+	local race = (gui :: BillboardGui):FindFirstChild("RaceTime") :: TextLabel?
+	if race then
+		race.Text = if p.raceBest then string.format("🏔️ %d:%05.2f", math.floor(p.raceBest / 60), p.raceBest % 60) else ""
+		race.TextColor3 = Color3.fromRGB(170, 225, 255)
+	end
 	player:SetAttribute("Level", level)
 end
 Social.plate = plate
@@ -273,11 +280,53 @@ function Social.claim(player: Player, id: string): (boolean, any)
 	return false, "That quest isn't one of today's."
 end
 
+-- ---- Playtime gifts -----------------------------------------------------------------------------
+-- Six gifts across the first hour of a session; each opens once its time has passed (the server's
+-- clock, from when the player joined). The last is a free Marble Bag (coins where bags aren't
+-- allowed).
+
+Social.GIFTS = { { 5, 25 }, { 10, 40 }, { 15, 60 }, { 25, 90 }, { 40, 150 }, { 60, "bag" } }
+local joined: { [Player]: number } = {}
+local opened: { [Player]: { [number]: boolean } } = {}
+
+function Social.gifts(player: Player): { any }
+	local since = os.time() - (joined[player] or os.time())
+	local out = {}
+	for i, g in ipairs(Social.GIFTS) do
+		table.insert(out, { minutes = g[1], reward = g[2], left = math.max(0, g[1] * 60 - since), claimed = (opened[player] or {})[i] == true })
+	end
+	return out
+end
+
+function Social.claimGift(player: Player, i: any): (boolean, any)
+	local g = typeof(i) == "number" and Social.GIFTS[i]
+	if not g then
+		return false, "Which gift?"
+	end
+	opened[player] = opened[player] or {}
+	if opened[player][i] then
+		return false, "Already opened."
+	end
+	if os.time() - (joined[player] or os.time()) < g[1] * 60 then
+		return false, "Not yet!"
+	end
+	opened[player][i] = true
+	if g[2] == "bag" and not Collectibles.bagsRestricted(player) then
+		local got = Collectibles.openBag(player, Random.new())
+		if got then
+			return true, { bag = got }
+		end
+	end
+	local amount = if typeof(g[2]) == "number" then g[2] else 200
+	return true, { coins = Economy.give(player, amount, "gift:" .. i) }
+end
+
 -- ---- Wiring -------------------------------------------------------------------------------------
 
 function Social.start(announceRemote: RemoteEvent)
 	Social.announceRemote = announceRemote
 	local function watch(player: Player)
+		joined[player] = os.time()
 		player.CharacterAdded:Connect(function()
 			task.wait(0.5)
 			plate(player)
@@ -292,6 +341,8 @@ function Social.start(announceRemote: RemoteEvent)
 	Players.PlayerAdded:Connect(watch)
 	Players.PlayerRemoving:Connect(function(pl)
 		streaks[pl] = nil
+		joined[pl] = nil
+		opened[pl] = nil
 	end)
 	Data.changed.Event:Connect(function(player)
 		plate(player)

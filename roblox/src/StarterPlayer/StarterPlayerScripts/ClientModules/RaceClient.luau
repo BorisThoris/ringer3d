@@ -134,6 +134,7 @@ function RaceClient.stop()
 		gui = nil
 	end
 	clearGhosts()
+	snow(false, Vector3.zero)
 	setLight(false)
 	local cam = Workspace.CurrentCamera
 	cam.CameraType = Enum.CameraType.Custom
@@ -242,6 +243,68 @@ local function buildHud(medals: any)
 	end)
 	local _ = d
 	return timer, speed, section, dot
+end
+
+-- Falling snow around the camera on the upper mountain.
+local snowPart: BasePart? = nil
+local function snow(on: boolean, at: Vector3)
+	if on and not snowPart then
+		local p = Instance.new("Part")
+		p.Name = "RaceSnow"
+		p.Anchored, p.CanCollide, p.CanQuery, p.CanTouch = true, false, false, false
+		p.Transparency = 1
+		p.Size = Vector3.new(120, 1, 120)
+		p.Parent = Workspace
+		local e = Instance.new("ParticleEmitter")
+		e.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+		e.Color = ColorSequence.new(Color3.new(1, 1, 1))
+		e.Size = NumberSequence.new(0.35)
+		e.Lifetime = NumberRange.new(4, 6)
+		e.Rate = 90
+		e.Speed = NumberRange.new(10, 14)
+		e.EmissionDirection = Enum.NormalId.Bottom
+		e.SpreadAngle = Vector2.new(15, 15)
+		e.LightEmission = 0.3
+		e.Parent = p
+		snowPart = p
+	elseif not on and snowPart then
+		snowPart:Destroy()
+		snowPart = nil
+	end
+	if snowPart then
+		snowPart.CFrame = CFrame.new(at + Vector3.new(0, 40, 0))
+	end
+end
+
+-- Fireworks over the finish line.
+local function fireworks(at: Vector3)
+	for k = 1, 6 do
+		task.delay(k * 0.35, function()
+			local p = Instance.new("Part")
+			p.Anchored, p.CanCollide, p.CanQuery, p.CanTouch = true, false, false, false
+			p.Transparency = 1
+			p.Size = Vector3.one
+			p.Position = at + Vector3.new(math.random(-40, 40), math.random(30, 55), math.random(-40, 40))
+			p.Parent = Workspace
+			local e = Instance.new("ParticleEmitter")
+			e.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+			local colors = { Color3.fromRGB(255, 90, 110), Color3.fromRGB(255, 220, 60), Color3.fromRGB(80, 200, 255), Color3.fromRGB(150, 255, 120), Color3.fromRGB(200, 120, 255) }
+			e.Color = ColorSequence.new(Color3.new(1, 1, 1), colors[math.random(1, #colors)])
+			e.Size = NumberSequence.new(1.8, 0.3)
+			e.Lifetime = NumberRange.new(1, 1.6)
+			e.Speed = NumberRange.new(20, 30)
+			e.SpreadAngle = Vector2.new(180, 180)
+			e.Acceleration = Vector3.new(0, -14, 0)
+			e.Drag = 1.2
+			e.LightEmission = 1
+			e.Rate = 0
+			e.Parent = p
+			e:Emit(80)
+			task.delay(2.5, function()
+				p:Destroy()
+			end)
+		end)
+	end
 end
 
 local function banner(text: string, color: Color3)
@@ -360,6 +423,7 @@ run = function()
 					elseif e == "finish" then
 						done = true
 						banner("FINISH!", Color3.fromRGB(255, 120, 180))
+						fireworks(curPos)
 						d.Sfx.chime("win")
 						task.spawn(function()
 							local okF, r = d.ask("raceFinish", log)
@@ -390,6 +454,13 @@ run = function()
 		local spd = RaceSim.speed(st)
 		local back = 18 + spd * 0.06
 		local camPos = pos - heading * back + Vector3.new(0, 7 + spd * 0.02, 0)
+		-- Never under the track: stay well above its surface behind the marble (steep drops).
+		local cp = course.paths[st.path]
+		local behind = RaceTrack.frame(cp, math.max(0, st.s - back))
+		local floorY = RaceTrack.ORIGIN.Y + behind.y + 7
+		if not st.air and camPos.Y < floorY then
+			camPos = Vector3.new(camPos.X, floorY, camPos.Z)
+		end
 		cam.CFrame = cam.CFrame:Lerp(CFrame.lookAt(camPos, pos + heading * 14 + Vector3.new(0, 2, 0)), math.min(1, dt * 8))
 		d.Juice.apply(cam, pos, 70 + math.min(25, spd * 0.15), dt)
 		if spd > 105 and math.random() < dt * 3 then
@@ -401,6 +472,7 @@ run = function()
 		timer.Text = fmt(t)
 		speedLabel.Text = string.format("%d studs/s", math.floor(spd))
 		local f = RaceTrack.frame(course.paths[st.path], st.s)
+		snow(f.y > 600, pos)
 		if f.section ~= lastSection then
 			lastSection = f.section
 			section.Text = string.upper(f.section)

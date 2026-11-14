@@ -196,6 +196,44 @@ local function gate(folder: Folder, f0: RaceTrack.Frame, text: string, color: Co
 	end
 end
 
+-- ---- Crowds: spectator marbles on bleachers, flags flying -----------------------------------------
+
+local FANS = { rgb(255, 90, 110), rgb(255, 200, 50), rgb(80, 200, 255), rgb(120, 230, 110), rgb(190, 110, 255), rgb(255, 150, 60), rgb(255, 255, 255) }
+local function crowd(folder: Folder, f0: RaceTrack.Frame, side: number, rng: Random)
+	local f = upright(f0)
+	local base = side * (f.w / 2 + 10)
+	for row = 0, 2 do
+		local u = base + side * row * 5
+		local h = row * 3
+		part(folder, { Name = "Bleacher", Size = Vector3.new(4.6, 1.2 + h, 34), CFrame = frameCF(f, u, (1.2 + h) / 2 - 0.4), Color = rgb(240, 240, 250) })
+		for k = 0, 5 do
+			local along = -14 + k * 5.6 + rng:NextNumber(-0.8, 0.8)
+			local col = FANS[rng:NextInteger(1, #FANS)]
+			local at = RaceTrack.world(f, u, h + 3.2) + Vector3.new(f.tx, 0, f.tz).Unit * along
+			ball(folder, at, Vector3.new(3.6, 3.6, 3.6), col)
+			-- Eyes on the side facing the track.
+			local toTrack = (RaceTrack.world(f, 0, h + 3.2) + Vector3.new(f.tx, 0, f.tz).Unit * along - at).Unit
+			local left = Vector3.new(0, 1, 0):Cross(toTrack).Unit
+			for _, e in ipairs({ -1, 1 }) do
+				ball(folder, at + toTrack * 1.55 + left * e * 0.6 + Vector3.new(0, 0.5, 0), Vector3.new(0.9, 1.1, 0.5), rgb(255, 255, 255))
+				ball(folder, at + toTrack * 1.85 + left * e * 0.6 + Vector3.new(0, 0.45, 0), Vector3.new(0.45, 0.55, 0.3), rgb(25, 20, 35))
+			end
+			if rng:NextNumber() < 0.35 then
+				-- A little flag on a stick.
+				local stick = at + Vector3.new(0, 2.4, 0)
+				part(folder, { Name = "FlagStick", Size = Vector3.new(0.15, 3.4, 0.15), CFrame = CFrame.new(stick + Vector3.new(0, 1.2, 0)), Color = rgb(120, 90, 60) })
+				part(folder, { Name = "FanFlag", Size = Vector3.new(0.1, 1.2, 1.8), CFrame = CFrame.new(stick + Vector3.new(0, 2.3, 0.9)), Color = FANS[rng:NextInteger(1, #FANS)] })
+			end
+		end
+	end
+	-- Tall flags behind the stands.
+	for k = -1, 1, 2 do
+		local at = RaceTrack.world(f, base + side * 18, 0) + Vector3.new(f.tx, 0, f.tz).Unit * k * 12
+		part(folder, { Name = "FlagPole", Size = Vector3.new(0.5, 18, 0.5), CFrame = CFrame.new(at + Vector3.new(0, 9, 0)), Color = rgb(255, 255, 255) })
+		part(folder, { Name = "Flag", Size = Vector3.new(0.2, 5, 8), CFrame = CFrame.new(at + Vector3.new(0, 15.5, 4)), Color = FANS[rng:NextInteger(1, #FANS)] })
+	end
+end
+
 -- ---- The world round the track ------------------------------------------------------------------
 
 local function pine(folder: Instance, at: Vector3, h: number, snow: boolean)
@@ -343,6 +381,17 @@ function Race.build(parent: Instance?): any
 	local s0 = RaceTrack.frame(main, 0)
 	part(folder, { Name = "StartDeck", Size = Vector3.new(60, 4, 60), CFrame = frameCF(s0, 0, -2) * CFrame.new(0, 0, 20), Color = rgb(255, 255, 255), CanCollide = true })
 	buildWorld(folder, course, Random.new(42))
+	-- Crowds at the start, the big jump, the Corkscrew and the finish.
+	local crng = Random.new(9)
+	crowd(folder, RaceTrack.frame(main, 40), -1, crng)
+	crowd(folder, RaceTrack.frame(main, 40), 1, crng)
+	crowd(folder, RaceTrack.frame(main, 2260), -1, crng)
+	crowd(folder, RaceTrack.frame(main, 2440), 1, crng)
+	crowd(folder, RaceTrack.frame(main, 2860), -1, crng)
+	crowd(folder, RaceTrack.frame(main, course.finish - 40), -1, crng)
+	crowd(folder, RaceTrack.frame(main, course.finish - 40), 1, crng)
+	crowd(folder, RaceTrack.frame(main, course.finish + 40), -1, crng)
+	crowd(folder, RaceTrack.frame(main, course.finish + 40), 1, crng)
 	folder.Parent = parent or Workspace
 	local f = RaceTrack.frame(main, main.length / 2)
 	built = { folder = folder, centre = RaceTrack.ORIGIN + Vector3.new(900, 450, 850), course = course, start = RaceSim.position(RaceSim.new()) }
@@ -356,6 +405,17 @@ local board = nil
 pcall(function()
 	board = DataStoreService:GetOrderedDataStore("RaceBest_v1")
 end)
+-- This week's board: a fresh one every Monday, so there is always a race anyone can win.
+local function week(): number
+	return math.floor((os.time() - 4 * 86400) / (7 * 86400)) -- the Unix epoch was a Thursday
+end
+Race.week = week
+local function weekBoard()
+	local ok, b = pcall(function()
+		return DataStoreService:GetOrderedDataStore("RaceWeek_" .. week())
+	end)
+	return if ok then b else nil
+end
 Race.announce = function(_text: string, _color: Color3?) end
 Race.quest = function(_player: Player, _stat: string, _n: number) end
 
@@ -440,32 +500,124 @@ function Race.finish(player: Player, log: any): (boolean, any)
 			end)
 		end)
 	end
+	-- This week's best, kept in the profile so only a better time is written.
+	local wk = week()
+	local weekBest = p and p.raceWeek and p.raceWeek.week == wk and p.raceWeek.best
+	if p and (not weekBest or time < weekBest) then
+		Data.update(player, function(pp)
+			pp.raceWeek = { week = wk, best = time }
+		end)
+		local wb = weekBoard()
+		if wb then
+			task.spawn(function()
+				pcall(function()
+					wb:SetAsync(tostring(player.UserId), math.floor(time * 1000))
+				end)
+			end)
+		end
+	end
 	if medal == "Gold" and newBest then
 		Race.announce(string.format("🥇 %s won GOLD on Marble Mountain in %.2fs!", player.DisplayName, time), Color3.fromRGB(255, 215, 80))
 	end
 	return true, { time = time, medal = medal, coins = got, best = if newBest then time else pb, newBest = newBest, respawns = st.respawns }
 end
 
---- The top times: { name, time }.
-local topCache, topAt = {}, 0
-function Race.top(): { any }
-	if os.clock() - topAt < 60 or not board then
-		return topCache
+--- The top times: { name, time }, all time and this week (cached a minute).
+local names: { [number]: string } = {}
+local function read(store: any): { any }?
+	if not store then
+		return nil
+	end
+	local out = nil
+	pcall(function()
+		local page = store:GetSortedAsync(true, 10):GetCurrentPage()
+		out = {}
+		for _, e in ipairs(page) do
+			local id = tonumber(e.key) :: number
+			if not names[id] then
+				pcall(function()
+					names[id] = Players:GetNameFromUserIdAsync(id)
+				end)
+			end
+			table.insert(out, { name = names[id] or "?", time = e.value / 1000 })
+		end
+	end)
+	return out
+end
+local topCache, weekCache, topAt = {}, {}, -math.huge
+local function refresh()
+	if os.clock() - topAt < 60 then
+		return
 	end
 	topAt = os.clock()
-	pcall(function()
-		local page = board:GetSortedAsync(true, 10):GetCurrentPage()
-		local out = {}
-		for _, e in ipairs(page) do
-			local name = "?"
-			pcall(function()
-				name = Players:GetNameFromUserIdAsync(tonumber(e.key) :: number)
-			end)
-			table.insert(out, { name = name, time = e.value / 1000 })
-		end
-		topCache = out
-	end)
+	topCache = read(board) or topCache
+	weekCache = read(weekBoard()) or weekCache
+end
+function Race.top(): { any }
+	refresh()
 	return topCache
+end
+function Race.topWeek(): { any }
+	refresh()
+	return weekCache
+end
+
+--- A board in the lobby by the race gate: the fastest times, all time and this week.
+function Race.board(cf: CFrame, parent: Instance)
+	local part = Instance.new("Part")
+	part.Name = "RaceBoard"
+	part.Anchored = true
+	part.Size = Vector3.new(26, 18, 1)
+	part.CFrame = cf
+	part.Color = Color3.fromRGB(30, 40, 70)
+	part.Parent = parent
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = Enum.NormalId.Front
+	gui.PixelsPerStud = 36
+	gui.LightInfluence = 0
+	gui.Parent = part
+	local head = Instance.new("TextLabel")
+	head.BackgroundTransparency = 1
+	head.Size = UDim2.new(1, 0, 0.16, 0)
+	head.Font = Enum.Font.FredokaOne
+	head.TextScaled = true
+	head.Text = "🏔️ MARBLE MOUNTAIN · FASTEST"
+	head.TextColor3 = Color3.fromRGB(255, 230, 120)
+	head.Parent = gui
+	local cols = {}
+	for k, title in ipairs({ "THIS WEEK", "ALL TIME" }) do
+		local l = Instance.new("TextLabel")
+		l.BackgroundTransparency = 1
+		l.Position = UDim2.new((k - 1) * 0.5, 16, 0.18, 0)
+		l.Size = UDim2.new(0.5, -24, 0.8, 0)
+		l.Font = Enum.Font.FredokaOne
+		l.TextSize = 30
+		l.TextXAlignment = Enum.TextXAlignment.Left
+		l.TextYAlignment = Enum.TextYAlignment.Top
+		l.TextColor3 = Color3.fromRGB(235, 240, 255)
+		l.Text = title .. "\n\n(loading)"
+		l.Parent = gui
+		cols[k] = { label = l, title = title }
+	end
+	local function fmt(t: number): string
+		return string.format("%d:%05.2f", math.floor(t / 60), t % 60)
+	end
+	task.spawn(function()
+		while part.Parent do
+			for k, list in ipairs({ Race.topWeek(), Race.top() }) do
+				local lines = { cols[k].title, "" }
+				for i, e in ipairs(list) do
+					table.insert(lines, string.format("%d. %s  %s", i, e.name, fmt(e.time)))
+				end
+				if #list == 0 then
+					table.insert(lines, "Be the first!")
+				end
+				cols[k].label.Text = table.concat(lines, "\n")
+			end
+			task.wait(60)
+		end
+	end)
+	return part
 end
 
 -- Ghosts: each racer's marble, relayed to the other racers ten times a second.

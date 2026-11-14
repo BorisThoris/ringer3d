@@ -730,6 +730,14 @@ end
 function handlers.raceTop(_player: Player)
 	return true, Race.top()
 end
+
+-- Playtime gifts (Server/Social).
+function handlers.gifts(player: Player)
+	return true, Social.gifts(player)
+end
+function handlers.claimGift(player: Player, i)
+	return Social.claimGift(player, i)
+end
 RaceGhost.OnServerEvent:Connect(function(player, pos)
 	Race.ghost(player, pos, RaceGhost)
 end)
@@ -891,6 +899,12 @@ Collectibles.onBag = Social.bagOpened
 Race.announce = Social.announce
 Race.quest = Social.quest
 task.spawn(Race.build, workspace)
+-- The race's leaderboard by its gate in the lobby park.
+do
+	local a = math.rad(303)
+	local at = Vector3.new(math.cos(a) * 112, 10, math.sin(a) * 112)
+	Race.board(CFrame.lookAt(at, Vector3.new(0, 10, 0)), lobby)
+end
 Social.start(Announce)
 
 Data.start()

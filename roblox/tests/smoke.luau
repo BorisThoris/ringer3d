@@ -83,6 +83,10 @@ for _, q in ipairs(Social.QUESTS) do
 	end
 end
 check("a pool of daily quests, each with a goal and a reward", questsOk, #Social.QUESTS)
+local giftFake = { UserId = 2 } :: any
+local gifts = Social.gifts(giftFake)
+local okEarly, whyEarly = Social.claimGift(giftFake, 1)
+check("six playtime gifts, none opens early", #gifts == 6 and gifts[1].left > 0 and not okEarly and whyEarly == "Not yet!", whyEarly)
 
 -- 3. Rules.
 local cross = Rules.startingCross()

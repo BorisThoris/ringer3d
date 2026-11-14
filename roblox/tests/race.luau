@@ -83,6 +83,16 @@ local okS = pcall(Race.start, fake :: any)
 local _, logC = RaceSim.runBot(0, false)
 local okF, why = Race.finish(fake :: any, logC)
 check("a run claimed faster than real time is refused", okS and not okF and tostring(why):find("real time") ~= nil, why)
+local okBoard, boardPart = pcall(Race.board, CFrame.new(0, 500, 0), workspace)
+check("the lobby race board builds with both tables", okBoard and boardPart:FindFirstChildOfClass("SurfaceGui") ~= nil, if okBoard then nil else boardPart)
+check("weeks roll over on a fixed day", Race.week() == math.floor((os.time() - 4 * 86400) / (7 * 86400)))
+local fans = 0
+for _, d in ipairs(built.folder:GetDescendants()) do
+	if d.Name == "Bleacher" then
+		fans += 1
+	end
+end
+check("crowds line the start, the jump, the Corkscrew and the finish", fans >= 27, fans)
 check("medals are ordered", Race.MEDALS[1][2] < Race.MEDALS[2][2] and Race.MEDALS[2][2] < Race.MEDALS[3][2] and times.shortcuts < Race.MEDALS[1][2] and times.centre < Race.MEDALS[3][2])
 check("the race client loads", type(require(game.StarterPlayer.StarterPlayerScripts.ClientModules.RaceClient).begin) == "function")
 

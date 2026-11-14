@@ -39,6 +39,49 @@ elseif SCENE:sub(1, 5) == "race:" then
 		local look = RaceTrack.world(ahead, 0, 2) - origin
 		table.insert(cams, { name, { at.X, at.Y, at.Z }, { look.X, look.Y, look.Z }, 72 })
 	end
+	if SCENE == "race:chase" then
+		-- The player's view: drive the expert bot and run the client's chase camera (RaceClient)
+		-- frame by frame, with a marble where the racer is at each sampled moment.
+		local RaceSim = require(RS.Ringer.RaceSim)
+		local st = RaceSim.new()
+		local heading = Vector3.new(1, 0, 0)
+		local prev = RaceSim.position(st)
+		local n = 0
+		while not st.finished and st.tick < 60 * 120 do
+			RaceSim.step(st, RaceSim.bot(st, 0.4, true))
+			local pos = RaceSim.position(st)
+			local vel = (pos - prev) * 60
+			prev = pos
+			local horiz = Vector3.new(vel.X, 0, vel.Z)
+			if horiz.Magnitude > 2 then
+				heading = heading:Lerp(horiz.Unit, 4 / 60).Unit
+			end
+			if st.tick % 150 == 0 then
+				n += 1
+				local spd = RaceSim.speed(st)
+				local back = 18 + spd * 0.06
+				local camW = pos - heading * back + Vector3.new(0, 7 + spd * 0.02, 0)
+				local behind = RaceTrack.frame(course.paths[st.path], math.max(0, st.s - back))
+				local floorY = RaceTrack.ORIGIN.Y + behind.y + 7
+				if not st.air and camW.Y < floorY then
+					camW = Vector3.new(camW.X, floorY, camW.Z)
+				end
+				local camPos = camW - origin
+				local look = pos + heading * 14 + Vector3.new(0, 2, 0) - origin
+				local ball = Instance.new("Part")
+				ball.Shape = Enum.PartType.Ball
+				ball.Size = Vector3.new(4, 4, 4)
+				ball.Color = Color3.fromRGB(255, 90, 140)
+				ball.Material = Enum.Material.SmoothPlastic
+				ball.Anchored = true
+				ball.Position = pos
+				ball.Parent = workspace
+				local f = RaceTrack.frame(course.paths[st.path], st.s)
+				table.insert(cams, { string.format("chase%02d-%s", n, f.section:gsub("%W", "")), { camPos.X, camPos.Y, camPos.Z }, { look.X, look.Y, look.Z }, 70 + math.min(25, spd * 0.15) })
+			end
+		end
+		_G.raceCams = cams
+	end
 	camAt("start", "main", 20)
 	camAt("esses", "main", 650)
 	camAt("fork", "main", 960)
@@ -53,7 +96,9 @@ elseif SCENE:sub(1, 5) == "race:" then
 	camAt("finish", "main", course.finish - 60)
 	table.insert(cams, { "overview", { -900, 900, -900 }, { 0, -100, 0 }, 60 })
 	table.insert(cams, { "overview2", { 1600, 700, 1900 }, { 0, -100, 0 }, 60 })
-	_G.raceCams = cams
+	if SCENE ~= "race:chase" then
+		_G.raceCams = cams
+	end
 else
 	local Table = require(SSS.Server.Table)
 	origin = Vector3.new(4800, 0, 4800)
