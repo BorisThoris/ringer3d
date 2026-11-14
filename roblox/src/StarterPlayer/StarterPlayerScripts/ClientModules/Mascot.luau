@@ -36,7 +36,8 @@ local function say(text: string)
 		return
 	end
 	local label = bubble :: TextLabel
-	local gui = label.Parent :: BillboardGui
+	-- The label sits in the bubble frame, inside the BillboardGui.
+	local gui = (label.Parent :: Frame).Parent :: BillboardGui
 	gui.Enabled = true
 	label.Text = ""
 	local scale = label:FindFirstChildOfClass("UIScale")
