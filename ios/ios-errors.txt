@@ -1,2 +1,4 @@
-2026-11-14 22:23:32.726 E  App[4736:5011] [com.apple.WebKit:ResourceLoadStatistics] Failed to request known fingerprinting scripts from WebPrivacy: Error Domain=WebPrivacyErrorDomain Code=1001 "List data not found" UserInfo={NSLocalizedDescription=List data not found}
-2026-11-14 22:23:33.714 E  App[4736:5045] [com.apple.TextInputUI:CandidateGeneration] Attempted to update accumulator from source type: 0, after completion has already been called for token:[AFCA6A08]. This is an error and will be ignored.
+2026-11-14 23:07:20.205 Df App[5279:5436] [com.apple.xpc:connection] [0x1028426d0] Re-initialization successful; calling out to event handler with XPC_ERROR_CONNECTION_INTERRUPTED
+2026-11-14 23:07:21.523 Df App[5279:5436] [com.apple.AppSSO:SOClient] configurationWithCompletion: success = YES, error = (null)
+2026-11-14 23:07:22.426 E  App[5279:5419] [com.apple.WebKit:ResourceLoadStatistics] Failed to request known fingerprinting scripts from WebPrivacy: Error Domain=WebPrivacyErrorDomain Code=1001 "List data not found" UserInfo={NSLocalizedDescription=List data not found}
+2026-11-14 23:07:24.263 E  App[5279:5437] [com.apple.TextInputUI:CandidateGeneration] Attempted to update accumulator from source type: 0, after completion has already been called for token:[4EDB0AEE]. This is an error and will be ignored.
