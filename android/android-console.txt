@@ -1,9 +1,6 @@
-11-14 17:20:26.406  2591  2591 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
-11-14 17:20:26.407  2591  2591 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
-11-14 17:20:26.407  2591  2591 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
-11-14 17:20:28.492  2591  2591 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-14 17:20:28.873  2591  2591 W Capacitor/Console: File: https://localhost/assets/index-DC-pgxxA.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
-11-14 17:20:45.323  2591  2591 I Capacitor/Console: File:  - Line 333 - Msg: undefined
-11-14 17:20:45.761  2591  2591 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-14 17:20:45.762  2591  2591 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-14 17:20:50.651  2591  2591 I Capacitor/Console: File:  - Line 333 - Msg: {}
+11-14 19:14:39.166  2726  2726 W Capacitor/Console: File: https://localhost/assets/index-DC-pgxxA.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+11-14 19:14:57.669  2726  2726 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+11-14 19:14:57.677  2726  2726 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+11-14 19:14:57.686  2726  2726 I Capacitor/Console: File:  - Line 333 - Msg: {}
+11-14 19:14:57.722  2726  2726 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+11-14 19:14:57.748  2726  2726 I Capacitor/Console: File:  - Line 333 - Msg: undefined
