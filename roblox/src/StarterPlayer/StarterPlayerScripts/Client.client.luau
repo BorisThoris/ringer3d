@@ -665,6 +665,95 @@ end, { Size = UDim2.fromOffset(150, 58), Parent = side })
 local dailyBadge = Kit.label("!", 24, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(1, -4, 0, 4), Size = UDim2.fromOffset(30, 30), BackgroundTransparency = 0, BackgroundColor3 = Kit.RED, Visible = false, ZIndex = 5, Parent = dailyButton })
 Kit.round(dailyBadge, 15)
 Kit.stroke(dailyBadge, Kit.INK, 2)
+
+-- Daily quests: three a day, quick enough for one session, for coins (Server/Social).
+local questPanel, questBody = Kit.panel(screen, "Daily Quests", UDim2.fromOffset(580, 440))
+panels.quests = questPanel
+local function refreshQuests()
+	for _, c in ipairs(questBody:GetChildren()) do
+		c:Destroy()
+	end
+	local ok, list = ask("quests")
+	if not ok or typeof(list) ~= "table" then
+		Kit.label("Quests are loading...", 24, { Size = UDim2.new(1, 0, 0, 40), Parent = questBody })
+		return
+	end
+	Kit.new("UIListLayout", { Padding = UDim.new(0, 12), Parent = questBody })
+	for _, q in ipairs(list) do
+		local row = Kit.new("Frame", { Size = UDim2.new(1, 0, 0, 96), BackgroundColor3 = Kit.CREAM, Parent = questBody })
+		Kit.round(row, 16)
+		Kit.stroke(row, Kit.INK, 3)
+		Kit.label(q.text, 22, { Position = UDim2.fromOffset(14, 8), Size = UDim2.new(1, -170, 0, 30), TextColor3 = Kit.INK, TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+		local bar = Kit.new("Frame", { Position = UDim2.fromOffset(14, 50), Size = UDim2.new(1, -170, 0, 22), BackgroundColor3 = Color3.fromRGB(220, 225, 240), Parent = row })
+		Kit.round(bar, 11)
+		local fill = Kit.new("Frame", { Size = UDim2.fromScale(math.clamp(q.progress / q.goal, 0, 1), 1), BackgroundColor3 = Kit.GREEN, Parent = bar })
+		Kit.round(fill, 11)
+		Kit.label(string.format("%d / %d", q.progress, q.goal), 16, { Size = UDim2.fromScale(1, 1), TextColor3 = Kit.INK, ZIndex = 3, Parent = bar })
+		local done = q.progress >= q.goal
+		local text = if q.claimed then "✓ Done" elseif done then ("Claim 🪙" .. q.reward) else ("🪙 " .. q.reward)
+		local btn = Kit.button(text, if done and not q.claimed then Kit.GOLD else Kit.BLUE, function()
+			if not done or q.claimed then
+				return
+			end
+			local ok2, got = ask("claimQuest", q.id)
+			if ok2 then
+				Sfx.play("coin_fly", 0.8)
+				local vp = workspace.CurrentCamera.ViewportSize
+				Rewards.coinsFly(Vector2.new(vp.X / 2, vp.Y / 2), got)
+				toast(string.format("Quest done! +%d coins", got), "good")
+				refreshQuests()
+			else
+				toast(typeof(got) == "string" and got or "Couldn't claim.", "bad")
+			end
+		end, { Size = UDim2.fromOffset(140, 56), Position = UDim2.new(1, -152, 0.5, -28), Parent = row })
+		btn.AutoButtonColor = done and not q.claimed
+	end
+end
+local questButton = Kit.button("📜 Quests", Kit.ORANGE, function()
+	refreshQuests()
+	show("quests")
+end, { Size = UDim2.fromOffset(150, 58), Parent = side })
+local questBadge = Kit.label("!", 24, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(1, -4, 0, 4), Size = UDim2.fromOffset(30, 30), BackgroundTransparency = 0, BackgroundColor3 = Kit.RED, Visible = false, ZIndex = 5, Parent = questButton })
+Kit.round(questBadge, 15)
+Kit.stroke(questBadge, Kit.INK, 2)
+
+-- Server-wide news (Server/Social): a banner sliding down from the top, and a line in chat.
+local newsBanner = Kit.label("", 26, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, -80), Size = UDim2.fromOffset(760, 56), BackgroundTransparency = 0.15, BackgroundColor3 = Color3.fromRGB(30, 22, 50), ZIndex = 60, Parent = screen })
+Kit.round(newsBanner, 18)
+Kit.stroke(newsBanner, Color3.fromRGB(255, 220, 90), 3)
+local newsQueue = {}
+local newsBusy = false
+local function nextNews()
+	if newsBusy or #newsQueue == 0 then
+		return
+	end
+	newsBusy = true
+	local item = table.remove(newsQueue, 1)
+	newsBanner.Text = item.text
+	newsBanner.TextColor3 = item.color
+	TweenService:Create(newsBanner, TweenInfo.new(0.4, Enum.EasingStyle.Back), { Position = UDim2.new(0.5, 0, 0, 70) }):Play()
+	task.delay(4, function()
+		TweenService:Create(newsBanner, TweenInfo.new(0.3), { Position = UDim2.new(0.5, 0, 0, -80) }):Play()
+		task.wait(0.4)
+		newsBusy = false
+		nextNews()
+	end)
+end
+Remotes:WaitForChild("Announce").OnClientEvent:Connect(function(text, color)
+	if typeof(text) ~= "string" then
+		return
+	end
+	table.insert(newsQueue, { text = text, color = if typeof(color) == "Color3" then color else Color3.fromRGB(255, 220, 90) })
+	Sfx.ui("chime_tap", 0.6)
+	nextNews()
+	pcall(function()
+		local channels = game:GetService("TextChatService"):FindFirstChild("TextChannels")
+		local sys = channels and channels:FindFirstChild("RBXSystem") :: TextChannel?
+		if sys then
+			sys:DisplaySystemMessage(text)
+		end
+	end)
+end)
 Kit.button("👋 Invite", Kit.BLUE, function()
 	local ok, can = pcall(SocialService.CanSendGameInviteAsync, SocialService, player)
 	if ok and can then
@@ -1270,6 +1359,7 @@ Remotes:WaitForChild("ProfileSync").OnClientEvent:Connect(function(p)
 	end
 	dailyButton.Text = "🎁 Daily"
 	dailyBadge.Visible = p.dailyReady == true
+	questBadge.Visible = (p.questsReady or 0) > 0
 	if panels.shop.Visible then
 		refreshShop()
 	end

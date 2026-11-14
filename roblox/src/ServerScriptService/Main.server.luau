@@ -15,6 +15,7 @@ local Economy = require(Server.Economy)
 local Collectibles = require(Server.Collectibles)
 local Market = require(Server.Market)
 local Leaderboard = require(Server.Leaderboard)
+local Social = require(Server.Social)
 
 -- ---- Remotes --------------------------------------------------------------------------------
 local remotes = Instance.new("Folder")
@@ -33,6 +34,7 @@ local Request = remote("RemoteFunction", "Request") :: RemoteFunction
 local ProfileSync = remote("RemoteEvent", "ProfileSync") :: RemoteEvent
 local Notify = remote("RemoteEvent", "Notify") :: RemoteEvent
 local BagOpened = remote("RemoteEvent", "BagOpened") :: RemoteEvent
+local Announce = remote("RemoteEvent", "Announce") :: RemoteEvent -- server-wide news (Social)
 remotes.Parent = ReplicatedStorage.Ringer
 
 local function notify(player: Player, text: string, kind: string?)
@@ -274,10 +276,12 @@ local active: { [Player]: any } = {} -- player -> table they play at
 local queue: { { player: Player, since: number } } = {}
 
 local function slotOrigin(slot: number): Vector3
-	local col = (slot - 1) % 8
-	local row = math.floor((slot - 1) / 8)
-	-- Out past the lobby's hills (LobbyWorld reaches 370 studs), so no field ever lands in them.
-	return Vector3.new((col + 3) * Config.TABLE_SPACING, 0, (row - 3) * Config.TABLE_SPACING)
+	-- Four to a row, far out past the lobby's hills (LobbyWorld reaches 370 studs) and from each
+	-- other: each client draws a world about 2000 studs across round the table it watches. Four wide
+	-- keeps busy servers within about 10,000 studs of the origin, where rendering stays steady.
+	local col = (slot - 1) % 4
+	local row = math.floor((slot - 1) / 4)
+	return Vector3.new((col + 1) * Config.TABLE_SPACING, 0, (row - 1) * Config.TABLE_SPACING)
 end
 
 local function freeSlot(): number
@@ -354,6 +358,8 @@ local function pay(tbl, result: Table.Result)
 		end
 		local got = Economy.give(player, coins, "match:" .. tbl.mode)
 		local extra = {}
+		local before = Data.get(player)
+		local levelBefore = if before then Social.level(before.played, before.wins) else 1
 		Data.update(player, function(p)
 			p.played += 1
 			p.captured += score
@@ -403,12 +409,14 @@ local function pay(tbl, result: Table.Result)
 					end
 					if floor == #Config.TOWER then
 						Economy.badge(player, "towerTop")
+						Social.announce(string.format("🏆 %s beat the Black Taw and conquered the Tower!", player.DisplayName), Color3.fromRGB(255, 215, 80))
 					end
 				end
 			else
 				Economy.progression(player, floor, Enum.AnalyticsProgressionType.Fail)
 			end
 		end
+		Social.gameOver(player, won, score, tbl.arena.id, levelBefore)
 		Economy.funnel(player, 4, "Finished a match")
 		TableEvent:FireClient(player, "result", {
 			won = won,
@@ -549,6 +557,26 @@ local function publicProfile(player: Player)
 		trails = Economy.hasPass(player, "trails"),
 		premium = player.MembershipType == Enum.MembershipType.Premium,
 		unsaved = player:GetAttribute("UnsavedProfile") == true,
+		level = Social.level(p.played, p.wins),
+		title = Social.title(Social.level(p.played, p.wins)),
+		-- Today's quests that are finished but not yet claimed (the Quests button's badge).
+		questsReady = (function()
+			local n = 0
+			if p.quests and p.quests.day == math.floor(os.time() / 86400) then
+				for _, e in ipairs(p.quests.list) do
+					local q = nil
+					for _, qq in ipairs(Social.QUESTS) do
+						if qq.id == e.id then
+							q = qq
+						end
+					end
+					if q and not e.claimed and e.progress >= q.goal then
+						n += 1
+					end
+				end
+			end
+			return n
+		end)(),
 	}
 end
 
@@ -671,12 +699,24 @@ function handlers.pickup(player: Player, i)
 	end
 	taken[i] = now
 	hour.n += 1
+	Social.quest(player, "lawn", 1)
 	return true, Economy.give(player, rule.value, "lobby coin")
 end
 Players.PlayerRemoving:Connect(function(p)
 	coinTaken[p] = nil
 	coinHour[p] = nil
 end)
+
+-- Daily quests: today's three, and claiming one's coins.
+function handlers.quests(player: Player)
+	return true, Social.quests(player)
+end
+function handlers.claimQuest(player: Player, id)
+	if typeof(id) ~= "string" then
+		return false, "Which quest?"
+	end
+	return Social.claim(player, id)
+end
 
 function handlers.equip(player: Player, id)
 	if not (typeof(id) == "string" and Collectibles.holds(player, id)) then
@@ -819,6 +859,9 @@ task.spawn(function()
 		end
 	end
 end)
+
+Collectibles.onBag = Social.bagOpened
+Social.start(Announce)
 
 Data.start()
 Market.start()

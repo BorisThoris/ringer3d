@@ -20,6 +20,8 @@ local Data = require(script.Parent.Data)
 local Economy = require(script.Parent.Economy)
 
 local Collectibles = {}
+-- Called with every marble out of a bag (Social: announcements and quests).
+Collectibles.onBag = function(_player: Player, _id: string) end
 
 local serials = nil
 pcall(function()
@@ -123,6 +125,7 @@ function Collectibles.openBag(player: Player, rng: Random)
 	Data.update(player, function(pp)
 		table.insert(pp.forged, { id = c.id, at = os.time(), tally = 0 })
 	end)
+	Collectibles.onBag(player, c.id)
 	return { id = c.id, rarity = c.tier, forged = true }
 end
 

@@ -24,7 +24,11 @@ Config.MIN_POWER = 0.03 -- a release weaker than this is not a shot
 Config.GUIDE = { full = 9, short = 2.2, off = 0 }
 
 -- Each table's centre sits on a grid far apart, so matches never touch.
-Config.TABLE_SPACING = 160
+-- PLOT is a table's own square of field and scenery; TABLE_SPACING keeps tables so far apart that
+-- each client can draw a whole world round the one it watches (ClientModules/Skies) and never see
+-- another table or the void past it.
+Config.PLOT = 160
+Config.TABLE_SPACING = 2400
 Config.TABLE_Y = 0
 
 -- ---- Fields --------------------------------------------------------------------------------

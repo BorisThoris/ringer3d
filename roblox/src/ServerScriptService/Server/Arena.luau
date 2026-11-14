@@ -712,7 +712,7 @@ local function backdrop(parent: Instance, origin: Vector3, arenaId: string, seat
 	local folder = Instance.new("Folder")
 	folder.Name = "Backdrop"
 	-- Just inside the plot: past it there is no ground under them.
-	local r = Config.TABLE_SPACING / 2 - 3
+	local r = Config.PLOT / 2 - 3
 	local n = 30
 	for k = 0, n - 1 do
 		local a = k / n * math.pi * 2 + rng:NextNumber(-0.06, 0.06)
@@ -735,7 +735,7 @@ local TERRAIN = { grass = Enum.Material.Grass, minigolf = Enum.Material.Grass, s
 Arena.TERRAIN = TERRAIN
 
 local function plot(origin: Vector3): (CFrame, Vector3)
-	local half = Config.TABLE_SPACING / 2
+	local half = Config.PLOT / 2
 	return CFrame.new(origin - Vector3.new(0, 2, 0)), Vector3.new(half * 2, 4, half * 2)
 end
 
@@ -758,7 +758,7 @@ function Arena.build(origin: Vector3, arena: Config.Arena, seats: number, rng: R
 
 	-- Ground: the field's own surface; outdoors a disc of it set into real terrain, indoors (the
 	-- desk, the street) one slab filling the table's plot.
-	local half = Config.TABLE_SPACING / 2
+	local half = Config.PLOT / 2
 	local terrain = TERRAIN[arena.id]
 	local discR = B + 22
 	if terrain then

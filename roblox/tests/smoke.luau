@@ -62,6 +62,27 @@ for _, d in ipairs(workspace.Lobby.Mascot:GetChildren()) do
 	end
 end
 check("the mascot smiles, grins, gasps, winks and yawns", okM and lips == 11, if okM then lips else errM)
+local Social = require(game.ServerScriptService.Server.Social)
+local Rewards = require(game.StarterPlayer.StarterPlayerScripts.ClientModules.Rewards)
+local levelsAgree = true
+for _, c in ipairs({ { 0, 0 }, { 5, 0 }, { 3, 2 }, { 40, 25 }, { 200, 120 } }) do
+	if Social.level(c[1], c[2]) ~= Rewards.level(c[1], c[2]) then
+		levelsAgree = false
+	end
+end
+check("nameplate levels match the client's level bar", levelsAgree)
+check("titles climb with level", Social.title(1) == "Rookie" and Social.title(12) == "Sharpshooter" and Social.title(60) == "Ringer King")
+local bestName, bestRarity = Social.best({ owned = { ember = true, blackhole = true }, forged = {} })
+check("the nameplate shows the rarest marble", bestRarity == "Mythic" or bestRarity == "Legendary", tostring(bestName) .. " " .. tostring(bestRarity))
+Social.announce("test news")
+check("announcements are logged and sent", Social.log[#Social.log] == "test news")
+local questsOk = #Social.QUESTS >= 6
+for _, q in ipairs(Social.QUESTS) do
+	if not (q.goal > 0 and q.reward > 0 and q.text ~= "") then
+		questsOk = false
+	end
+end
+check("a pool of daily quests, each with a goal and a reward", questsOk, #Social.QUESTS)
 
 -- 3. Rules.
 local cross = Rules.startingCross()

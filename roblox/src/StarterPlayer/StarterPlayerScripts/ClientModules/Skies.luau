@@ -598,6 +598,285 @@ CRITTERS.minigolf = function(f: Folder, o: Vector3, _rng: Random)
 end
 Skies.CRITTERS = CRITTERS
 
+-- ---- The world round the field: no edge, no void, out to the horizon ---------------------------
+-- The field's plot is 160 studs square (Config.PLOT). Past it, on this client only: real terrain to
+-- about 320 studs for outdoor fields, a ground plane to the horizon (fog does the rest), and each
+-- field's own surroundings. Tables stand 2400 studs apart, so nothing here meets another table.
+
+local Config = require(game:GetService("ReplicatedStorage").Ringer.Config)
+local SURROUND = {}
+local TERRAIN_R = 320
+
+local function groundPlane(f: Folder, o: Vector3, color: Color3, material: Enum.Material, y: number?)
+	-- A disc as wide as a part can be (2048), its top just under the field's own ground.
+	return piece(f, { Shape = Enum.PartType.Cylinder, Size = Vector3.new(4, 2048, 2048), CFrame = CFrame.new(o + Vector3.new(0, (y or -0.3) - 2, 0)) * CFrame.Angles(0, 0, math.pi / 2), Color = color, Material = material })
+end
+
+-- Fill this client's terrain round the plot with `material`, leaving the field's disc as the server
+-- carved it (the same carve as Arena.build).
+local function terrainRing(o: Vector3, material: Enum.Material)
+	local T = Workspace.Terrain
+	T:FillCylinder(CFrame.new(o - Vector3.new(0, 2, 0)), 4, TERRAIN_R, material)
+	T:FillCylinder(CFrame.new(o), 12, Config.BOUND_R + 22 - 1, Enum.Material.Air)
+end
+
+local function hillsRing(f: Folder, o: Vector3, rng: Random, colors: { Color3 }, rMin: number, rMax: number, n: number, sMin: number, sMax: number, material: Enum.Material?)
+	for i = 0, n - 1 do
+		local a = i / n * math.pi * 2 + rng:NextNumber(-0.1, 0.1)
+		local d = rng:NextNumber(rMin, rMax)
+		local s = rng:NextNumber(sMin, sMax)
+		ball(f, o + Vector3.new(math.cos(a) * d, -s * 0.15, math.sin(a) * d), Vector3.new(s * 2, s * 0.9, s * 1.6), colors[rng:NextInteger(1, #colors)], material)
+	end
+end
+
+local function roundTree(f: Folder, at: Vector3, rng: Random, tint: Color3?)
+	local h = rng:NextNumber(10, 18)
+	piece(f, { Shape = Enum.PartType.Cylinder, Size = Vector3.new(h, 2.4, 2.4), CFrame = CFrame.new(at + Vector3.new(0, h / 2, 0)) * CFrame.Angles(0, 0, math.pi / 2), Color = rgb(140, 92, 56), Material = Enum.Material.Wood })
+	local c = rng:NextNumber(14, 22)
+	ball(f, at + Vector3.new(0, h + c * 0.3, 0), Vector3.new(c, c * 0.9, c), tint or ({ rgb(92, 200, 80), rgb(70, 180, 100), rgb(130, 215, 70) })[rng:NextInteger(1, 3)])
+end
+
+local function snowPine(f: Folder, at: Vector3, h: number)
+	piece(f, { Shape = Enum.PartType.Cylinder, Size = Vector3.new(h * 0.3, h * 0.12, h * 0.12), CFrame = CFrame.new(at + Vector3.new(0, h * 0.15, 0)) * CFrame.Angles(0, 0, math.pi / 2), Color = rgb(107, 74, 48), Material = Enum.Material.Wood })
+	for i = 0, 4 do
+		local fr = i / 5
+		local r = h * 0.34 * (1 - fr) + h * 0.04
+		local y = h * (0.28 + fr * 0.65)
+		piece(f, { Shape = Enum.PartType.Cylinder, Size = Vector3.new(h * 0.12, r * 2, r * 2), CFrame = CFrame.new(at + Vector3.new(0, y, 0)) * CFrame.Angles(0, 0, math.pi / 2), Color = if i % 2 == 0 then rgb(42, 95, 62) else rgb(47, 107, 69), Material = Enum.Material.LeafyGrass })
+		piece(f, { Shape = Enum.PartType.Cylinder, Size = Vector3.new(h * 0.03, r * 1.4, r * 1.4), CFrame = CFrame.new(at + Vector3.new(0, y + h * 0.065, 0)) * CFrame.Angles(0, 0, math.pi / 2), Color = rgb(244, 248, 252), Material = Enum.Material.Snow })
+	end
+end
+
+local function houseAt(f: Folder, at: Vector3, toward: Vector3, rng: Random, scale: number)
+	local w, d, h = rng:NextNumber(26, 36) * scale, 22 * scale, rng:NextNumber(16, 20) * scale
+	local face = CFrame.lookAt(at, Vector3.new(toward.X, at.Y, toward.Z))
+	local pastel = ({ rgb(255, 179, 199), rgb(255, 224, 138), rgb(168, 230, 161), rgb(159, 212, 255), rgb(211, 184, 255), rgb(255, 201, 153) })[rng:NextInteger(1, 6)]
+	piece(f, { Size = Vector3.new(w, h, d), CFrame = face * CFrame.new(0, h / 2, 0), Color = pastel })
+	local roof = ({ rgb(209, 69, 59), rgb(58, 95, 209), rgb(107, 74, 48) })[rng:NextInteger(1, 3)]
+	for _, sd in ipairs({ -1, 1 }) do
+		local wd = Instance.new("WedgePart")
+		wd.Anchored, wd.CanCollide, wd.CanQuery, wd.CanTouch = true, false, false, false
+		wd.Size = Vector3.new(w + 2, 9 * scale, d / 2 + 1)
+		wd.CFrame = face * CFrame.new(0, h + 4.5 * scale, sd * (d / 4 + 0.5)) * CFrame.Angles(0, if sd < 0 then 0 else math.pi, 0)
+		wd.Color = roof
+		wd.Parent = f
+		Skies.pieces += 1
+	end
+	piece(f, { Size = Vector3.new(4.5 * scale, 9 * scale, 0.4), CFrame = face * CFrame.new(0, 4.5 * scale, -d / 2 - 0.2), Color = rgb(122, 74, 42) })
+	for _, x in ipairs({ -w / 3.2, w / 3.2 }) do
+		piece(f, { Size = Vector3.new(5 * scale, 5 * scale, 0.4), CFrame = face * CFrame.new(x, h * 0.6, -d / 2 - 0.2), Color = rgb(255, 241, 184), Material = Enum.Material.Neon })
+	end
+end
+
+-- The desk: a big desk in a bedroom. Its top runs past the field, then drops to the floor; walls,
+-- a window with the night outside, a bed, a shelf of toys, a rug and posters close the room.
+SURROUND.desk = function(f: Folder, o: Vector3, rng: Random)
+	local deskTop = rgb(160, 98, 55)
+	local H = 78 -- desk height in studs (1 stud is about 1 cm here)
+	piece(f, { Size = Vector3.new(300, 5, 220), CFrame = CFrame.new(o + Vector3.new(0, -2.8, 0)), Color = deskTop, Material = Enum.Material.Wood })
+	for _, c in ipairs({ { -1, -1 }, { -1, 1 }, { 1, -1 }, { 1, 1 } }) do
+		piece(f, { Size = Vector3.new(8, H, 8), CFrame = CFrame.new(o + Vector3.new(c[1] * 140, -H / 2 - 5, c[2] * 100)), Color = deskTop:Lerp(Color3.new(0, 0, 0), 0.15), Material = Enum.Material.Wood })
+	end
+	local floorY = -H - 5
+	piece(f, { Size = Vector3.new(900, 2, 900), CFrame = CFrame.new(o + Vector3.new(0, floorY - 1, 0)), Color = rgb(200, 150, 100), Material = Enum.Material.WoodPlanks })
+	piece(f, { Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.6, 380, 380), CFrame = CFrame.new(o + Vector3.new(0, floorY + 0.3, 40)) * CFrame.Angles(0, 0, math.pi / 2), Color = rgb(150, 120, 230), Material = Enum.Material.Fabric })
+	-- Four walls: pastel, with a skirting board.
+	local wall = rgb(190, 225, 255)
+	for k = 0, 3 do
+		local a = k * math.pi / 2
+		local dir = Vector3.new(math.cos(a), 0, math.sin(a))
+		local at = o + dir * 440 + Vector3.new(0, floorY + 170, 0)
+		local p = piece(f, { Size = Vector3.new(900, 340, 4), CFrame = CFrame.lookAt(at, Vector3.new(o.X, at.Y, o.Z)), Color = if k % 2 == 0 then wall else rgb(255, 214, 230), Material = Enum.Material.SmoothPlastic })
+		piece(f, { Size = Vector3.new(900, 10, 2), CFrame = p.CFrame * CFrame.new(0, -165, -2.5), Color = rgb(255, 255, 255) })
+	end
+	piece(f, { Size = Vector3.new(900, 4, 900), CFrame = CFrame.new(o + Vector3.new(0, floorY + 342, 0)), Color = rgb(255, 250, 240) })
+	-- The window behind the lamp side: a night sky with a moon and stars.
+	local win = CFrame.lookAt(o + Vector3.new(0, floorY + 190, -437), o + Vector3.new(0, floorY + 190, 0))
+	piece(f, { Size = Vector3.new(220, 150, 1), CFrame = win, Color = rgb(40, 50, 120), Material = Enum.Material.Neon, Transparency = 0.1 })
+	ball(f, (win * CFrame.new(60, 35, -2)).Position, Vector3.new(30, 30, 6), rgb(255, 248, 210), Enum.Material.Neon)
+	for _ = 1, 14 do
+		ball(f, (win * CFrame.new(rng:NextNumber(-100, 100), rng:NextNumber(-65, 65), -1.5)).Position, Vector3.new(2.5, 2.5, 1), rgb(255, 255, 230), Enum.Material.Neon)
+	end
+	for _, x in ipairs({ -112, 112 }) do
+		piece(f, { Size = Vector3.new(6, 160, 4), CFrame = win * CFrame.new(x, 0, -2), Color = rgb(255, 255, 255) })
+	end
+	piece(f, { Size = Vector3.new(4, 150, 4), CFrame = win * CFrame.new(0, 0, -2), Color = rgb(255, 255, 255) })
+	piece(f, { Size = Vector3.new(230, 6, 4), CFrame = win * CFrame.new(0, -78, -2), Color = rgb(255, 255, 255) })
+	-- A bed with a big pillow and a striped blanket.
+	local bed = CFrame.new(o + Vector3.new(270, floorY, 150))
+	piece(f, { Size = Vector3.new(140, 40, 220), CFrame = bed * CFrame.new(0, 20, 0), Color = rgb(255, 255, 255), Material = Enum.Material.Fabric })
+	piece(f, { Size = Vector3.new(144, 12, 160), CFrame = bed * CFrame.new(0, 44, 30), Color = rgb(255, 140, 180), Material = Enum.Material.Fabric })
+	ball(f, (bed * CFrame.new(0, 48, -80)).Position, Vector3.new(100, 26, 46), rgb(255, 250, 220), Enum.Material.Fabric)
+	-- A shelf of toys on the far wall.
+	local shelf = CFrame.new(o + Vector3.new(-300, floorY, 300))
+	for k = 0, 3 do
+		piece(f, { Size = Vector3.new(160, 5, 50), CFrame = shelf * CFrame.new(0, 40 + k * 55, 0), Color = rgb(255, 255, 255) })
+		for j = 0, 3 do
+			local col = TOY[(k + j) % #TOY + 1]
+			if (j + k) % 2 == 0 then
+				ball(f, (shelf * CFrame.new(-55 + j * 36, 56 + k * 55, 0)).Position, Vector3.new(26, 26, 26), col)
+			else
+				piece(f, { Size = Vector3.new(24, 24, 24), CFrame = shelf * CFrame.new(-55 + j * 36, 55 + k * 55, 0) * CFrame.Angles(0, 0.4, 0), Color = col })
+			end
+		end
+	end
+	-- Posters.
+	for k, x in ipairs({ -250, 200 }) do
+		piece(f, { Size = Vector3.new(90, 120, 1), CFrame = CFrame.lookAt(o + Vector3.new(437, floorY + 200, x), o + Vector3.new(0, floorY + 200, x)), Color = TOY[k * 2], Material = Enum.Material.SmoothPlastic })
+	end
+end
+
+-- The street: tarmac all round, a ring road, a second ring of houses, trees and far hills.
+SURROUND.culdesac = function(f: Folder, o: Vector3, rng: Random)
+	groundPlane(f, o, rgb(160, 200, 120), Enum.Material.Grass)
+	piece(f, { Shape = Enum.PartType.Cylinder, Size = Vector3.new(2, 420, 420), CFrame = CFrame.new(o + Vector3.new(0, -1.25, 0)) * CFrame.Angles(0, 0, math.pi / 2), Color = rgb(196, 196, 202), Material = Enum.Material.Concrete })
+	piece(f, { Shape = Enum.PartType.Cylinder, Size = Vector3.new(2, 320, 320), CFrame = CFrame.new(o + Vector3.new(0, -1.2, 0)) * CFrame.Angles(0, 0, math.pi / 2), Color = rgb(80, 82, 92), Material = Enum.Material.Asphalt })
+	-- Dashed centre line on the ring road.
+	for i = 0, 47 do
+		local a = i / 48 * math.pi * 2
+		local at = o + Vector3.new(math.cos(a) * 130, -0.15, math.sin(a) * 130)
+		piece(f, { Size = Vector3.new(8, 0.1, 1), CFrame = CFrame.lookAt(at, Vector3.new(o.X, at.Y, o.Z)) * CFrame.Angles(0, math.pi / 2, 0), Color = rgb(255, 230, 120) })
+	end
+	for i = 0, 13 do
+		local a = i / 14 * math.pi * 2 + 0.1
+		houseAt(f, o + Vector3.new(math.cos(a) * 250, -0.25, math.sin(a) * 250), o, rng, 1.6)
+		roundTree(f, o + Vector3.new(math.cos(a + 0.22) * 225, -0.25, math.sin(a + 0.22) * 225), rng)
+	end
+	hillsRing(f, o, rng, { rgb(120, 200, 100), rgb(100, 185, 95), rgb(140, 210, 110) }, 600, 900, 18, 120, 200)
+end
+
+-- The lawn: grass to the horizon, a white picket fence, a garden shed, trees and hills.
+SURROUND.grass = function(f: Folder, o: Vector3, rng: Random)
+	terrainRing(o, Enum.Material.Grass)
+	groundPlane(f, o, rgb(96, 205, 70), Enum.Material.Grass, -1)
+	for i = 0, 89 do
+		local a = i / 90 * math.pi * 2
+		local at = o + Vector3.new(math.cos(a) * 150, 4, math.sin(a) * 150)
+		piece(f, { Size = Vector3.new(1.4, 9, 1), CFrame = CFrame.lookAt(at, Vector3.new(o.X, at.Y, o.Z)), Color = rgb(255, 255, 255) })
+		if i % 2 == 0 then
+			piece(f, { Size = Vector3.new(2 * math.pi * 150 / 45, 1, 0.6), CFrame = CFrame.lookAt(at + Vector3.new(0, 1.5, 0), Vector3.new(o.X, at.Y + 1.5, o.Z)), Color = rgb(255, 255, 255) })
+		end
+	end
+	local shed = CFrame.lookAt(o + Vector3.new(190, 0, -120), o)
+	piece(f, { Size = Vector3.new(40, 30, 30), CFrame = shed * CFrame.new(0, 15, 0), Color = rgb(150, 210, 255), Material = Enum.Material.WoodPlanks })
+	piece(f, { Size = Vector3.new(44, 3, 34), CFrame = shed * CFrame.new(0, 31, 0) * CFrame.Angles(0.2, 0, 0), Color = rgb(209, 69, 59) })
+	for i = 0, 17 do
+		local a = i / 18 * math.pi * 2 + rng:NextNumber(-0.1, 0.1)
+		roundTree(f, o + Vector3.new(math.cos(a) * rng:NextNumber(200, 290), -0.5, math.sin(a) * rng:NextNumber(200, 290)), rng)
+	end
+	hillsRing(f, o, rng, { rgb(110, 200, 90), rgb(90, 185, 85), rgb(140, 215, 100) }, 500, 900, 20, 130, 220)
+end
+
+-- The beach: sand to the water's edge, then the sea to the horizon toward the low sun; dunes and
+-- palms behind.
+SURROUND.sand = function(f: Folder, o: Vector3, rng: Random)
+	terrainRing(o, Enum.Material.Sand)
+	groundPlane(f, o, rgb(240, 214, 150), Enum.Material.Sand, -1)
+	local dir = Vector3.new(-0.8, 0, -0.6).Unit
+	local side = Vector3.new(-dir.Z, 0, dir.X)
+	-- The sea: a vast sheet starting past the field, with a foam line along the shore.
+	local seaStart = 130
+	piece(f, { Size = Vector3.new(2048, 1, 2048), CFrame = CFrame.lookAt(o + dir * (seaStart + 1024) + Vector3.new(0, -0.6, 0), o + dir * 4000 + Vector3.new(0, -0.6, 0)), Color = rgb(60, 170, 220), Material = Enum.Material.Glass, Transparency = 0.15, Reflectance = 0.2 })
+	for i = -20, 20 do
+		local at = o + dir * seaStart + side * (i * 24) + Vector3.new(0, -0.05, 0)
+		ball(f, at, Vector3.new(26, 0.6, 7), rgb(255, 255, 255))
+	end
+	-- Dunes and palms on the land side.
+	for i = 0, 11 do
+		local a = math.atan2(-dir.Z, -dir.X) + (i / 11 - 0.5) * 2.6
+		local d = rng:NextNumber(170, 280)
+		Workspace.Terrain:FillBall(o + Vector3.new(math.cos(a) * d, -14, math.sin(a) * d), rng:NextNumber(24, 40), Enum.Material.Sand)
+	end
+	for i = 0, 9 do
+		local a = math.atan2(-dir.Z, -dir.X) + (i / 9 - 0.5) * 2.4
+		local at = o + Vector3.new(math.cos(a) * rng:NextNumber(140, 200), 0, math.sin(a) * rng:NextNumber(140, 200))
+		local p = at
+		for k = 1, 7 do
+			local q = p + Vector3.new(0, 4, 0) + Vector3.new(0.6, 0, 0.3) * (k / 3)
+			piece(f, { Size = Vector3.new(2, 2, (q - p).Magnitude + 0.4), CFrame = CFrame.lookAt((p + q) / 2, q), Color = rgb(176, 129, 79), Material = Enum.Material.Wood })
+			p = q
+		end
+		for k = 0, 5 do
+			local fa = k / 6 * math.pi * 2
+			local fd = Vector3.new(math.cos(fa), 0, math.sin(fa))
+			local mid = p + fd * 6 + Vector3.new(0, -1.2, 0)
+			piece(f, { Size = Vector3.new(4, 0.3, 13), CFrame = CFrame.lookAt(mid, mid + fd) * CFrame.Angles(math.rad(-20), 0, 0), Color = rgb(63, 175, 74), Material = Enum.Material.LeafyGrass })
+		end
+	end
+end
+
+-- The frozen lake: snow all round, pines, a log cabin and white mountains closing the valley.
+SURROUND.ice = function(f: Folder, o: Vector3, rng: Random)
+	terrainRing(o, Enum.Material.Snow)
+	groundPlane(f, o, rgb(240, 246, 252), Enum.Material.Snow, -1)
+	for i = 0, 29 do
+		local a = i / 30 * math.pi * 2 + rng:NextNumber(-0.08, 0.08)
+		snowPine(f, o + Vector3.new(math.cos(a) * rng:NextNumber(150, 300), 0, math.sin(a) * rng:NextNumber(150, 300)), rng:NextNumber(30, 55))
+	end
+	local cabin = CFrame.lookAt(o + Vector3.new(-170, 0, 140), o)
+	piece(f, { Size = Vector3.new(50, 30, 40), CFrame = cabin * CFrame.new(0, 15, 0), Color = rgb(140, 90, 55), Material = Enum.Material.WoodPlanks })
+	piece(f, { Size = Vector3.new(56, 6, 46), CFrame = cabin * CFrame.new(0, 33, 0), Color = rgb(250, 252, 255), Material = Enum.Material.Snow })
+	piece(f, { Size = Vector3.new(10, 10, 0.4), CFrame = cabin * CFrame.new(-12, 16, -20.2), Color = rgb(255, 210, 120), Material = Enum.Material.Neon })
+	-- Mountains: rock cones with snow caps, a jagged ring.
+	for i = 0, 15 do
+		local a = i / 16 * math.pi * 2 + rng:NextNumber(-0.1, 0.1)
+		local d = rng:NextNumber(600, 850)
+		local h = rng:NextNumber(260, 420)
+		local at = o + Vector3.new(math.cos(a) * d, 0, math.sin(a) * d)
+		for k = 0, 5 do
+			local fr = k / 6
+			local r = h * 0.75 * (1 - fr) + 10
+			piece(f, { Shape = Enum.PartType.Cylinder, Size = Vector3.new(h / 6 + 1, r * 2, r * 2), CFrame = CFrame.new(at + Vector3.new(0, h * (fr + 1 / 12), 0)) * CFrame.Angles(0, 0, math.pi / 2), Color = if k >= 3 then rgb(248, 251, 255) else rgb(130, 140, 160), Material = if k >= 3 then Enum.Material.Snow else Enum.Material.Rock })
+		end
+	end
+end
+
+-- The gravel pit: a quarry bowl, terraced walls of rock rising all round, a road winding up.
+SURROUND.gravel = function(f: Folder, o: Vector3, rng: Random)
+	local T = Workspace.Terrain
+	T:FillCylinder(CFrame.new(o + Vector3.new(0, 30, 0)), 64, TERRAIN_R, Enum.Material.Rock)
+	-- Terraces: carve wider and wider steps the higher they go.
+	T:FillCylinder(CFrame.new(o + Vector3.new(0, 30, 0)), 64, 130, Enum.Material.Air)
+	T:FillCylinder(CFrame.new(o + Vector3.new(0, 44, 0)), 36, 170, Enum.Material.Air)
+	T:FillCylinder(CFrame.new(o + Vector3.new(0, 54, 0)), 16, 215, Enum.Material.Air)
+	-- The pit floor round the field in loose ground.
+	T:FillCylinder(CFrame.new(o - Vector3.new(0, 2, 0)), 4, 130, Enum.Material.Ground)
+	T:FillCylinder(CFrame.new(o), 12, Config.BOUND_R + 22 - 1, Enum.Material.Air)
+	groundPlane(f, o, rgb(150, 132, 110), Enum.Material.Ground, 62)
+	for i = 0, 7 do
+		local a = i / 8 * math.pi * 2 + rng:NextNumber(-0.2, 0.2)
+		ball(f, o + Vector3.new(math.cos(a) * 150, 18, math.sin(a) * 150), Vector3.new(30, 22, 26), rgb(160, 150, 138), Enum.Material.Rock)
+	end
+	hillsRing(f, o, rng, { rgb(180, 160, 130), rgb(165, 145, 120) }, 500, 800, 14, 140, 220, Enum.Material.Ground)
+end
+
+-- The mini-golf: more holes all round, a boardwalk, the arcade's signs, and the sea beyond.
+SURROUND.minigolf = function(f: Folder, o: Vector3, rng: Random)
+	terrainRing(o, Enum.Material.Grass)
+	groundPlane(f, o, rgb(90, 200, 110), Enum.Material.Grass, -1)
+	for i = 0, 7 do
+		local a = i / 8 * math.pi * 2 + 0.3
+		local at = o + Vector3.new(math.cos(a) * 190, 0.2, math.sin(a) * 190)
+		piece(f, { Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.6, 70, 70), CFrame = CFrame.new(at) * CFrame.Angles(0, 0, math.pi / 2), Color = rgb(60, 200, 100), Material = Enum.Material.Fabric })
+		piece(f, { Shape = Enum.PartType.Cylinder, Size = Vector3.new(2.4, 74, 74), CFrame = CFrame.new(at - Vector3.new(0, 0.9, 0)) * CFrame.Angles(0, 0, math.pi / 2), Color = rgb(229, 50, 63) })
+		piece(f, { Size = Vector3.new(0.4, 14, 0.4), CFrame = CFrame.new(at + Vector3.new(10, 7, 6)), Color = rgb(255, 255, 255) })
+		piece(f, { Size = Vector3.new(0.2, 3, 5), CFrame = CFrame.new(at + Vector3.new(10, 12.5, 8.5)), Color = TOY[i % #TOY + 1] })
+		ball(f, at + Vector3.new(-12, 1.6, rng:NextNumber(-8, 8)), Vector3.new(8, 8, 8), TOY[(i + 2) % #TOY + 1])
+	end
+	-- A boardwalk on one side, with arcade signs glowing over it.
+	local dir = Vector3.new(0.7, 0, -0.7).Unit
+	local side = Vector3.new(-dir.Z, 0, dir.X)
+	local bw = o + dir * 300
+	piece(f, { Size = Vector3.new(600, 3, 40), CFrame = CFrame.lookAt(bw, bw + side), Color = rgb(190, 140, 90), Material = Enum.Material.WoodPlanks })
+	for k = -2, 2 do
+		local at = bw + side * (k * 110) + dir * 30
+		piece(f, { Size = Vector3.new(60, 40, 30), CFrame = CFrame.lookAt(at + Vector3.new(0, 20, 0), o + Vector3.new(0, 20, 0)), Color = TOY[(k + 3) % #TOY + 1] })
+		piece(f, { Size = Vector3.new(50, 10, 1), CFrame = CFrame.lookAt(at + Vector3.new(0, 46, 0) - dir * 15.5, o + Vector3.new(0, 46, 0)), Color = TOY[(k + 5) % #TOY + 1], Material = Enum.Material.Neon })
+	end
+	piece(f, { Size = Vector3.new(2048, 1, 2048), CFrame = CFrame.new(o + dir * (360 + 1024) + Vector3.new(0, -0.6, 0)), Color = rgb(60, 170, 220), Material = Enum.Material.Glass, Transparency = 0.15, Reflectance = 0.2 })
+end
+Skies.SURROUND = SURROUND
+
 --- Dress this client's sky for the field `arenaId` around `origin`.
 function Skies.enter(arenaId: string, origin: Vector3)
 	if Skies.current == arenaId .. tostring(origin) then
@@ -635,6 +914,9 @@ function Skies.enter(arenaId: string, origin: Vector3)
 	local rng = Random.new(math.floor(origin.X + origin.Z))
 	local skyUpdate = BUILD[arenaId] and BUILD[arenaId](f, origin, rng)
 	local critUpdate = CRITTERS[arenaId] and CRITTERS[arenaId](f, origin, rng)
+	if SURROUND[arenaId] then
+		SURROUND[arenaId](f, origin, rng)
+	end
 	local update = if skyUpdate or critUpdate
 		then function(t: number)
 			if skyUpdate then

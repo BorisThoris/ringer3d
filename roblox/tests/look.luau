@@ -438,6 +438,7 @@ for _, id in ipairs(Config.ARENA_ORDER) do
 	local n = Skies.pieces
 	local ok2 = pcall(Skies.leave)
 	check(id .. " has something alive going round it", Skies.CRITTERS[id] ~= nil)
+	check(id .. " has a world all round it, no void", Skies.SURROUND[id] ~= nil)
 	check(id .. " has its own sky (" .. tostring(Skies.SKY[id].clock) .. "h, " .. n .. " pieces)", okK and ok2 and n >= 3 and workspace:FindFirstChild("FieldSkyPieces") == nil, if okK then n else errK)
 end
 local okE, errE = pcall(function()
