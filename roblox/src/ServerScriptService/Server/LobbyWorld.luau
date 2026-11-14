@@ -369,6 +369,102 @@ local function marbleRun(parent: Instance)
 	m.Parent = parent
 end
 
+-- World gates: one arch per field round the park, the paths leading to them. Each frames a
+-- swirling portal in the field's colours over a little disc of its ground, with its name, and a
+-- prompt that starts a game against a bot right there (the client asks; ProximityPrompt).
+local GATE = {
+	desk = { emoji = "📚", color = rgb(255, 170, 90) },
+	culdesac = { emoji = "🏠", color = rgb(255, 120, 150) },
+	grass = { emoji = "🌳", color = rgb(90, 220, 110) },
+	sand = { emoji = "🏖️", color = rgb(255, 210, 110) },
+	ice = { emoji = "❄️", color = rgb(120, 210, 255) },
+	gravel = { emoji = "🪨", color = rgb(190, 170, 150) },
+	minigolf = { emoji = "⛳", color = rgb(110, 240, 170) },
+}
+LobbyWorld.GATE_ANGLES = { 0, 45, 90, 135, 180, 225, 270 }
+local function gates(parent: Instance)
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local Config = require(ReplicatedStorage.Ringer.Config)
+	local folder = Instance.new("Folder")
+	folder.Name = "Gates"
+	for i, id in ipairs(Config.ARENA_ORDER) do
+		local arena = Config.ARENAS[id]
+		local g = GATE[id]
+		local a = math.rad(LobbyWorld.GATE_ANGLES[i])
+		local at = Vector3.new(math.cos(a) * 115, 0, math.sin(a) * 115)
+		local face = CFrame.lookAt(at, Vector3.new(0, 0, 0))
+		local m = Instance.new("Model")
+		m.Name = "Gate_" .. id
+		-- Two pillars and a rainbow-striped arch across them.
+		for _, sd in ipairs({ -1, 1 }) do
+			part(m, { Name = "Pillar", Shape = Enum.PartType.Cylinder, Size = Vector3.new(13, 2.2, 2.2), CFrame = face * CFrame.new(sd * 7, 6.5, 0) * CFrame.Angles(0, 0, math.pi / 2), Color = rgb(255, 255, 255), CanCollide = true })
+			ball(m, (face * CFrame.new(sd * 7, 0.6, 0)).Position, Vector3.new(3.6, 1.6, 3.6), g.color, "Foot")
+		end
+		for k = 0, 11 do
+			local a1, a2 = k / 12 * math.pi, (k + 1) / 12 * math.pi
+			local p1 = (face * CFrame.new(math.cos(a1) * 7, 13 + math.sin(a1) * 7, 0)).Position
+			local p2 = (face * CFrame.new(math.cos(a2) * 7, 13 + math.sin(a2) * 7, 0)).Position
+			local seg = rod(m, p1, p2, 2.3, TOY[k % #TOY + 1], "Arch")
+			seg.CanCollide = true
+		end
+		-- The portal: a swirling force-field disc filling the arch.
+		local portal = part(m, { Name = "Portal", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.4, 12, 12), CFrame = face * CFrame.new(0, 9, 0) * CFrame.Angles(0, math.pi / 2, 0), Color = g.color, Material = Enum.Material.ForceField, Transparency = 0.05 })
+		part(m, { Name = "PortalLower", Size = Vector3.new(11.6, 6.4, 0.4), CFrame = face * CFrame.new(0, 3.4, 0), Color = g.color, Material = Enum.Material.ForceField, Transparency = 0.05 })
+		local glow = Instance.new("PointLight")
+		glow.Color = g.color
+		glow.Range = 16
+		glow.Brightness = 1.2
+		glow.Parent = portal
+		local sparks = Instance.new("ParticleEmitter")
+		sparks.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+		sparks.Color = ColorSequence.new(g.color, rgb(255, 255, 255))
+		sparks.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.4, 0.6), NumberSequenceKeypoint.new(1, 0) })
+		sparks.Lifetime = NumberRange.new(1, 1.6)
+		sparks.Rate = 10
+		sparks.Speed = NumberRange.new(1, 3)
+		sparks.SpreadAngle = Vector2.new(180, 180)
+		sparks.LightEmission = 1
+		sparks.Parent = portal
+		-- A little disc of the field's own ground in front, like a doormat.
+		part(m, { Name = "Mat", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.4, 10, 10), CFrame = face * CFrame.new(0, 0.2, -6) * CFrame.Angles(0, 0, math.pi / 2), Color = arena.color, Material = arena.material, CanCollide = true })
+		-- Its name over the top.
+		local sign = part(m, { Name = "GateSign", Size = Vector3.one, CFrame = face * CFrame.new(0, 23.5, 0), Transparency = 1 })
+		local gui = Instance.new("BillboardGui")
+		gui.Size = UDim2.fromScale(18, 3.6)
+		gui.LightInfluence = 0
+		gui.MaxDistance = 180
+		gui.Parent = sign
+		local label = Instance.new("TextLabel")
+		label.BackgroundTransparency = 1
+		label.Size = UDim2.fromScale(1, 1)
+		label.Font = Enum.Font.FredokaOne
+		label.TextScaled = true
+		label.Text = g.emoji .. " " .. string.upper(arena.name)
+		label.TextColor3 = rgb(255, 255, 255)
+		label.Parent = gui
+		local stroke = Instance.new("UIStroke")
+		stroke.Thickness = 3
+		stroke.Color = rgb(30, 22, 40)
+		stroke.Parent = label
+		local grad = Instance.new("UIGradient")
+		grad.Color = ColorSequence.new(rgb(255, 255, 255), g.color)
+		grad.Rotation = 90
+		grad.Parent = label
+		-- Walk up and press: a game against a bot on this field.
+		local prompt = Instance.new("ProximityPrompt")
+		prompt.ActionText = "Play here"
+		prompt.ObjectText = arena.name
+		prompt.HoldDuration = 0
+		prompt.MaxActivationDistance = 14
+		prompt.RequiresLineOfSight = false
+		prompt:SetAttribute("Arena", id)
+		prompt.Parent = portal
+		m:SetAttribute("Arena", id)
+		m.Parent = folder
+	end
+	folder.Parent = parent
+end
+
 -- The park's edge: a ring of walls nobody can see or climb, out on the lawn before the hills.
 LobbyWorld.EDGE_R = 135
 local function edge(parent: Instance)
@@ -435,6 +531,7 @@ function LobbyWorld.build(lobby: Instance)
 	end
 	butterflies(world)
 	marbleRun(world)
+	gates(world)
 	edge(world)
 	mist(world)
 	world.Parent = lobby

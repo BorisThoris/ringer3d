@@ -349,6 +349,22 @@ if runModel then
 	end
 end
 check("the marble run spirals three times round its tube", runModel ~= nil and tracks == 66 and runModel:GetAttribute("turns") == 3, tracks)
+local gateArenas = {}
+if world and world:FindFirstChild("Gates") then
+	for _, g in ipairs(world.Gates:GetChildren()) do
+		local prompt = g:FindFirstChildWhichIsA("ProximityPrompt", true)
+		if prompt and Config.ARENAS[prompt:GetAttribute("Arena")] then
+			gateArenas[prompt:GetAttribute("Arena")] = true
+		end
+	end
+end
+local gateCount = 0
+for _, id in ipairs(Config.ARENA_ORDER) do
+	if gateArenas[id] then
+		gateCount += 1
+	end
+end
+check("a world gate for every field, each with a play prompt", gateCount == #Config.ARENA_ORDER, gateCount)
 check("lobby fun module loads", type(require(client.LobbyFun).start) == "function")
 
 -- Books have no faces in the same place (they flickered and broke shadows on the desk).

@@ -161,6 +161,17 @@ local function play(args)
 	end
 end
 
+-- The lobby's world gates: step up to one and press, and you play a bot on that field.
+game:GetService("ProximityPromptService").PromptTriggered:Connect(function(prompt)
+	local arena = prompt:GetAttribute("Arena")
+	if typeof(arena) ~= "string" or inMatch or queued then
+		return
+	end
+	Sfx.ui("whoosh", 0.8)
+	toast("Off to " .. (Config.ARENAS[arena] and Config.ARENAS[arena].name or "the ring") .. "!", "good")
+	play({ mode = "bot", bot = "casual", arena = arena, difficulty = "medium" })
+end)
+
 local duel = card(playBody, "Duel", "Play another player on this server. Winner takes the bonus coins.", Kit.ORANGE)
 Kit.button("Find a match", Kit.GREEN, function()
 	play({ mode = "duel" })
