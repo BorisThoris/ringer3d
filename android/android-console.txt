@@ -1,10 +1,6 @@
-11-14 00:26:34.607  3112  3112 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
-11-14 00:26:34.608  3112  3112 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
-11-14 00:26:34.609  3112  3112 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
-11-14 00:26:36.276  3112  3112 W Capacitor/Console: File: https://localhost/assets/index-DC-pgxxA.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
-11-14 00:26:53.566  3112  3112 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-14 00:26:53.574  3112  3112 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-14 00:26:54.373  3112  3112 I Capacitor/Console: File:  - Line 333 - Msg: {}
-11-14 00:26:55.953  3112  3112 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-14 00:26:58.240  3112  3112 I Capacitor/Console: File:  - Line 333 - Msg: undefined
-11-14 00:27:17.535  1042  1684 E JavaBinder: *** Uncaught remote exception! Exceptions are not yet supported across processes. Client PID 4114 UID 10118.
+11-14 00:49:54.079  3039  3039 W Capacitor/Console: File: https://localhost/assets/index-DC-pgxxA.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+11-14 00:50:14.472  3039  3039 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+11-14 00:50:14.491  3039  3039 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+11-14 00:50:20.063  3039  3039 I Capacitor/Console: File:  - Line 333 - Msg: {}
+11-14 00:50:20.063  3039  3039 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+11-14 00:50:23.636  3039  3039 I Capacitor/Console: File:  - Line 333 - Msg: undefined
