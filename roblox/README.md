@@ -21,6 +21,21 @@ collectibles and Robux.
   fingerprints where everything stopped (FNV-1a over the quantized layout, `Playback.layoutHash`)
   and checks it against the fingerprint the server sent. The in-game stats overlay (F3) shows the
   check for every shot.
+- **A downhill race on its own deterministic physics.** Marble Mountain is one hand-designed
+  track: a Catmull-Rom spline sampled into banked frames, with two branching shortcuts, jumps, a
+  tunnel and boost pads (`RaceTrack`). The marble runs in track space at a fixed 60 Hz: slope
+  gravity, banking, the pull of turns, walls, crests and gaps. Jumps fly in world space with air
+  control (`RaceSim`).
+  - **Cheating:** the client sends its input log at the finish, and the server replays it on the
+    same simulation to verify the time. Logs are change-encoded, so a full run is a few hundred
+    entries.
+  - **Bot drivers:** prove the course can be finished, set the medal times, and check that every
+    replay is exact.
+  - **A sloppy-driver test:** makes sure a wobbly young player still reaches the bottom.
+- **Seeing builds without Studio.** `scripts/preview/` builds any scene on a Roblox cloud server
+  (a field and its surroundings, the lobby, the race course), dumps every part and a terrain height
+  map, and rebuilds it in three.js in headless Chromium for screenshots from fixed cameras. That's
+  how the worlds round every field were checked, and it caught real bugs before players did.
 - **Server-authoritative, cheat-resistant.** A client only ever sends an aim, a power and a spin.
   The server checks every request:
   - purchases and equips against what the player owns

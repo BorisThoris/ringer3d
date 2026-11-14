@@ -9,12 +9,23 @@ const KEY_FILE = process.env.ROBLOX_KEY_FILE ?? 'D:/agent-work/ringer3d/roblox-s
 const key = () => readFileSync(KEY_FILE, 'utf8').trim();
 
 export async function api(method, url, body, contentType = 'application/json') {
-  const r = await fetch(url, {
-    method,
-    headers: { 'x-api-key': key(), ...(body !== undefined ? { 'content-type': contentType } : {}) },
-    body: body === undefined ? undefined : contentType === 'application/json' ? JSON.stringify(body) : body,
-  });
-  const text = await r.text();
+  // Rate limits (429) and brief outages (5xx) are retried with a growing wait.
+  let r;
+  let text = '';
+  for (let attempt = 0; ; attempt++) {
+    r = await fetch(url, {
+      method,
+      headers: { 'x-api-key': key(), ...(body !== undefined ? { 'content-type': contentType } : {}) },
+      body: body === undefined ? undefined : contentType === 'application/json' ? JSON.stringify(body) : body,
+    });
+    text = await r.text();
+    if ((r.status === 429 || r.status >= 500) && attempt < 8) {
+      const wait = Number(r.headers.get('retry-after')) * 1000 || 10000 * (attempt + 1);
+      await new Promise((res) => setTimeout(res, wait));
+      continue;
+    }
+    break;
+  }
   let json = null;
   try {
     json = JSON.parse(text);

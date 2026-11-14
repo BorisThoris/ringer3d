@@ -462,6 +462,47 @@ local function gates(parent: Instance)
 		m:SetAttribute("Arena", id)
 		m.Parent = folder
 	end
+	-- The race gate: bigger, snow-capped, the way up Marble Mountain.
+	do
+		local a = math.rad(295)
+		local at = Vector3.new(math.cos(a) * 115, 0, math.sin(a) * 115)
+		local face = CFrame.lookAt(at, Vector3.new(0, 0, 0))
+		local m = Instance.new("Model")
+		m.Name = "Gate_race"
+		for _, sd in ipairs({ -1, 1 }) do
+			part(m, { Name = "Pillar", Size = Vector3.new(4, 20, 4), CFrame = face * CFrame.new(sd * 9, 10, 0), Color = rgb(120, 140, 170), Material = Enum.Material.Rock, CanCollide = true })
+			ball(m, (face * CFrame.new(sd * 9, 21, 0)).Position, Vector3.new(6, 3, 6), rgb(248, 251, 255), "Snowcap", Enum.Material.Snow)
+		end
+		part(m, { Name = "Lintel", Size = Vector3.new(24, 4, 5), CFrame = face * CFrame.new(0, 22, 0), Color = rgb(120, 140, 170), Material = Enum.Material.Rock, CanCollide = true })
+		local portal = part(m, { Name = "Portal", Size = Vector3.new(14, 19, 0.4), CFrame = face * CFrame.new(0, 10, 0), Color = rgb(150, 220, 255), Material = Enum.Material.ForceField })
+		local sign = part(m, { Name = "GateSign", Size = Vector3.one, CFrame = face * CFrame.new(0, 29, 0), Transparency = 1 })
+		local gui = Instance.new("BillboardGui")
+		gui.Size = UDim2.fromScale(26, 4.4)
+		gui.LightInfluence = 0
+		gui.MaxDistance = 220
+		gui.Parent = sign
+		local label = Instance.new("TextLabel")
+		label.BackgroundTransparency = 1
+		label.Size = UDim2.fromScale(1, 1)
+		label.Font = Enum.Font.FredokaOne
+		label.TextScaled = true
+		label.Text = "🏔️ MARBLE MOUNTAIN · DOWNHILL RACE"
+		label.TextColor3 = rgb(255, 255, 255)
+		label.Parent = gui
+		local stroke = Instance.new("UIStroke")
+		stroke.Thickness = 3
+		stroke.Color = rgb(30, 22, 40)
+		stroke.Parent = label
+		local prompt = Instance.new("ProximityPrompt")
+		prompt.ActionText = "Race!"
+		prompt.ObjectText = "Marble Mountain"
+		prompt.HoldDuration = 0
+		prompt.MaxActivationDistance = 16
+		prompt.RequiresLineOfSight = false
+		prompt:SetAttribute("Race", true)
+		prompt.Parent = portal
+		m.Parent = folder
+	end
 	folder.Parent = parent
 end
 

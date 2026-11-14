@@ -1,0 +1,149 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>html,body{margin:0;height:100%;overflow:hidden;background:#000}canvas{display:block}</style>
+<script type="importmap">{ "imports": { "three": "/three/build/three.module.js" } }</script></head>
+<body>
+<script type="module">
+// Rebuilds a scene dumped by dump.luau with three.js: parts by shape, terrain columns, and light
+// from the field's clock, sky and fog. preview.mjs then sets cameras and takes screenshots.
+import * as THREE from 'three';
+
+const dump = await (await fetch('/dump.json')).json();
+const L = dump.light || {};
+const rgb = (c) => new THREE.Color(c[0] / 255, c[1] / 255, c[2] / 255);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(1);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = Math.pow(2, L.exposure || 0) * 1.05;
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const skyTop = rgb(L.sky || [120, 180, 255]);
+const skyBottom = rgb(L.horizon || [220, 235, 255]);
+// Sky: a big gradient sphere.
+{
+  const g = new THREE.SphereGeometry(9000, 32, 16);
+  const m = new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms: { top: { value: skyTop }, bottom: { value: skyBottom } },
+    vertexShader: 'varying vec3 v; void main(){ v = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+    fragmentShader: 'uniform vec3 top; uniform vec3 bottom; varying vec3 v; void main(){ float t = clamp(v.y*1.6+0.15,0.0,1.0); gl_FragColor = vec4(mix(bottom, top, t), 1.0); }',
+  });
+  scene.add(new THREE.Mesh(g, m));
+}
+// Fog: Roblox's Atmosphere, roughly — density to distance.
+const fogColor = rgb(L.fog || [220, 230, 245]);
+scene.fog = new THREE.Fog(fogColor, 120 / Math.max(0.05, L.density || 0.25), 2600 / Math.max(0.05, L.density || 0.25) * 0.4);
+
+// Sun from the clock: rises in the east at 6, sets in the west at 18.
+const clock = L.clock ?? 13;
+const sunAngle = ((clock - 6) / 12) * Math.PI;
+const sunDir = new THREE.Vector3(Math.cos(sunAngle), Math.max(0.08, Math.sin(sunAngle)), 0.35).normalize();
+const sun = new THREE.DirectionalLight(rgb(L.sun || [255, 245, 230]), 2.2 * Math.max(0.35, Math.sin(Math.max(0.15, sunAngle))));
+sun.position.copy(sunDir.clone().multiplyScalar(600));
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -260, right: 260, top: 260, bottom: -260, near: 1, far: 2000 });
+scene.add(sun, sun.target);
+scene.add(new THREE.HemisphereLight(skyTop, new THREE.Color(0.35, 0.3, 0.25), 1.15));
+
+// Materials: colour, and how it shines.
+const ROUGH = { SmoothPlastic: 0.45, Plastic: 0.6, Glass: 0.05, Metal: 0.3, Neon: 1, Ice: 0.15, Marble: 0.3, Granite: 0.7, Wood: 0.75, WoodPlanks: 0.8, Fabric: 0.95, Grass: 0.95, LeafyGrass: 0.95, Sand: 1, Snow: 0.9, Concrete: 0.9, Asphalt: 0.95, Rock: 0.9, Slate: 0.85, Ground: 1, Brick: 0.9, Rubber: 0.8, ForceField: 0.2, Pebble: 0.9 };
+const matCache = new Map();
+function material(colour, transparency, name) {
+  const key = colour.join(',') + '|' + transparency + '|' + name;
+  if (matCache.has(key)) return matCache.get(key);
+  let m;
+  const col = rgb(colour);
+  if (name === 'Neon') m = new THREE.MeshBasicMaterial({ color: col.clone().multiplyScalar(1.6) });
+  else if (name === 'ForceField') m = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.45 });
+  else m = new THREE.MeshStandardMaterial({ color: col, roughness: ROUGH[name] ?? 0.7, metalness: name === 'Metal' ? 0.6 : 0, envMapIntensity: 0.6 });
+  if (transparency > 0.01 && name !== 'ForceField') { m.transparent = true; m.opacity = 1 - transparency; m.depthWrite = transparency < 0.5; }
+  matCache.set(key, m);
+  return m;
+}
+
+// Geometry: unit shapes scaled per part, as Roblox draws them.
+const unit = {
+  Block: new THREE.BoxGeometry(1, 1, 1),
+  Sphere: new THREE.SphereGeometry(0.5, 24, 16),
+  Ball: new THREE.SphereGeometry(0.5, 24, 16),
+  Cylinder: new THREE.CylinderGeometry(0.5, 0.5, 1, 28).rotateZ(Math.PI / 2), // Roblox: axis along X
+};
+// WedgePart: bottom face full, back (+Z) face full, the slope from top-back down to bottom-front.
+{
+  const g = new THREE.BufferGeometry();
+  const v = [
+    [-0.5, -0.5, -0.5], [0.5, -0.5, -0.5], [-0.5, -0.5, 0.5], [0.5, -0.5, 0.5], [-0.5, 0.5, 0.5], [0.5, 0.5, 0.5],
+  ];
+  const tri = [[0, 2, 1], [1, 2, 3], [2, 4, 3], [3, 4, 5], [0, 1, 4], [1, 5, 4], [0, 4, 2], [1, 3, 5]];
+  const pos = [];
+  for (const t of tri) for (const i of t) pos.push(...v[i]);
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  unit.Wedge = g;
+  unit.Corner = g;
+}
+
+const m4 = new THREE.Matrix4();
+for (const [shape, p, r, s, c, t, mat] of dump.parts || []) {
+  const geo = unit[shape] || unit.Block;
+  const mesh = new THREE.Mesh(geo, material(c, t, mat));
+  m4.set(r[0], r[1], r[2], p[0], r[3], r[4], r[5], p[1], r[6], r[7], r[8], p[2], 0, 0, 0, 1);
+  mesh.applyMatrix4(m4);
+  let sx = s[0], sy = s[1], sz = s[2];
+  if (shape === 'Ball') sx = sy = sz = Math.min(s[0], s[1], s[2]);
+  if (shape === 'Cylinder') { const d = Math.min(s[1], s[2]); sy = sz = d; }
+  mesh.scale.set(sx, sy, sz);
+  const big = Math.max(sx, sy, sz);
+  mesh.castShadow = big < 200 && t < 0.5;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+}
+
+// Terrain columns, instanced per material.
+if (dump.terrain) {
+  const T = dump.terrain;
+  const byMat = new Map();
+  for (const [xi, zi, yi, name] of T.cols) {
+    if (!byMat.has(name)) byMat.set(name, []);
+    byMat.get(name).push([xi, zi, yi]);
+  }
+  const box = new THREE.BoxGeometry(1, 1, 1);
+  for (const [name, list] of byMat) {
+    const col = T.colors[name] || [120, 120, 120];
+    const inst = new THREE.InstancedMesh(box, material(col, 0, name), list.length);
+    const m = new THREE.Matrix4();
+    list.forEach(([xi, zi, yi], k) => {
+      const top = T.min[1] + yi * (T.cellY || T.cell);
+      // Columns reach down to the dump's floor, or a little under their own top when the ground
+      // lies below that floor (never a sheet floating at the floor's height).
+      const bottom = Math.min(T.min[1], top - 8);
+      const h = Math.max(1, top - bottom);
+      m.makeScale(T.cell, h, T.cell);
+      m.setPosition(T.min[0] + (xi - 0.5) * T.cell, bottom + h / 2, T.min[2] + (zi - 0.5) * T.cell);
+      inst.setMatrixAt(k, m);
+    });
+    inst.receiveShadow = true;
+    scene.add(inst);
+  }
+}
+
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.5, 12000);
+window.view = (pos, look, fov) => {
+  camera.fov = fov || 60;
+  camera.position.set(...pos);
+  camera.lookAt(new THREE.Vector3(...look));
+  camera.updateProjectionMatrix();
+  sun.target.position.set(look[0], 0, look[2]);
+  sun.position.copy(sun.target.position).add(sunDir.clone().multiplyScalar(600));
+  renderer.render(scene, camera);
+  return true;
+};
+window.stats = { parts: (dump.parts || []).length, terrain: dump.terrain ? dump.terrain.cols.length : 0 };
+window.ready = true;
+</script>
+</body></html>

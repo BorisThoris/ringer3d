@@ -671,9 +671,9 @@ end
 -- The desk: a big desk in a bedroom. Its top runs past the field, then drops to the floor; walls,
 -- a window with the night outside, a bed, a shelf of toys, a rug and posters close the room.
 SURROUND.desk = function(f: Folder, o: Vector3, rng: Random)
-	local deskTop = rgb(160, 98, 55)
+	local deskTop = Config.ARENAS.desk.color
 	local H = 78 -- desk height in studs (1 stud is about 1 cm here)
-	piece(f, { Size = Vector3.new(300, 5, 220), CFrame = CFrame.new(o + Vector3.new(0, -2.8, 0)), Color = deskTop, Material = Enum.Material.Wood })
+	piece(f, { Size = Vector3.new(300, 5, 220), CFrame = CFrame.new(o + Vector3.new(0, -2.8, 0)), Color = deskTop, Material = Config.ARENAS.desk.material })
 	for _, c in ipairs({ { -1, -1 }, { -1, 1 }, { 1, -1 }, { 1, 1 } }) do
 		piece(f, { Size = Vector3.new(8, H, 8), CFrame = CFrame.new(o + Vector3.new(c[1] * 140, -H / 2 - 5, c[2] * 100)), Color = deskTop:Lerp(Color3.new(0, 0, 0), 0.15), Material = Enum.Material.Wood })
 	end
@@ -842,7 +842,13 @@ SURROUND.gravel = function(f: Folder, o: Vector3, rng: Random)
 	-- The pit floor round the field in loose ground.
 	T:FillCylinder(CFrame.new(o - Vector3.new(0, 2, 0)), 4, 130, Enum.Material.Ground)
 	T:FillCylinder(CFrame.new(o), 12, Config.BOUND_R + 22 - 1, Enum.Material.Air)
-	groundPlane(f, o, rgb(150, 132, 110), Enum.Material.Ground, 62)
+	-- The land beyond the rim, as a ring of slabs (a single disc here would put a lid on the pit).
+	for i = 0, 35 do
+		local a = (i + 0.5) / 36 * math.pi * 2
+		local dirv = Vector3.new(math.cos(a), 0, math.sin(a))
+		local mid = o + dirv * 670 + Vector3.new(0, 60, 0)
+		piece(f, { Size = Vector3.new(2 * math.pi * 1024 / 36 * 1.08, 4, 740), CFrame = CFrame.lookAt(mid, Vector3.new(o.X, mid.Y, o.Z)), Color = rgb(150, 132, 110), Material = Enum.Material.Ground })
+	end
 	for i = 0, 7 do
 		local a = i / 8 * math.pi * 2 + rng:NextNumber(-0.2, 0.2)
 		ball(f, o + Vector3.new(math.cos(a) * 150, 18, math.sin(a) * 150), Vector3.new(30, 22, 26), rgb(160, 150, 138), Enum.Material.Rock)
@@ -867,7 +873,7 @@ SURROUND.minigolf = function(f: Folder, o: Vector3, rng: Random)
 	local dir = Vector3.new(0.7, 0, -0.7).Unit
 	local side = Vector3.new(-dir.Z, 0, dir.X)
 	local bw = o + dir * 300
-	piece(f, { Size = Vector3.new(600, 3, 40), CFrame = CFrame.lookAt(bw, bw + side), Color = rgb(190, 140, 90), Material = Enum.Material.WoodPlanks })
+	piece(f, { Size = Vector3.new(40, 3, 600), CFrame = CFrame.lookAt(bw, bw + side), Color = rgb(190, 140, 90), Material = Enum.Material.WoodPlanks })
 	for k = -2, 2 do
 		local at = bw + side * (k * 110) + dir * 30
 		piece(f, { Size = Vector3.new(60, 40, 30), CFrame = CFrame.lookAt(at + Vector3.new(0, 20, 0), o + Vector3.new(0, 20, 0)), Color = TOY[(k + 3) % #TOY + 1] })

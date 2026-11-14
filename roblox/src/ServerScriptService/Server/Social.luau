@@ -175,6 +175,8 @@ Social.QUESTS = {
 	{ id = "fields2", text = "Play on 2 different fields", stat = "fields", goal = 2, reward = 70 },
 	{ id = "lawn10", text = "Grab 10 coins on the lobby lawn", stat = "lawn", goal = 10, reward = 40 },
 	{ id = "bag1", text = "Open a Marble Bag", stat = "bags", goal = 1, reward = 50 },
+	{ id = "race1", text = "Finish a race on Marble Mountain", stat = "races", goal = 1, reward = 60 },
+	{ id = "race3", text = "Finish 3 races on Marble Mountain", stat = "races", goal = 3, reward = 120 },
 }
 local BY_ID = {}
 for _, q in ipairs(Social.QUESTS) do

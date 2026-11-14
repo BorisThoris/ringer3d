@@ -16,6 +16,7 @@ local Collectibles = require(Server.Collectibles)
 local Market = require(Server.Market)
 local Leaderboard = require(Server.Leaderboard)
 local Social = require(Server.Social)
+local Race = require(Server.Race)
 
 -- ---- Remotes --------------------------------------------------------------------------------
 local remotes = Instance.new("Folder")
@@ -35,6 +36,7 @@ local ProfileSync = remote("RemoteEvent", "ProfileSync") :: RemoteEvent
 local Notify = remote("RemoteEvent", "Notify") :: RemoteEvent
 local BagOpened = remote("RemoteEvent", "BagOpened") :: RemoteEvent
 local Announce = remote("RemoteEvent", "Announce") :: RemoteEvent -- server-wide news (Social)
+local RaceGhost = remote("RemoteEvent", "RaceGhost") :: RemoteEvent -- racers' marbles, relayed
 remotes.Parent = ReplicatedStorage.Ringer
 
 local function notify(player: Player, text: string, kind: string?)
@@ -600,6 +602,9 @@ function handlers.play(player: Player, args)
 	if active[player] then
 		return false, "You're already in a game."
 	end
+	if Race.racing(player) then
+		return false, "Finish your race first."
+	end
 	local p = Data.await(player)
 	if not p then
 		return false, "Still loading your profile."
@@ -705,6 +710,28 @@ end
 Players.PlayerRemoving:Connect(function(p)
 	coinTaken[p] = nil
 	coinHour[p] = nil
+end)
+
+-- The downhill race (Server/Race): start, finish (the server replays the inputs), leave, records.
+function handlers.raceStart(player: Player)
+	if active[player] then
+		return false, "Finish your game first."
+	end
+	dequeue(player)
+	return Race.start(player)
+end
+function handlers.raceFinish(player: Player, log)
+	return Race.finish(player, log)
+end
+function handlers.raceLeave(player: Player)
+	Race.leave(player)
+	return true
+end
+function handlers.raceTop(_player: Player)
+	return true, Race.top()
+end
+RaceGhost.OnServerEvent:Connect(function(player, pos)
+	Race.ghost(player, pos, RaceGhost)
 end)
 
 -- Daily quests: today's three, and claiming one's coins.
@@ -861,6 +888,9 @@ task.spawn(function()
 end)
 
 Collectibles.onBag = Social.bagOpened
+Race.announce = Social.announce
+Race.quest = Social.quest
+task.spawn(Race.build, workspace)
 Social.start(Announce)
 
 Data.start()

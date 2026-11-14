@@ -8,7 +8,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const SUITES = process.argv.slice(2).length ? process.argv.slice(2) : ['smoke', 'look', 'client', 'marbles', 'sim'];
+const SUITES = process.argv.slice(2).length ? process.argv.slice(2) : ['smoke', 'look', 'client', 'marbles', 'race', 'sim'];
 const run = (args, env = {}) =>
   execFileSync(process.execPath, args, { cwd: root, encoding: 'utf8', env: { ...process.env, ...env }, maxBuffer: 64 * 1024 * 1024 });
 

@@ -127,7 +127,7 @@ Juice.gui = screen
 local event = Kit.label(string.format("✨ NEW: every Marble Bag mints a one-of-a-kind marble · %.1f%% hold a phenomenon", Forge.phenomenonOdds()), 20, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 62), Size = UDim2.fromOffset(620, 28), TextColor3 = Color3.fromRGB(255, 170, 60), Parent = hud })
 event.TextWrapped = false
 
-local side = Kit.new("Frame", { Position = UDim2.new(0, 12, 0.5, -170), Size = UDim2.fromOffset(150, 340), BackgroundTransparency = 1, Parent = hud })
+local side = Kit.new("Frame", { Position = UDim2.new(0, 12, 0.5, -205), Size = UDim2.fromOffset(150, 410), BackgroundTransparency = 1, Parent = hud })
 Kit.new("UIListLayout", { Padding = UDim.new(0, 10), Parent = side })
 
 local playButton = nil
@@ -174,6 +174,12 @@ end
 
 -- The lobby's world gates: step up to one and press, and you play a bot on that field.
 game:GetService("ProximityPromptService").PromptTriggered:Connect(function(prompt)
+	if prompt:GetAttribute("Race") then
+		if not inMatch and not queued then
+			require(Modules.RaceClient).begin()
+		end
+		return
+	end
 	local arena = prompt:GetAttribute("Arena")
 	if typeof(arena) ~= "string" or inMatch or queued then
 		return
@@ -709,6 +715,14 @@ local function refreshQuests()
 		btn.AutoButtonColor = done and not q.claimed
 	end
 end
+-- The downhill race (ClientModules/RaceClient).
+local RaceClient = require(Modules.RaceClient)
+RaceClient.init({ ask = ask, hud = hud, Sfx = Sfx, Juice = Juice, Rewards = Rewards, Remotes = Remotes, toast = toast })
+Kit.button("🏔️ Race", Kit.BLUE, function()
+	if not inMatch and not queued then
+		RaceClient.begin()
+	end
+end, { Size = UDim2.fromOffset(150, 58), Parent = side })
 local questButton = Kit.button("📜 Quests", Kit.ORANGE, function()
 	refreshQuests()
 	show("quests")
