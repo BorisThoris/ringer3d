@@ -24,6 +24,7 @@ local Juice = require(Modules.Juice)
 local Show = require(Modules.Show)
 local Rewards = require(Modules.Rewards)
 local Ground = require(Modules.Ground)
+local Skies = require(Modules.Skies)
 
 -- Marbles come alive (bolts, moons, auras), and everyone's marble floats beside them.
 MarbleFX.animate()
@@ -871,6 +872,11 @@ Replay.onImpact = function(kind, strength, pos)
 	if kind ~= "marble" and strength > 120 then
 		Ground.slam(pos, strength)
 	end
+	-- A hard rebound off the bank gets its own springy call.
+	if kind == "kerb" and strength > 350 then
+		Juice.rebound(pos, strength)
+		Sfx.ui("boing", 0.5)
+	end
 	if kind == "marble" and strength > 400 then
 		local look = shooterLook()
 		Juice.signature(pos, table.concat(MarbleFX.forLook(look), ","), MarbleLook.uiColor(look))
@@ -887,6 +893,11 @@ Replay.onCross = function(pos)
 	Juice.coins(pos, Config.COINS.capture)
 	task.delay(0.15, Sfx.play, "coin_fly", 0.6, 1 + math.min(capturesThisShot, 6) * 0.06)
 end
+Replay.onReenter = function(pos)
+	capturesThisShot = math.max(0, capturesThisShot - 1)
+	Juice.reenter(pos)
+	Sfx.chime("lose")
+end
 Replay.onBreak = function(pos, color, material)
 	Sfx.clack(900, "kerb")
 	Ground.shatter(pos, color, material)
@@ -902,6 +913,7 @@ local function leaveTable()
 	Sfx.stopPad()
 	Ambience.leave()
 	Ground.leave()
+	Skies.leave()
 	Show.clear()
 	Pets.setPlaying(player, nil)
 end
@@ -914,6 +926,7 @@ local function onState(state)
 	local field = Config.ARENAS[state.arena]
 	if field and state.origin then
 		Ambience.enter(state.arena, state.origin, state.id)
+		Skies.enter(state.arena, state.origin)
 		if soundTable ~= state.id then
 			soundTable = state.id
 			Sfx.setSurface(field.surface)
@@ -1256,6 +1269,9 @@ Remotes:WaitForChild("TableEvent").OnClientEvent:Connect(function(kind, data, id
 		Show.feed(data.name .. " left: a bot takes their seat")
 	elseif kind == "shooterOut" then
 		task.delay(1.6, Show.feed, if data.seat == Aim.mySeat then "Your marble flew out! Turn over" else "Their marble flew out!", Color3.fromRGB(255, 150, 120))
+		if data.seat == Aim.mySeat then
+			task.delay(0.9, Juice.stamp, "OUT! TURN OVER", Color3.fromRGB(255, 90, 90))
+		end
 	end
 end)
 

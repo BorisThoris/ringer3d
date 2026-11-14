@@ -394,6 +394,109 @@ function Juice.coins(pos: Vector3, amount: number)
 	end)
 end
 
+-- ---- Words and stamps -------------------------------------------------------------------------
+
+--- A word popping up in the world: rises, wobbles, fades. `drift` > 0 rises, < 0 sinks.
+function Juice.word(pos: Vector3, text: string, color: Color3, size: number?, drift: number?)
+	local a = anchor(pos + Vector3.new(0, 1.5, 0), 2)
+	local bb = Instance.new("BillboardGui")
+	bb.Size = UDim2.fromOffset(260 * (size or 1), 90 * (size or 1))
+	bb.AlwaysOnTop = true
+	bb.LightInfluence = 0
+	bb.StudsOffsetWorldSpace = Vector3.new(0, 2, 0)
+	bb.Parent = a
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Size = UDim2.fromScale(1, 1)
+	label.Font = Enum.Font.FredokaOne
+	label.Text = text
+	label.TextScaled = true
+	label.TextColor3 = color
+	label.TextStrokeTransparency = 0
+	label.TextStrokeColor3 = Color3.fromRGB(30, 22, 40)
+	label.Rotation = rng:NextNumber(-10, 10)
+	label.Parent = bb
+	local scale = Instance.new("UIScale")
+	scale.Scale = 0.2
+	scale.Parent = label
+	TweenService:Create(scale, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+	TweenService:Create(bb, TweenInfo.new(1.4, Enum.EasingStyle.Quad), { StudsOffsetWorldSpace = Vector3.new(0, 2 + 5 * (drift or 1), 0) }):Play()
+	task.delay(0.9, function()
+		TweenService:Create(label, TweenInfo.new(0.45), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+	end)
+end
+
+local lastBounce = 0
+--- A hard rebound off the bank: a springy word and a ring of the field's stuff.
+function Juice.rebound(pos: Vector3, strength: number)
+	local now = os.clock()
+	if now - lastBounce < 0.5 then
+		return
+	end
+	lastBounce = now
+	Juice.word(pos, ({ "BOING!", "BOUNCE!", "REBOUND!", "SPROING!" })[rng:NextInteger(1, 4)], Color3.fromRGB(120, 230, 255), 0.75 + math.min(strength, 1200) / 2400)
+	Juice.shockwave(pos, strength * 0.7, Color3.fromRGB(150, 235, 255))
+end
+
+--- A marble rolled back into the ring: the cheer taken back. A sinking "BACK IN!", a drooping ring.
+function Juice.reenter(pos: Vector3)
+	Juice.word(pos, "BACK IN! -1", Color3.fromRGB(255, 120, 90), 0.9, -0.4)
+	local a = anchor(pos + Vector3.new(0, 0.4, 0), 1.5)
+	emit(a, { Texture = TEX.glow, Color = ColorSequence.new(Color3.fromRGB(255, 110, 90)), Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 8), NumberSequenceKeypoint.new(1, 1) }), Transparency = NumberSequence.new(0.4, 1), Lifetime = NumberRange.new(0.5), Speed = NumberRange.new(0), LightEmission = 1 }, 1)
+	emit(a, { Texture = TEX.sparkle, Color = ColorSequence.new(Color3.fromRGB(255, 150, 120)), Size = NumberSequence.new(0.5, 0), Lifetime = NumberRange.new(0.5, 0.8), Speed = NumberRange.new(2, 5), Acceleration = Vector3.new(0, -25, 0), LightEmission = 1 }, 14)
+	Juice.kick(0.15)
+end
+
+--- A big stamp across the screen ("OUT!", "TURN OVER", "-1 POINT"), with a red edge flash.
+function Juice.stamp(text: string, color: Color3?)
+	local g = Juice.gui
+	if not g then
+		return
+	end
+	local c = color or Color3.fromRGB(255, 80, 80)
+	local edge = Instance.new("Frame")
+	edge.Name = "StampEdge"
+	edge.Size = UDim2.fromScale(1, 1)
+	edge.BackgroundColor3 = c
+	edge.BackgroundTransparency = 0.55
+	edge.BorderSizePixel = 0
+	edge.ZIndex = 81
+	edge.Active = false
+	edge.Parent = g
+	local grad = Instance.new("UIGradient")
+	grad.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.25, 1), NumberSequenceKeypoint.new(0.75, 1), NumberSequenceKeypoint.new(1, 0) })
+	grad.Parent = edge
+	local label = Instance.new("TextLabel")
+	label.Name = "Stamp"
+	label.AnchorPoint = Vector2.new(0.5, 0.5)
+	label.Position = UDim2.fromScale(0.5, 0.42)
+	label.Size = UDim2.fromScale(0.6, 0.18)
+	label.BackgroundTransparency = 1
+	label.Font = Enum.Font.FredokaOne
+	label.TextScaled = true
+	label.Text = text
+	label.TextColor3 = c
+	label.Rotation = -8
+	label.ZIndex = 82
+	label.Parent = g
+	local stroke = Instance.new("UIStroke")
+	stroke.Thickness = 5
+	stroke.Color = Color3.fromRGB(30, 22, 40)
+	stroke.Parent = label
+	local scale = Instance.new("UIScale")
+	scale.Scale = 3
+	scale.Parent = label
+	TweenService:Create(scale, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+	TweenService:Create(edge, TweenInfo.new(0.9), { BackgroundTransparency = 1 }):Play()
+	Juice.kick(0.35)
+	task.delay(1.2, function()
+		TweenService:Create(label, TweenInfo.new(0.4), { TextTransparency = 1 }):Play()
+		TweenService:Create(stroke, TweenInfo.new(0.4), { Transparency = 1 }):Play()
+	end)
+	Debris:AddItem(label, 1.7)
+	Debris:AddItem(edge, 1.7)
+end
+
 --- Anime speed lines rushing in from the screen's edges on a hard flick.
 function Juice.speedLines(power: number)
 	local g = Juice.gui

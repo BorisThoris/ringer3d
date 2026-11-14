@@ -404,6 +404,26 @@ local okG, errG = pcall(function()
 	Ground.leave()
 end)
 check("the sand kicks up, keeps tracks, and props shatter", okG and Ground.emitted > 20 and Ground.tracks >= 3, if okG then (Ground.emitted .. " particles " .. Ground.tracks .. " tracks") else errG)
+-- Every field has its own sky: set pieces built, animated, and taken away again.
+local Skies = require(client.Skies)
+for _, id in ipairs(Config.ARENA_ORDER) do
+	local okK, errK = pcall(function()
+		Skies.enter(id, Vector3.new(16000, 0, 0))
+		task.wait(0.1)
+	end)
+	local n = Skies.pieces
+	local ok2 = pcall(Skies.leave)
+	check(id .. " has its own sky (" .. tostring(Skies.SKY[id].clock) .. "h, " .. n .. " pieces)", okK and ok2 and n >= 3 and workspace:FindFirstChild("FieldSkyPieces") == nil, if okK then n else errK)
+end
+local okE, errE = pcall(function()
+	local p = Vector3.new(7000, 1, 0)
+	Juice.rebound(p, 800)
+	Juice.reenter(p)
+	Juice.word(p, "TEST", Color3.new(1, 1, 1))
+	Juice.gui = Instance.new("ScreenGui")
+	Juice.stamp("OUT! TURN OVER")
+end)
+check("rebound, back-in and stamp effects run", okE, errE)
 check("the mascot module loads", type(require(client.Mascot).start) == "function")
 
 -- 4. Ambience changes the light for a field and gives it back.

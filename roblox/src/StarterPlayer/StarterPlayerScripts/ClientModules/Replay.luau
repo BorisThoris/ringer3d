@@ -17,6 +17,8 @@ local Replay = {}
 Replay.fast = false
 Replay.onImpact = function(_kind: string, _strength: number, _pos: Vector3) end
 Replay.onCross = function(_pos: Vector3) end
+-- A marble that had gone over the line rolled back into the ring.
+Replay.onReenter = function(_pos: Vector3) end
 Replay.onBreak = function(_pos: Vector3, _color: Color3, _material: Enum.Material) end
 -- Every frame: the sim's marbles and the table's centre, for what they kick up off the ground.
 Replay.onBodies = function(_bodies: { any }, _origin: Vector3, _dt: number) end
@@ -98,6 +100,13 @@ function Replay.play(state, data, done: () -> ())
 
 	local clock = Playback.clock()
 	local crossed = false
+	-- Marbles already outside the ring when the shot starts don't count as crossing it.
+	local outside = {}
+	for _, b in ipairs(sim.bodies) do
+		if b.id ~= Sim.SHOOTER_ID and Sim.isOutsideRing(b.px, b.pz) then
+			outside[b.id] = true
+		end
+	end
 	Replay.playing = true
 	frozenUntil, frozenTotal = 0, 0
 	-- RenderStepped on a client; Heartbeat lets tests replay on a server.
@@ -115,10 +124,19 @@ function Replay.play(state, data, done: () -> ())
 			end
 			if not crossed and Playback.crossedNow(sim) then
 				crossed = true
-				for _, b in ipairs(sim.bodies) do
-					if b.id ~= Sim.SHOOTER_ID and Sim.isOutsideRing(b.px, b.pz) then
+			end
+			-- Every target marble over the line is a cheer; one rolling back in is a groan.
+			for _, b in ipairs(sim.bodies) do
+				if b.id ~= Sim.SHOOTER_ID and not b.holed then
+					local out = Sim.isOutsideRing(b.px, b.pz)
+					-- Back in only when clearly inside, so one on the line doesn't flicker.
+					local d = math.sqrt(b.px * b.px + b.pz * b.pz)
+					if out and not outside[b.id] then
+						outside[b.id] = true
 						Replay.onCross(world(b.px, b.py, b.pz))
-						break
+					elseif d < Sim.WORLD.ringRadius - 0.15 and outside[b.id] then
+						outside[b.id] = nil
+						Replay.onReenter(world(b.px, b.py, b.pz))
 					end
 				end
 			end
