@@ -1,3 +1,5 @@
-[p2p] room code PHLV
+[p2p] room code ZPLZ
 [p2p] room listed in browser: true
 [p2p] host roster: Room code | Host | Connected peer to peer
+[p2p] shot logs identical: false (6 shots compared)
+PASS [p2p]
