@@ -17,7 +17,9 @@ local Replay = {}
 Replay.fast = false
 Replay.onImpact = function(_kind: string, _strength: number, _pos: Vector3) end
 Replay.onCross = function(_pos: Vector3) end
-Replay.onBreak = function(_pos: Vector3) end
+Replay.onBreak = function(_pos: Vector3, _color: Color3, _material: Enum.Material) end
+-- Every frame: the sim's marbles and the table's centre, for what they kick up off the ground.
+Replay.onBodies = function(_bodies: { any }, _origin: Vector3, _dt: number) end
 -- Every frame: the marbles' total speed (web units/s), for the rolling sound.
 Replay.onFrame = function(_speed: number) end
 Replay.playing = false
@@ -126,6 +128,9 @@ function Replay.play(state, data, done: () -> ())
 			speed += math.sqrt(b.vx * b.vx + b.vz * b.vz)
 		end
 		Replay.onFrame(if sim.done then 0 else speed)
+		if n > 0 and not sim.done then
+			Replay.onBodies(sim.bodies, origin, math.min(dt, 0.1))
+		end
 		for _, b in ipairs(sim.bodies) do
 			local part = partFor(b.id)
 			if part then
@@ -138,7 +143,7 @@ function Replay.play(state, data, done: () -> ())
 				if part then
 					if p.broken then
 						if part.LocalTransparencyModifier < 1 then
-							Replay.onBreak(part.Position)
+							Replay.onBreak(part.Position, part.Color, part.Material)
 						end
 						part.LocalTransparencyModifier = 1
 						for _, d in ipairs(part:GetDescendants()) do

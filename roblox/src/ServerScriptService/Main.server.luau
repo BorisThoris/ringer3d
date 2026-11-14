@@ -200,21 +200,18 @@ for _, side in ipairs({ -1, 1 }) do
 	facePart({ Name = "Cheek", Shape = Enum.PartType.Ball, Size = Vector3.new(1.6, 1, 0.6), CFrame = CFrame.new(side * 4.3, -0.9, 5.7), Color = rgb(255, 120, 150), CanCollide = false })
 end
 facePart({ Name = "Smile", Shape = Enum.PartType.Ball, Size = Vector3.new(4.4, 1.5, 1.4), CFrame = CFrame.new(0, -1.9, 6.4), Color = rgb(60, 20, 30), CanCollide = false })
--- The face looks at +Z (the spawn); every part keeps its offset from the body as it moves.
+-- The face looks at +Z (the spawn). Built about the origin, then set in place; each client brings
+-- it to life (ClientModules/Mascot: it watches you, blinks, hops and talks), so the server only
+-- places it once.
 local mascotHome = CFrame.new(0, 17, 0)
-local mascotParts = {}
 for _, p in ipairs(mascot:GetDescendants()) do
 	if p:IsA("BasePart") then
-		mascotParts[p] = p.CFrame
+		p.CFrame = mascotHome * p.CFrame
 	end
 end
-RunService.Heartbeat:Connect(function()
-	local t = os.clock()
-	local cf = mascotHome * CFrame.new(0, math.sin(t * 1.4) * 1.2, 0) * CFrame.Angles(0, math.sin(t * 0.5) * 0.7, 0)
-	for p, off in pairs(mascotParts) do
-		p.CFrame = cf * off
-	end
-end)
+mascot:SetAttribute("Home", mascotHome.Position)
+body.Name = "Body"
+local _ = RunService
 local sign = lobbyPart({ Name = "Sign", Size = Vector3.new(1, 1, 1), CFrame = CFrame.new(0, 31, 0), Transparency = 1, CanCollide = false, CanQuery = false, CanTouch = false })
 bigText(sign, "MARBLE DUELS", { rgb(255, 240, 90), rgb(255, 140, 40) }, Vector2.new(46, 8))
 bigText(sign, "✨ ONE-OF-A-KIND MARBLES ✨", { rgb(200, 240, 255), rgb(150, 110, 255) }, Vector2.new(34, 3.4), Vector3.new(0, -5.2, 0))

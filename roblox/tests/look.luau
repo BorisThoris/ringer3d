@@ -323,6 +323,29 @@ check("lobby coins sit clear of the fountains", (function()
 end)())
 check("lobby fun module loads", type(require(client.LobbyFun).start) == "function")
 
+-- The fields answer the marbles: kick-up while rolling, tracks in sand, bank bursts, smashed props.
+local Ground = require(client.Ground)
+local okG, errG = pcall(function()
+	local gm = Instance.new("Model")
+	gm.Parent = workspace
+	Arena.build(Vector3.new(12000, 0, 0), Config.ARENAS.sand, 2, Random.new(1), gm, true)
+	Ground.enter("sand", gm)
+	local bodies = { { id = 1, r = 0.21, px = 0, py = 0.21, pz = 0, vx = 20, vz = 0 }, { id = 2, r = 0.16, px = 1, py = 0.9, pz = 0, vx = 0, vz = 0 } }
+	for i = 1, 12 do
+		bodies[1].px += 0.4
+		if i == 6 then
+			bodies[2].py = 0.16
+		end
+		Ground.roll(bodies, Vector3.new(12000, 0, 0), 1 / 30)
+	end
+	Ground.slam(Vector3.new(12000, 1, 50), 600)
+	Ground.shatter(Vector3.new(12000, 1, 0), Color3.new(1, 0, 0))
+	task.wait(0.2)
+	Ground.leave()
+end)
+check("the sand kicks up, keeps tracks, and props shatter", okG and Ground.emitted > 20 and Ground.tracks >= 3, if okG then (Ground.emitted .. " particles " .. Ground.tracks .. " tracks") else errG)
+check("the mascot module loads", type(require(client.Mascot).start) == "function")
+
 -- 4. Ambience changes the light for a field and gives it back.
 local Lighting = game:GetService("Lighting")
 local before = Lighting.ClockTime

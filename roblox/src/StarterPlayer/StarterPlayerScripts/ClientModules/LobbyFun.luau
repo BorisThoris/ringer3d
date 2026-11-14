@@ -13,6 +13,7 @@ local Config = require(ReplicatedStorage.Ringer.Config)
 local LobbyFun = {}
 LobbyFun.coins = {} :: { { part: BasePart, spot: Vector3, readyAt: number } }
 LobbyFun.collected = 0
+LobbyFun.onChain = function(_n: number) end -- a run of coins picked up quickly
 
 local GOLD = Color3.fromRGB(255, 200, 40)
 
@@ -122,6 +123,7 @@ function LobbyFun.start(ask: (string, any) -> (boolean, any), sfx: any, characte
 		chain = if os.clock() - lastPick < 1.6 then chain + 1 else 0
 		lastPick = os.clock()
 		sfx.play("coin", 0.7, 1 + math.min(chain, 8) * 0.07)
+		LobbyFun.onChain(chain + 1)
 		sparkle(c.spot, GOLD, 18)
 		task.spawn(function()
 			local ok, got = ask("pickup", i)
@@ -176,9 +178,122 @@ function LobbyFun.start(ask: (string, any) -> (boolean, any), sfx: any, characte
 		end
 	end
 
+	-- The rainbow: a shimmer of light running along its bands, and twinkles over it.
+	local bands = {}
+	local rainbow = world and world:FindFirstChild("Rainbow")
+	if rainbow then
+		for _, b in ipairs(rainbow:GetChildren()) do
+			if b:IsA("BasePart") then
+				-- Its place along the arc, 0..1, from its angle about the arc's centre.
+				local p = b.Position
+				local a = math.atan2(p.Y + 12, p.X)
+				table.insert(bands, { part = b, color = b.Color, k = 1 - a / math.pi })
+			end
+		end
+		for i = 1, 7 do
+			local a = i / 8 * math.pi
+			local tw = Instance.new("Part")
+			tw.Anchored, tw.CanCollide, tw.CanQuery, tw.CanTouch = true, false, false, false
+			tw.Transparency = 1
+			tw.Size = Vector3.new(30, 30, 4)
+			tw.CFrame = CFrame.new(Vector3.new(math.cos(a) * 102, -12 + math.sin(a) * 102, -235))
+			tw.Parent = rainbow
+			local e = Instance.new("ParticleEmitter")
+			e.Shape = Enum.ParticleEmitterShape.Box
+			e.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+			e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.5, 4), NumberSequenceKeypoint.new(1, 0) })
+			e.Lifetime = NumberRange.new(0.8, 1.4)
+			e.Rate = 3
+			e.Speed = NumberRange.new(0)
+			e.LightEmission = 1
+			e.Parent = tw
+		end
+	end
+	-- Swaying tree crowns and nodding flowers round the lawn.
+	local sway = {}
+	if lobby then
+		for _, p in ipairs(lobby:GetDescendants()) do
+			if p:IsA("BasePart") and (p.Name == "Crown" or p.Name == "Petals" or p.Name == "Middle") then
+				table.insert(sway, { part = p, base = p.CFrame, k = p.Position.X * 0.05 + p.Position.Z * 0.07, amp = if p.Name == "Crown" then 0.5 else 0.15 })
+			end
+		end
+	end
+	-- The mushrooms breathe; the fountain marbles turn.
+	local breathe = {}
+	local spinners = {}
+	if world then
+		for _, p in ipairs(world:GetDescendants()) do
+			if p:IsA("BasePart") and p:GetAttribute("Bounce") then
+				table.insert(breathe, { mesh = p:FindFirstChildOfClass("SpecialMesh"), k = p.Position.X })
+			elseif p:IsA("BasePart") and p.Name == "Marble" and p.Parent and p.Parent.Name == "Fountain" then
+				table.insert(spinners, { part = p, base = p.CFrame })
+			end
+		end
+	end
+	-- A little flock of birds circling high over the park, flapping.
+	local birds = {}
+	local flock = Instance.new("Folder")
+	flock.Name = "Birds"
+	flock.Parent = Workspace
+	for i = 1, 6 do
+		local function piece(size: Vector3, color: Color3)
+			local p = Instance.new("Part")
+			p.Anchored, p.CanCollide, p.CanQuery, p.CanTouch, p.CastShadow = true, false, false, false, false
+			p.Size = size
+			p.Color = color
+			p.Material = Enum.Material.SmoothPlastic
+			p.Parent = flock
+			return p
+		end
+		local tone = ({ Color3.fromRGB(255, 255, 255), Color3.fromRGB(255, 210, 120), Color3.fromRGB(150, 210, 255) })[i % 3 + 1]
+		table.insert(birds, {
+			body = piece(Vector3.new(0.9, 0.9, 2), tone),
+			left = piece(Vector3.new(2.6, 0.15, 1.2), tone),
+			right = piece(Vector3.new(2.6, 0.15, 1.2), tone),
+			r = 70 + i * 9, y = 48 + (i % 3) * 7, speed = 0.12 + (i % 2) * 0.03, phase = i * 1.1,
+		})
+	end
+
 	local t = 0
+	local frame = 0
 	RunService.RenderStepped:Connect(function(dt)
 		t += dt
+		frame += 1
+		-- Scenery at half rate: it's slow motion anyway, and it's a lot of parts.
+		if frame % 2 == 0 then
+			local wave = (t * 0.25) % 1.4 - 0.2
+			for _, b in ipairs(bands) do
+				local glow = math.max(0, 1 - math.abs(b.k - wave) * 7)
+				b.part.Color = b.color:Lerp(Color3.new(1, 1, 1), glow * 0.55)
+				b.part.Transparency = 0.18 - glow * 0.15
+			end
+			for _, s in ipairs(sway) do
+				local a = t * 1.3 + s.k
+				s.part.CFrame = s.base * CFrame.new(math.sin(a) * s.amp, math.abs(math.sin(a * 0.5)) * s.amp * 0.3, math.cos(a * 0.8) * s.amp * 0.6)
+			end
+		end
+		for _, b in ipairs(breathe) do
+			if b.mesh then
+				local s = math.sin(t * 2 + b.k)
+				-- Leave a bounce's squash alone until it has settled.
+				if math.abs(b.mesh.Scale.Y - 1) < 0.08 then
+					b.mesh.Scale = Vector3.new(1 + s * 0.025, 1 - s * 0.035, 1 + s * 0.025)
+				end
+			end
+		end
+		for _, s in ipairs(spinners) do
+			s.part.CFrame = s.base * CFrame.new(0, math.sin(t * 2) * 0.3, 0) * CFrame.Angles(0, t * 1.5, 0)
+		end
+		for _, b in ipairs(birds) do
+			local a = t * b.speed + b.phase
+			local pos = Vector3.new(math.cos(a) * b.r, b.y + math.sin(t * 0.7 + b.phase) * 3, math.sin(a) * b.r)
+			local ahead = Vector3.new(-math.sin(a), 0, math.cos(a))
+			local cf = CFrame.lookAt(pos, pos + ahead) * CFrame.Angles(0, 0, -0.25)
+			local flap = math.sin(t * 9 + b.phase) * 0.6
+			b.body.CFrame = cf
+			b.left.CFrame = cf * CFrame.new(-0.4, 0, 0) * CFrame.Angles(0, 0, flap) * CFrame.new(-1.3, 0, 0)
+			b.right.CFrame = cf * CFrame.new(0.4, 0, 0) * CFrame.Angles(0, 0, -flap) * CFrame.new(1.3, 0, 0)
+		end
 		local char = character()
 		local root = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
 		local now = os.clock()

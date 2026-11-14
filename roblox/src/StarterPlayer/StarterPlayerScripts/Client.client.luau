@@ -23,6 +23,7 @@ local Pets = require(Modules.Pets)
 local Juice = require(Modules.Juice)
 local Show = require(Modules.Show)
 local Rewards = require(Modules.Rewards)
+local Ground = require(Modules.Ground)
 
 -- Marbles come alive (bolts, moons, auras), and everyone's marble floats beside them.
 MarbleFX.animate()
@@ -54,9 +55,20 @@ local function ask(action: string, args: any?)
 end
 
 -- The lobby's toys: coins on the lawn, bouncy mushrooms, drifting clouds, bobbing balloons.
-task.spawn(require(Modules.LobbyFun).start, ask, Sfx, function()
+local LobbyFun = require(Modules.LobbyFun)
+local Mascot = require(Modules.Mascot)
+task.spawn(LobbyFun.start, ask, Sfx, function()
 	return player.Character
 end)
+-- The big marble with the eyes watches you, blinks, hops and talks.
+task.spawn(Mascot.start, player)
+LobbyFun.onChain = function(n)
+	if n == 4 then
+		Mascot.cheer("Coin streak! 🪙🪙🪙")
+	elseif n == 8 then
+		Mascot.cheer("You're a coin magnet! 🤑")
+	end
+end
 
 -- =============================================================================================
 -- Lobby HUD
@@ -853,6 +865,10 @@ Replay.onImpact = function(kind, strength, pos)
 	elseif kind == "bumper" and strength > 150 then
 		Sfx.ui("boing", 0.8)
 	end
+	-- The bank and the pieces answer in the field's own stuff: sand, snow, gravel, clippings.
+	if kind ~= "marble" and strength > 120 then
+		Ground.slam(pos, strength)
+	end
 	if kind == "marble" and strength > 400 then
 		local look = shooterLook()
 		Juice.signature(pos, table.concat(MarbleFX.forLook(look), ","), MarbleLook.uiColor(look))
@@ -869,8 +885,13 @@ Replay.onCross = function(pos)
 	Juice.coins(pos, Config.COINS.capture)
 	task.delay(0.15, Sfx.play, "coin_fly", 0.6, 1 + math.min(capturesThisShot, 6) * 0.06)
 end
-Replay.onBreak = function(_pos)
+Replay.onBreak = function(pos, color, material)
 	Sfx.clack(900, "kerb")
+	Ground.shatter(pos, color, material)
+	Juice.kick(0.3)
+end
+Replay.onBodies = function(bodies, origin, dt)
+	Ground.roll(bodies, origin, dt)
 end
 local function leaveTable()
 	task.delay(0.5, Sfx.music, "lobby")
@@ -878,6 +899,7 @@ local function leaveTable()
 	lastTurn = ""
 	Sfx.stopPad()
 	Ambience.leave()
+	Ground.leave()
 	Show.clear()
 	Pets.setPlaying(player, nil)
 end
@@ -894,6 +916,7 @@ local function onState(state)
 			soundTable = state.id
 			Sfx.setSurface(field.surface)
 			Sfx.startPad(field.mood)
+			Ground.enter(field.surface, workspace:FindFirstChild("Table" .. state.id))
 		end
 	end
 	-- A new table: the intro first, then whose turn it is.
