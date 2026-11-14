@@ -9,6 +9,51 @@ collectibles and Robux.
   the project can also be opened with `rojo serve` and Studio. No Studio is needed to build,
   publish or test.
 
+**Play it:** https://www.roblox.com/games/114836219465070
+
+## Technical highlights
+
+- **One deterministic physics engine, shared by server and clients.** Shots don't use Roblox
+  physics: `Ringer.Sim` is a fixed-step rigid-body sim in pure Luau (spheres, rolling and spin,
+  per-field surface friction and camber, breakable and movable props, bumpers, cups, banks), ported
+  from the web game. The server plays a shot to the end in one go and its result is final. Each
+  client replays the same shot frame by frame, with slow motion and hit-stop. The client then
+  fingerprints where everything stopped (FNV-1a over the quantized layout, `Playback.layoutHash`)
+  and checks it against the fingerprint the server sent. The in-game stats overlay (F3) shows the
+  check for every shot.
+- **Server-authoritative, cheat-resistant.** A client only ever sends an aim, a power and a spin.
+  The server checks every request:
+  - purchases and equips against what the player owns
+  - emotes against a rate limit
+  - lobby coin pickups: the player must be standing at the coin, each coin has a respawn timer,
+    and there's an hourly cap
+- **Tested in the cloud, built without Studio.** `scripts/build.mjs` packs `src/` into a place file
+  (Rojo layout), and `publish.mjs` uploads it through Open Cloud. `scripts/test-all.mjs` uploads a
+  test build as an unpublished version and runs the suites on Roblox's own servers through Open
+  Cloud Luau Execution:
+  - a server boot and a whole bot game
+  - every field and marble
+  - effects, skies and UI modules
+  - a full client replay of a bot game, fingerprint-checked shot by shot
+  - 345 physics shots against the web game's engine
+  
+  CI: `.github/workflows/roblox.yml`.
+- **Data you can trust.** Profiles are session-locked through `UpdateAsync` (a server holding a
+  fresh lock is waited for, and a save never overwrites a copy another server now owns). Saves
+  retry, and every profile is saved on shutdown. If the DataStore can't be reached, the player
+  gets a fresh profile that is never saved, rather than one that could overwrite their real data. `ProcessReceipt` records each purchase id and saves before granting, so a retried
+  receipt never pays out twice. Limited marbles get serial numbers from a global DataStore counter.
+  Marble Bags show their odds before purchase and are refused where PolicyService restricts paid
+  random items.
+- **Live-ops basics.** AnalyticsService economy events (every coin source and sink) and an
+  onboarding funnel; badges; game passes and developer products; a daily streak reward; a global
+  leaderboard.
+- **Feel and retention.** First-game coaching and an animated mascot that reacts to the player.
+  Shots get camera trauma, FOV punch, hit-stop, comic hit words and coin bursts, and the ring line
+  flashes as marbles cross it. Each field has its own sky, set pieces and critters, plus surface
+  kick-up and tracks. Sound is an OGG sprite played with PlaybackRegions, with ACE-Step music.
+  Everything is drawn client-side where it can be, so the server only replicates what matters.
+
 ## Layout
 
 | Path | What it is |
@@ -38,6 +83,7 @@ The Open Cloud API key lives outside the repo, in `D:/agent-work/ringer3d/roblox
 restricted to this PC's IP, and expires on 2027-01-26.
 
 ```bash
+node roblox/scripts/test-all.mjs                                 # build, upload a draft, run every cloud suite
 CHECK=1 node roblox/scripts/build.mjs roblox/build/check.rbxlx   # a test build
 node roblox/scripts/publish.mjs roblox/build/check.rbxlx Saved   # upload as a draft version
 node roblox/scripts/run-luau.mjs roblox/tests/smoke.luau <version>

@@ -1,0 +1,43 @@
+name: Roblox
+
+# The Roblox experience (roblox/): every push that touches it builds the place file from source on
+# a hosted runner. The cloud suites (a server boot and a whole bot game, every field and marble,
+# client replays fingerprint-checked against the server, 345 physics shots against the web game)
+# run on Roblox's own servers through Open Cloud, from the self-hosted runner that holds the API key
+# (labelled roblox-cloud), once the ROBLOX_CLOUD_TESTS repository variable is set to "true".
+on:
+  push:
+    branches: [main]
+    paths: ['roblox/**', '.github/workflows/roblox.yml']
+  pull_request:
+    paths: ['roblox/**']
+  workflow_dispatch:
+
+concurrency:
+  group: roblox-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build the place from source
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: node roblox/scripts/build.mjs roblox/build/ringer.rbxlx
+      - run: CHECK=1 node roblox/scripts/build.mjs roblox/build/check.rbxlx
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ringer-place
+          path: roblox/build/ringer.rbxlx
+
+  cloud-tests:
+    name: Cloud test suites (Open Cloud Luau Execution)
+    needs: build
+    if: vars.ROBLOX_CLOUD_TESTS == 'true'
+    runs-on: [self-hosted, roblox-cloud]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - run: node roblox/scripts/test-all.mjs
