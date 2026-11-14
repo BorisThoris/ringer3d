@@ -1,9 +1,10 @@
-11-13 22:44:51.067  2533  2533 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
-11-13 22:44:51.067  2533  2533 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
-11-13 22:44:51.068  2533  2533 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
-11-13 22:44:53.328  2533  2533 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-13 22:44:53.394  2533  2533 W Capacitor/Console: File: https://localhost/assets/index-DC-pgxxA.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
-11-13 22:45:14.306  2533  2533 I Capacitor/Console: File:  - Line 333 - Msg: undefined
-11-13 22:45:21.016  2533  2533 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-13 22:45:21.018  2533  2533 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
-11-13 22:45:21.846  2533  2533 I Capacitor/Console: File:  - Line 333 - Msg: {}
+11-14 00:26:34.607  3112  3112 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
+11-14 00:26:34.608  3112  3112 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
+11-14 00:26:34.609  3112  3112 E Capacitor/Console: File:  - Line 6 - Msg: Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')
+11-14 00:26:36.276  3112  3112 W Capacitor/Console: File: https://localhost/assets/index-DC-pgxxA.js - Line 9 - Msg: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+11-14 00:26:53.566  3112  3112 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+11-14 00:26:53.574  3112  3112 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+11-14 00:26:54.373  3112  3112 I Capacitor/Console: File:  - Line 333 - Msg: {}
+11-14 00:26:55.953  3112  3112 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+11-14 00:26:58.240  3112  3112 I Capacitor/Console: File:  - Line 333 - Msg: undefined
+11-14 00:27:17.535  1042  1684 E JavaBinder: *** Uncaught remote exception! Exceptions are not yet supported across processes. Client PID 4114 UID 10118.
