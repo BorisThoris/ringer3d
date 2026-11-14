@@ -889,6 +889,7 @@ Replay.onCross = function(pos)
 	Sfx.chime("capture")
 	capturesThisShot += 1
 	Juice.capture(pos, MarbleLook.uiColor(shooterLook()), capturesThisShot)
+	Ground.lineFlash(pos, Color3.fromRGB(255, 225, 80))
 	-- Each marble won is coins in the bank (paid at the end of the game): show them now.
 	Juice.coins(pos, Config.COINS.capture)
 	task.delay(0.15, Sfx.play, "coin_fly", 0.6, 1 + math.min(capturesThisShot, 6) * 0.06)
@@ -896,12 +897,23 @@ end
 Replay.onReenter = function(pos)
 	capturesThisShot = math.max(0, capturesThisShot - 1)
 	Juice.reenter(pos)
+	Ground.lineFlash(pos, Color3.fromRGB(255, 80, 80))
 	Sfx.chime("lose")
 end
 Replay.onBreak = function(pos, color, material)
 	Sfx.clack(900, "kerb")
 	Ground.shatter(pos, color, material)
 	Juice.kick(0.3)
+end
+Replay.onSettled = function(shooterAt, inside)
+	-- Won a marble and the shooter stayed in the ring: a "stick", the best shot in Ringer.
+	if shooterAt and capturesThisShot > 0 then
+		Juice.word(shooterAt, "STICK! 🎯", Color3.fromRGB(255, 215, 60), 1.2)
+		Sfx.chime("win")
+	end
+	if inside == 1 and capturesThisShot > 0 then
+		task.delay(0.5, Juice.stamp, "LAST MARBLE!", Color3.fromRGB(255, 200, 50))
+	end
 end
 Replay.onBodies = function(bodies, origin, dt)
 	Ground.roll(bodies, origin, dt)

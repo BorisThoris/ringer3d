@@ -60,10 +60,36 @@ local function puff(at: Vector3, n: number, scale: number?)
 	Ground.emitted += n
 end
 
+local LINE_NAMES = { String = true, Groove = true, Scratch = true, Chalk = true }
+local line: { { part: BasePart, color: Color3 } } = {}
+local TweenService = game:GetService("TweenService")
+
+--- The ring line lights up where a marble crosses it: gold going out, red coming back in.
+function Ground.lineFlash(pos: Vector3, color: Color3)
+	for _, seg in ipairs(line) do
+		local d = (seg.part.Position - pos) * Vector3.new(1, 0, 1)
+		if d.Magnitude < 9 and seg.part.Parent then
+			local k = 1 - d.Magnitude / 9
+			seg.part.Color = seg.color:Lerp(color, 0.4 + 0.6 * k)
+			TweenService:Create(seg.part, TweenInfo.new(0.9, Enum.EasingStyle.Quad), { Color = seg.color }):Play()
+		end
+	end
+	Ground.flashes = (Ground.flashes or 0) + 1
+end
+
 --- Start answering the marbles on the field `arenaSurface` (Config surface name) of `tableModel`.
 function Ground.enter(surface: string, tableModel: Instance?)
 	Ground.leave()
 	Ground.surface = surface
+	line = {}
+	local field = tableModel and tableModel:FindFirstChild("Field", true)
+	if field then
+		for _, p in ipairs(field:GetChildren()) do
+			if LINE_NAMES[p.Name] and p:IsA("BasePart") then
+				table.insert(line, { part = p, color = p.Color })
+			end
+		end
+	end
 	local kick = KICK[surface]
 	if not kick then
 		return

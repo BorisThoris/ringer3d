@@ -398,6 +398,14 @@ local okG, errG = pcall(function()
 		end
 		Ground.roll(bodies, Vector3.new(12000, 0, 0), 1 / 30)
 	end
+	Ground.lineFlash(Vector3.new(12000 + Config.RING_R, 0, 0), Color3.new(1, 0, 0))
+	local lit = 0
+	for _, seg in ipairs(gm:GetDescendants()) do
+		if seg.Name == "Groove" and seg:IsA("BasePart") and seg.Color.R > 0.85 and seg.Color.G < 0.6 then
+			lit += 1
+		end
+	end
+	assert(lit >= 2, "ring line lit " .. lit)
 	Ground.slam(Vector3.new(12000, 1, 50), 600)
 	Ground.shatter(Vector3.new(12000, 1, 0), Color3.new(1, 0, 0))
 	task.wait(0.2)
@@ -413,6 +421,7 @@ for _, id in ipairs(Config.ARENA_ORDER) do
 	end)
 	local n = Skies.pieces
 	local ok2 = pcall(Skies.leave)
+	check(id .. " has something alive going round it", Skies.CRITTERS[id] ~= nil)
 	check(id .. " has its own sky (" .. tostring(Skies.SKY[id].clock) .. "h, " .. n .. " pieces)", okK and ok2 and n >= 3 and workspace:FindFirstChild("FieldSkyPieces") == nil, if okK then n else errK)
 end
 local okE, errE = pcall(function()

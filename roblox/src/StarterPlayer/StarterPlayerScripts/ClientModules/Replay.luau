@@ -19,6 +19,9 @@ Replay.onImpact = function(_kind: string, _strength: number, _pos: Vector3) end
 Replay.onCross = function(_pos: Vector3) end
 -- A marble that had gone over the line rolled back into the ring.
 Replay.onReenter = function(_pos: Vector3) end
+-- The shot has played out: where the shooter rests (nil if it left the ring), and how many target
+-- marbles are still inside.
+Replay.onSettled = function(_shooterAt: Vector3?, _inside: number) end
 Replay.onBreak = function(_pos: Vector3, _color: Color3, _material: Enum.Material) end
 -- Every frame: the sim's marbles and the table's centre, for what they kick up off the ground.
 Replay.onBodies = function(_bodies: { any }, _origin: Vector3, _dt: number) end
@@ -178,6 +181,16 @@ function Replay.play(state, data, done: () -> ())
 		if sim.done then
 			Replay.stop()
 			Replay.lastLayout = sim:resultLayout()
+			-- Where things came to rest: the shooter (world), and how many targets are still in.
+			local shooterAt, inside = nil, 0
+			for _, b in ipairs(sim.bodies) do
+				if b.id == Sim.SHOOTER_ID then
+					shooterAt = if Sim.isOutsideRing(b.px, b.pz) then nil else world(b.px, b.py, b.pz)
+				elseif not b.holed and not Sim.isOutsideRing(b.px, b.pz) then
+					inside += 1
+				end
+			end
+			Replay.onSettled(shooterAt, inside)
 			done()
 		end
 	end)

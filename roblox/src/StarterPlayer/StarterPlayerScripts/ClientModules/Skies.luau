@@ -377,6 +377,227 @@ BUILD.minigolf = function(f: Folder, o: Vector3, rng: Random)
 	end
 end
 
+-- ---- Critters: something alive going round each field at ground level -----------------------
+
+local CRITTERS = {}
+local PATH_R = 71 -- just past the field's disc, among the toys
+
+-- Build parts at `o` + offsets, and return a mover for the whole group.
+local function group(o: Vector3, parts: { BasePart })
+	return rig(parts, CFrame.new(o))
+end
+
+local function wheelSet(f: Folder, o: Vector3, w: number, l: number, r: number): { BasePart }
+	local list = {}
+	for _, x in ipairs({ -w, w }) do
+		for _, z in ipairs({ -l, l }) do
+			table.insert(list, piece(f, { Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.7, r * 2, r * 2), CFrame = CFrame.new(o + Vector3.new(x, r, z)), Color = rgb(35, 35, 45) }))
+		end
+	end
+	return list
+end
+
+-- Drive `move` round the path: `speed` radians a second, facing along the way, with `extra` on top.
+local function roundPath(o: Vector3, speed: number, phase: number, r: number?)
+	return function(t: number): (CFrame, number)
+		local a = t * speed + phase
+		local rr = r or PATH_R
+		local pos = o + Vector3.new(math.cos(a) * rr, 0, math.sin(a) * rr)
+		local ahead = Vector3.new(-math.sin(a), 0, math.cos(a)) * (if speed < 0 then -1 else 1)
+		return CFrame.lookAt(pos, pos + ahead), a
+	end
+end
+
+-- A wind-up toy car on the desk, its key turning.
+CRITTERS.desk = function(f: Folder, o: Vector3, _rng: Random)
+	local parts = {
+		piece(f, { Size = Vector3.new(3.8, 1.6, 6.4), CFrame = CFrame.new(o + Vector3.new(0, 1.6, 0)), Color = rgb(235, 60, 70) }),
+		piece(f, { Size = Vector3.new(3.2, 1.4, 2.8), CFrame = CFrame.new(o + Vector3.new(0, 3, 0.6)), Color = rgb(150, 220, 255), Transparency = 0.2 }),
+	}
+	for _, w in ipairs(wheelSet(f, o, 2, 2.1, 0.9)) do
+		table.insert(parts, w)
+	end
+	local key = piece(f, { Size = Vector3.new(2.4, 1.4, 0.3), CFrame = CFrame.new(o + Vector3.new(0, 4.6, -1.5)), Color = rgb(255, 210, 60), Material = Enum.Material.Metal })
+	local move = group(o, parts)
+	local path = roundPath(o, 0.22, 0, 66)
+	return function(t: number)
+		local cf = path(t)
+		move(cf * CFrame.new(0, math.abs(math.sin(t * 10)) * 0.15, 0))
+		key.CFrame = cf * CFrame.new(0, 4.6, 1.5) * CFrame.Angles(0, 0, t * 6)
+	end
+end
+
+-- A puppy trotting round the cul-de-sac, tail wagging.
+CRITTERS.culdesac = function(f: Folder, o: Vector3, _rng: Random)
+	local brown, dark = rgb(200, 140, 80), rgb(110, 70, 40)
+	local parts = {
+		ball(f, o + Vector3.new(0, 2.4, 0), Vector3.new(2.6, 2.4, 4), brown),
+		ball(f, o + Vector3.new(0, 3.8, -2.2), Vector3.new(2.3, 2.3, 2.3), brown),
+		ball(f, o + Vector3.new(0, 3.5, -3.3), Vector3.new(1.1, 0.9, 1.1), rgb(240, 200, 160)),
+		ball(f, o + Vector3.new(0, 3.7, -3.9), Vector3.new(0.5, 0.45, 0.45), rgb(30, 25, 30)),
+		ball(f, o + Vector3.new(-1.1, 4.3, -2.1), Vector3.new(0.6, 1.4, 0.9), dark),
+		ball(f, o + Vector3.new(1.1, 4.3, -2.1), Vector3.new(0.6, 1.4, 0.9), dark),
+		ball(f, o + Vector3.new(-0.5, 4.2, -3.1), Vector3.new(0.35, 0.35, 0.35), rgb(20, 20, 25)),
+		ball(f, o + Vector3.new(0.5, 4.2, -3.1), Vector3.new(0.35, 0.35, 0.35), rgb(20, 20, 25)),
+	}
+	local legs = {}
+	for _, x in ipairs({ -0.8, 0.8 }) do
+		for _, z in ipairs({ -1.2, 1.2 }) do
+			table.insert(legs, piece(f, { Size = Vector3.new(0.5, 1.6, 0.5), CFrame = CFrame.new(o), Color = brown }))
+			legs[#legs]:SetAttribute("x", x)
+			legs[#legs]:SetAttribute("z", z)
+		end
+	end
+	local tail = piece(f, { Size = Vector3.new(0.35, 0.35, 1.6), CFrame = CFrame.new(o), Color = brown })
+	local move = group(o, parts)
+	local path = roundPath(o, 0.3, 1.2)
+	return function(t: number)
+		local cf = path(t) * CFrame.new(0, math.abs(math.sin(t * 9)) * 0.35, 0)
+		move(cf)
+		for i, leg in ipairs(legs) do
+			local swing = math.sin(t * 9 + (if i % 2 == 0 then math.pi else 0)) * 0.5
+			leg.CFrame = cf * CFrame.new(leg:GetAttribute("x") :: number, 1.2, leg:GetAttribute("z") :: number) * CFrame.Angles(swing, 0, 0)
+		end
+		tail.CFrame = cf * CFrame.new(0, 3.2, 2.4) * CFrame.Angles(0.6, math.sin(t * 16) * 0.7, 0) * CFrame.new(0, 0, 0.6)
+	end
+end
+
+-- Bees buzzing in loops over the lawn's flowers.
+CRITTERS.grass = function(f: Folder, o: Vector3, rng: Random)
+	local bees = {}
+	for i = 1, 4 do
+		local body = ball(f, o, Vector3.new(1.1, 1.1, 1.6), rgb(255, 200, 30))
+		local stripe = piece(f, { Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.35, 1.15, 1.15), CFrame = CFrame.new(o), Color = rgb(30, 25, 30) })
+		local wl = ball(f, o, Vector3.new(1.2, 0.1, 0.8), rgb(230, 245, 255))
+		local wr = ball(f, o, Vector3.new(1.2, 0.1, 0.8), rgb(230, 245, 255))
+		wl.Transparency, wr.Transparency = 0.35, 0.35
+		table.insert(bees, { body = body, stripe = stripe, wl = wl, wr = wr, a0 = rng:NextNumber() * 6.28, r = 64 + i * 2, speed = 0.25 + i * 0.05 })
+	end
+	return function(t: number)
+		for _, b in ipairs(bees) do
+			local a = b.a0 + t * b.speed + math.sin(t * 2 + b.a0) * 0.15
+			local pos = o + Vector3.new(math.cos(a) * b.r + math.sin(t * 3 + b.a0) * 2, 3.5 + math.sin(t * 4 + b.a0) * 1.2, math.sin(a) * b.r)
+			local cf = CFrame.lookAt(pos, pos + Vector3.new(-math.sin(a), 0, math.cos(a)))
+			b.body.CFrame = cf
+			b.stripe.CFrame = cf * CFrame.Angles(0, math.pi / 2, 0)
+			local flap = math.sin(t * 40) * 0.5
+			b.wl.CFrame = cf * CFrame.new(-0.6, 0.6, 0) * CFrame.Angles(0, 0, 0.4 + flap)
+			b.wr.CFrame = cf * CFrame.new(0.6, 0.6, 0) * CFrame.Angles(0, 0, -0.4 - flap)
+		end
+	end
+end
+
+-- Crabs scuttling sideways along the beach, claws snapping.
+CRITTERS.sand = function(f: Folder, o: Vector3, rng: Random)
+	local crabs = {}
+	for i = 1, 3 do
+		local red = rgb(240, 90, 60)
+		local parts = { ball(f, o + Vector3.new(0, 0.9, 0), Vector3.new(3, 1.4, 2.2), red) }
+		for _, sd in ipairs({ -1, 1 }) do
+			table.insert(parts, ball(f, o + Vector3.new(sd * 0.6, 1.9, -0.8), Vector3.new(0.45, 0.45, 0.45), rgb(255, 255, 255)))
+			table.insert(parts, ball(f, o + Vector3.new(sd * 0.6, 2, -1), Vector3.new(0.22, 0.22, 0.22), rgb(20, 20, 25)))
+			for k = 1, 3 do
+				table.insert(parts, piece(f, { Size = Vector3.new(1.4, 0.25, 0.25), CFrame = CFrame.new(o + Vector3.new(sd * 1.8, 0.5, -0.6 + k * 0.5)) * CFrame.Angles(0, 0, sd * 0.5), Color = red }))
+			end
+		end
+		local claws = { ball(f, o, Vector3.new(1, 0.7, 0.9), red), ball(f, o, Vector3.new(1, 0.7, 0.9), red) }
+		table.insert(crabs, { move = group(o, parts), claws = claws, a0 = i / 3 * math.pi * 2 + rng:NextNumber() * 0.5 })
+	end
+	return function(t: number)
+		for _, c in ipairs(crabs) do
+			-- Back and forth along a stretch of the shore, side-on.
+			local a = c.a0 + math.sin(t * 0.35 + c.a0) * 0.35
+			local pos = o + Vector3.new(math.cos(a) * 68, 0, math.sin(a) * 68)
+			local cf = CFrame.lookAt(pos, o * Vector3.new(1, 0, 1) + Vector3.new(0, pos.Y, 0)) * CFrame.new(0, math.abs(math.sin(t * 14)) * 0.12, 0)
+			c.move(cf)
+			for k, claw in ipairs(c.claws) do
+				local sd = if k == 1 then -1 else 1
+				claw.CFrame = cf * CFrame.new(sd * 1.5, 1.2, -1.4) * CFrame.Angles(math.sin(t * 6 + k) * 0.4, 0, 0)
+			end
+		end
+	end
+end
+
+-- Penguins waddling in a line round the frozen lake, now and then sliding on their bellies.
+CRITTERS.ice = function(f: Folder, o: Vector3, _rng: Random)
+	local pens = {}
+	for i = 1, 3 do
+		local parts = {
+			ball(f, o + Vector3.new(0, 2.2, 0), Vector3.new(2.6, 3.8, 2.4), rgb(30, 32, 45)),
+			ball(f, o + Vector3.new(0, 2, -0.6), Vector3.new(1.9, 2.9, 1.4), rgb(250, 250, 255)),
+			ball(f, o + Vector3.new(0, 4.3, -0.2), Vector3.new(1.9, 1.8, 1.9), rgb(30, 32, 45)),
+			ball(f, o + Vector3.new(0, 4.2, -1.2), Vector3.new(0.6, 0.4, 0.8), rgb(255, 160, 40)),
+			ball(f, o + Vector3.new(-0.45, 4.6, -0.95), Vector3.new(0.35, 0.35, 0.35), rgb(255, 255, 255)),
+			ball(f, o + Vector3.new(0.45, 4.6, -0.95), Vector3.new(0.35, 0.35, 0.35), rgb(255, 255, 255)),
+			ball(f, o + Vector3.new(-0.6, 0.25, -0.6), Vector3.new(0.9, 0.3, 1.2), rgb(255, 160, 40)),
+			ball(f, o + Vector3.new(0.6, 0.25, -0.6), Vector3.new(0.9, 0.3, 1.2), rgb(255, 160, 40)),
+		}
+		table.insert(pens, { move = group(o, parts), lag = i * 0.075 })
+	end
+	return function(t: number)
+		for _, p in ipairs(pens) do
+			local tt = t - p.lag * 8
+			local cf = roundPath(o, -0.12, 2.5)(tt)
+			-- Every so often they flop down and slide.
+			local slide = math.sin(tt * 0.5) > 0.85
+			if slide then
+				p.move(cf * CFrame.new(0, -1.2, 0) * CFrame.Angles(-1.35, 0, 0) * CFrame.new(0, 0, 0))
+			else
+				p.move(cf * CFrame.Angles(0, 0, math.sin(tt * 8) * 0.18))
+			end
+		end
+	end
+end
+
+-- A toy dump truck rumbling round the pit, bed tipping now and then.
+CRITTERS.gravel = function(f: Folder, o: Vector3, _rng: Random)
+	local yellow = rgb(255, 195, 30)
+	local parts = {
+		piece(f, { Size = Vector3.new(4, 1, 8), CFrame = CFrame.new(o + Vector3.new(0, 1.6, 0)), Color = rgb(60, 60, 70) }),
+		piece(f, { Size = Vector3.new(3.8, 2.6, 2.6), CFrame = CFrame.new(o + Vector3.new(0, 3.3, -2.6)), Color = yellow }),
+		piece(f, { Size = Vector3.new(3.2, 1.2, 0.2), CFrame = CFrame.new(o + Vector3.new(0, 3.8, -3.95)), Color = rgb(150, 220, 255) }),
+	}
+	for _, w in ipairs(wheelSet(f, o, 2.1, 2.6, 1.1)) do
+		table.insert(parts, w)
+	end
+	local bed = piece(f, { Size = Vector3.new(3.8, 2, 4.6), CFrame = CFrame.new(o), Color = yellow })
+	local load = ball(f, o, Vector3.new(3.2, 1.6, 3.8), rgb(150, 140, 125))
+	local move = group(o, parts)
+	local path = roundPath(o, 0.16, 4)
+	return function(t: number)
+		local cf = path(t) * CFrame.new(0, math.sin(t * 13) * 0.06, 0)
+		move(cf)
+		local tip = math.max(0, math.sin(t * 0.4)) ^ 6 * 0.6
+		local hinge = cf * CFrame.new(0, 2.1, 3.9) * CFrame.Angles(tip, 0, 0)
+		bed.CFrame = hinge * CFrame.new(0, 1, -2.3)
+		load.CFrame = hinge * CFrame.new(0, 2.1, -2.3)
+	end
+end
+
+-- A golf cart puttering round the course.
+CRITTERS.minigolf = function(f: Folder, o: Vector3, _rng: Random)
+	local parts = {
+		piece(f, { Size = Vector3.new(4, 1.4, 6.4), CFrame = CFrame.new(o + Vector3.new(0, 1.5, 0)), Color = rgb(255, 255, 255) }),
+		piece(f, { Size = Vector3.new(3.6, 1, 2.2), CFrame = CFrame.new(o + Vector3.new(0, 2.6, 0.8)), Color = rgb(235, 60, 70) }),
+		piece(f, { Size = Vector3.new(4.2, 0.3, 4.6), CFrame = CFrame.new(o + Vector3.new(0, 6, 0)), Color = rgb(60, 180, 90) }),
+	}
+	for _, x in ipairs({ -1.8, 1.8 }) do
+		for _, z in ipairs({ -1.8, 1.8 }) do
+			table.insert(parts, piece(f, { Size = Vector3.new(0.25, 3.6, 0.25), CFrame = CFrame.new(o + Vector3.new(x, 4.1, z)), Color = rgb(220, 220, 230) }))
+		end
+	end
+	for _, w in ipairs(wheelSet(f, o, 2, 2.2, 0.8)) do
+		table.insert(parts, w)
+	end
+	table.insert(parts, piece(f, { Shape = Enum.PartType.Cylinder, Size = Vector3.new(2.6, 1, 1), CFrame = CFrame.new(o + Vector3.new(0, 3, 3)) * CFrame.Angles(0, 0, math.pi / 2), Color = rgb(80, 120, 220) }))
+	local move = group(o, parts)
+	local path = roundPath(o, -0.18, 0.5)
+	return function(t: number)
+		move(path(t) * CFrame.new(0, math.abs(math.sin(t * 7)) * 0.1, 0))
+	end
+end
+Skies.CRITTERS = CRITTERS
+
 --- Dress this client's sky for the field `arenaId` around `origin`.
 function Skies.enter(arenaId: string, origin: Vector3)
 	if Skies.current == arenaId .. tostring(origin) then
@@ -411,7 +632,19 @@ function Skies.enter(arenaId: string, origin: Vector3)
 	f.Parent = Workspace
 	folder = f
 	Skies.pieces = 0
-	local update = BUILD[arenaId] and BUILD[arenaId](f, origin, Random.new(math.floor(origin.X + origin.Z)))
+	local rng = Random.new(math.floor(origin.X + origin.Z))
+	local skyUpdate = BUILD[arenaId] and BUILD[arenaId](f, origin, rng)
+	local critUpdate = CRITTERS[arenaId] and CRITTERS[arenaId](f, origin, rng)
+	local update = if skyUpdate or critUpdate
+		then function(t: number)
+			if skyUpdate then
+				skyUpdate(t)
+			end
+			if critUpdate then
+				critUpdate(t)
+			end
+		end
+		else nil
 	if update then
 		local t = 0
 		local tick = if RunService:IsClient() then RunService.RenderStepped else RunService.Heartbeat
