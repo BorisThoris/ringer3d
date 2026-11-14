@@ -1,1 +1,1 @@
-2026-11-14 00:51:34.588 E  App[5344:5679] [com.apple.TextInputUI:CandidateGeneration] Attempted to update accumulator from source type: 0, after completion has already been called for token:[29A09AF4]. This is an error and will be ignored.
+2026-11-14 12:03:40.081 E  App[5543:55e6] [com.apple.TextInputUI:CandidateGeneration] Attempted to update accumulator from source type: 0, after completion has already been called for token:[DBB8C7C6]. This is an error and will be ignored.
