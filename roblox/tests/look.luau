@@ -303,6 +303,24 @@ if world then
 end
 check("the lobby park is built", world ~= nil and world:FindFirstChild("Rainbow") ~= nil and world:FindFirstChild("Clouds") ~= nil)
 check("4 bouncy mushrooms and 2 fountains", caps == 4 and fountains == 2, caps .. " " .. fountains)
+local edgeWalls = 0
+if world and world:FindFirstChild("Edge") then
+	for _, w in ipairs(world.Edge:GetChildren()) do
+		if w.Name == "EdgeWall" and w.CanCollide and w.Transparency == 1 then
+			edgeWalls += 1
+		end
+	end
+end
+check("an invisible wall rings the park, with a lid", edgeWalls == 72 and world.Edge:FindFirstChild("EdgeLid") ~= nil, edgeWalls)
+check("pastel mist drifts at the park's edge", world ~= nil and #world:GetChildren() > 0 and (function()
+	local n = 0
+	for _, d in ipairs(world:GetChildren()) do
+		if d.Name == "Mist" then
+			n += 1
+		end
+	end
+	return n == 16
+end)())
 local hillVox = workspace.Terrain:ReadVoxels(Region3.new(Vector3.new(160, 4, -4), Vector3.new(300, 8, 4)):ExpandToGrid(4), 4)
 local hillCells = 0
 for x = 1, hillVox.Size.X do

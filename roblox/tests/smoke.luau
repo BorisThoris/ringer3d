@@ -42,6 +42,8 @@ check("server script runs", booted, bootErr)
 task.wait(2)
 check("remotes created", Ringer:FindFirstChild("Remotes") ~= nil)
 check("lobby built", workspace:FindFirstChild("Lobby") ~= nil)
+local mascotBody = workspace:FindFirstChild("Lobby") and workspace.Lobby:FindFirstChild("Mascot") and workspace.Lobby.Mascot:FindFirstChild("Body")
+check("the mascot has a solid body you can see", mascotBody ~= nil and mascotBody.Transparency == 0 and mascotBody.Size.X >= 12, mascotBody and mascotBody.Transparency)
 
 -- 3. Rules.
 local cross = Rules.startingCross()

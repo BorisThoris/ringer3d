@@ -109,7 +109,9 @@ local function clouds(parent: Instance, rng: Random)
 		for k = 1, n do
 			local s = rng:NextNumber(12, 22)
 			local off = Vector3.new((k - n / 2) * s * 0.55, rng:NextNumber(-2, 4), rng:NextNumber(-5, 5))
-			local c = ball(model, at + off, Vector3.new(s * 1.2, s * 0.8, s), rgb(255, 255, 255), "Puff")
+			-- Mostly white, some candy-tinted: pink, lilac, peach.
+			local tint = ({ rgb(255, 255, 255), rgb(255, 255, 255), rgb(255, 228, 242), rgb(236, 228, 255), rgb(255, 238, 222) })[i % 5 + 1]
+			local c = ball(model, at + off, Vector3.new(s * 1.2, s * 0.8, s), tint, "Puff")
 			c.CastShadow = false
 		end
 	end
@@ -304,6 +306,50 @@ local function butterflies(parent: Instance)
 	e.Parent = p
 end
 
+-- The park's edge: a ring of walls nobody can see or climb, out on the lawn before the hills.
+LobbyWorld.EDGE_R = 135
+local function edge(parent: Instance)
+	local folder = Instance.new("Folder")
+	folder.Name = "Edge"
+	local n = 72
+	local r = LobbyWorld.EDGE_R
+	local len = 2 * math.pi * r / n * 1.1
+	for i = 0, n - 1 do
+		local a = i / n * math.pi * 2
+		local at = Vector3.new(math.cos(a) * r, 60, math.sin(a) * r)
+		part(folder, { Name = "EdgeWall", Size = Vector3.new(len, 160, 4), CFrame = CFrame.lookAt(at, Vector3.new(0, 60, 0)), Transparency = 1, CanCollide = true, CastShadow = false })
+	end
+	-- A lid, so nobody bounces over from a mushroom.
+	part(folder, { Name = "EdgeLid", Size = Vector3.new(2 * r + 20, 4, 2 * r + 20), CFrame = CFrame.new(0, 142, 0), Transparency = 1, CanCollide = true, CastShadow = false })
+	folder.Parent = parent
+end
+
+-- Dreamy pastel mist drifting along the park's edge: it softens where the lawn meets the hills
+-- and hides the walls' line.
+local function mist(parent: Instance)
+	local colors = { rgb(255, 205, 235), rgb(220, 205, 255), rgb(200, 240, 230), rgb(255, 230, 200) }
+	for i = 0, 15 do
+		local a = i / 16 * math.pi * 2
+		local at = Vector3.new(math.cos(a) * 132, 5, math.sin(a) * 132)
+		local p = part(parent, { Name = "Mist", Size = Vector3.new(44, 6, 18), CFrame = CFrame.lookAt(at, Vector3.new(0, 5, 0)), Transparency = 1 })
+		local e = Instance.new("ParticleEmitter")
+		e.Shape = Enum.ParticleEmitterShape.Box
+		e.Texture = "rbxasset://textures/particles/smoke_main.dds"
+		local c = colors[i % #colors + 1]
+		e.Color = ColorSequence.new(c, Color3.new(1, 1, 1))
+		e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 10), NumberSequenceKeypoint.new(1, 22) })
+		e.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.35, 0.72), NumberSequenceKeypoint.new(0.7, 0.75), NumberSequenceKeypoint.new(1, 1) })
+		e.Lifetime = NumberRange.new(9, 13)
+		e.Rate = 1.6
+		e.Speed = NumberRange.new(0.6, 1.4)
+		e.SpreadAngle = Vector2.new(180, 20)
+		e.RotSpeed = NumberRange.new(-8, 8)
+		e.Rotation = NumberRange.new(0, 360)
+		e.LightInfluence = 0.4
+		e.Parent = p
+	end
+end
+
 function LobbyWorld.build(lobby: Instance)
 	local rng = Random.new(31)
 	local world = Instance.new("Folder")
@@ -325,6 +371,8 @@ function LobbyWorld.build(lobby: Instance)
 		balloons(world, Vector3.new(x, 0, 45), rng)
 	end
 	butterflies(world)
+	edge(world)
+	mist(world)
 	world.Parent = lobby
 	return world
 end

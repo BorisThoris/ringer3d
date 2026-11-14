@@ -178,21 +178,27 @@ end
 local mascot = Instance.new("Model")
 mascot.Name = "Mascot"
 mascot.Parent = lobby
-local body = MarbleLook.make(MarbleLook.lookFor(mythicVoid), 7)
--- The mascot wears its Void's colours as plain glass: a face reads better than a phenomenon.
-body.Material = Enum.Material.Glass
-body.Transparency = 0.3
-for _, d in ipairs(body:GetChildren()) do
-	if d:IsA("Highlight") or d:IsA("Sparkles") or d:IsA("Part") then
-		d:Destroy()
-	end
-end
-body.Anchored = true
-body.CFrame = CFrame.new()
+-- A solid, glossy candy marble: see-through glass this big against the sky reads as nothing at
+-- all (players saw only floating eyes), so it is opaque, bright and polka-dotted.
+local _ = mythicVoid
+local body = lobbyPart({ Name = "Body", Shape = Enum.PartType.Ball, Size = Vector3.new(14, 14, 14), CFrame = CFrame.new(), Color = rgb(176, 128, 255), Reflectance = 0.06, CanCollide = false })
 body.Parent = mascot
 local function facePart(props)
 	return lobbyPart(props, mascot)
 end
+-- Polka dots round the back and sides (none on the face), and a gloss highlight up top.
+local dotColors = { rgb(255, 120, 200), rgb(255, 220, 80), rgb(110, 220, 255), rgb(130, 240, 150), rgb(255, 255, 255) }
+local dotRng = Random.new(5)
+local placed = 0
+while placed < 16 do
+	local d = Vector3.new(dotRng:NextNumber(-1, 1), dotRng:NextNumber(-0.8, 1), dotRng:NextNumber(-1, 1))
+	if d.Magnitude > 0.2 and d.Unit.Z < 0.35 then
+		placed += 1
+		local s = dotRng:NextNumber(2, 3.2)
+		facePart({ Name = "Dot", Shape = Enum.PartType.Ball, Size = Vector3.new(s, s, s), CFrame = CFrame.new(d.Unit * (7 - s * 0.38)), Color = dotColors[placed % #dotColors + 1], CanCollide = false })
+	end
+end
+facePart({ Name = "Gloss", Shape = Enum.PartType.Ball, Size = Vector3.new(2.6, 2.6, 2.6), CFrame = CFrame.new(Vector3.new(-0.45, 0.75, 0.5).Unit * 6.2), Color = rgb(255, 255, 255), Material = Enum.Material.Neon, Transparency = 0.25, CanCollide = false })
 for _, side in ipairs({ -1, 1 }) do
 	facePart({ Name = "Eye", Shape = Enum.PartType.Ball, Size = Vector3.new(3.4, 3.8, 3.4), CFrame = CFrame.new(side * 2.4, 1.6, 6.1), Color = rgb(255, 255, 255), CanCollide = false })
 	facePart({ Name = "Pupil", Shape = Enum.PartType.Ball, Size = Vector3.new(2, 2.3, 2), CFrame = CFrame.new(side * 2.4, 1.4, 7.4), Color = rgb(25, 20, 35), CanCollide = false })
@@ -791,6 +797,21 @@ Players.PlayerRemoving:Connect(function(player)
 		tbl:lose(player)
 	end
 	active[player] = nil
+end)
+
+-- A safety net: anyone in the lobby who somehow falls out of the world lands back on the spawn.
+task.spawn(function()
+	while true do
+		task.wait(1)
+		for _, p in ipairs(Players:GetPlayers()) do
+			local char = p.Character
+			local root = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
+			if root and not active[p] and root.Position.Y < -30 then
+				char:PivotTo(CFrame.new(0, 5, 38))
+				root.AssemblyLinearVelocity = Vector3.zero
+			end
+		end
+	end
 end)
 
 Data.start()
