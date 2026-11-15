@@ -8,7 +8,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const SUITES = process.argv.slice(2).length ? process.argv.slice(2) : ['smoke', 'look', 'client', 'marbles', 'race', 'sim'];
+const SUITES = process.argv.slice(2).length ? process.argv.slice(2) : ['smoke', 'look', 'client', 'marbles', 'race', 'sim', 'playthrough'];
 const run = (args, env = {}) =>
   execFileSync(process.execPath, args, { cwd: root, encoding: 'utf8', env: { ...process.env, ...env }, maxBuffer: 64 * 1024 * 1024 });
 
@@ -26,7 +26,10 @@ for (const suite of SUITES) {
   let out = '';
   let ok = false;
   try {
-    out = run(['roblox/scripts/run-luau.mjs', `roblox/tests/${suite}.luau`, version], { LUAU_TIMEOUT: '300s' });
+    // The playthrough suite is the simulation report with its gate (scripts/race-report.mjs).
+    out = suite === 'playthrough'
+      ? run(['roblox/scripts/race-report.mjs', version]) + '\nstate COMPLETE'
+      : run(['roblox/scripts/run-luau.mjs', `roblox/tests/${suite}.luau`, version], { LUAU_TIMEOUT: '300s' });
     // A suite passes when its task completes, nothing printed FAIL, and it returned PASS (or,
     // for the parity suites, says its parity holds).
     ok = /state COMPLETE/.test(out) && !/\bFAIL\b/.test(out.replace(/"results":\[.*$/s, ''));
