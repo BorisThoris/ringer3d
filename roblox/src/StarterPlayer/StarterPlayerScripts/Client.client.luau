@@ -48,11 +48,11 @@ local function toast(text: string, kind: string?)
 end
 
 local function ask(action: string, args: any?)
-	local ok, a, b = pcall(Request.InvokeServer, Request, action, args)
+	local ok, a, b, c = pcall(Request.InvokeServer, Request, action, args)
 	if not ok then
 		return false, "Couldn't reach the server."
 	end
-	return a, b
+	return a, b, c
 end
 
 -- The stats overlay (F3 / 📊): frame rate, ping, memory, and the per-shot replay check.
@@ -828,6 +828,13 @@ local function refreshQuests()
 		end, { Size = UDim2.fromOffset(140, 56), Position = UDim2.new(1, -152, 0.5, -28), Parent = row })
 		btn.AutoButtonColor = done and not q.claimed
 	end
+	local claimed = 0
+	for _, q in ipairs(list) do
+		if q.claimed then
+			claimed += 1
+		end
+	end
+	Kit.label(if claimed == #list then "🎁 All done today! Come back tomorrow for three new quests." else string.format("🎁 Finish all %d for a +100 coin bonus (%d / %d)", #list, claimed, #list), 20, { Size = UDim2.new(1, 0, 0, 30), Parent = questBody })
 end
 -- The downhill race (ClientModules/RaceClient).
 local RaceClient = require(Modules.RaceClient)
