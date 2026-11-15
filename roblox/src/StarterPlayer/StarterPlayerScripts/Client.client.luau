@@ -1019,8 +1019,9 @@ task.spawn(function()
 	if typeof(info) == "table" and info.wheel then
 		spinInfo, spinAt = info, os.clock()
 		drawWheel(info.wheel)
-		-- Ready on arrival: open the wheel once.
-		if spinLeft() <= 0 then
+		-- Ready on arrival: open the wheel once. Not on a first visit: then the welcome and the
+		-- first game come first, and the button's "!" waits for them.
+		if spinLeft() <= 0 and not newbie() then
 			show("spin")
 		end
 		-- Ask once, ever, six minutes into a session, to favourite the game. No reward: paying
