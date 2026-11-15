@@ -748,7 +748,8 @@ function handlers.claimQuest(player: Player, id)
 	if typeof(id) ~= "string" then
 		return false, "Which quest?"
 	end
-	return Social.claim(player, id)
+	local ok, got, bonus = Social.claim(player, id)
+	return ok, got, bonus
 end
 
 function handlers.equip(player: Player, id)

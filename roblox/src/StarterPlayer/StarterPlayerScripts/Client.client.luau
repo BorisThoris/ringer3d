@@ -811,12 +811,16 @@ local function refreshQuests()
 			if not done or q.claimed then
 				return
 			end
-			local ok2, got = ask("claimQuest", q.id)
+			local ok2, got, bonus = ask("claimQuest", q.id)
 			if ok2 then
 				Sfx.play("coin_fly", 0.8)
 				local vp = workspace.CurrentCamera.ViewportSize
-				Rewards.coinsFly(Vector2.new(vp.X / 2, vp.Y / 2), got)
-				toast(string.format("Quest done! +%d coins", got), "good")
+				Rewards.coinsFly(Vector2.new(vp.X / 2, vp.Y / 2), got + (tonumber(bonus) or 0))
+				if tonumber(bonus) then
+					toast(string.format("All quests done! +%d coins and a +%d bonus", got, bonus), "good")
+				else
+					toast(string.format("Quest done! +%d coins", got), "good")
+				end
 				refreshQuests()
 			else
 				toast(typeof(got) == "string" and got or "Couldn't claim.", "bad")

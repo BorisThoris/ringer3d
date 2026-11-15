@@ -257,7 +257,23 @@ function Social.quest(player: Player, stat: string, amount: number, key: string?
 	end)
 end
 
---- Claim a finished quest's coins. (ok, coins or why)
+--- Finish all of today's quests for a bonus chest on top.
+Social.ALL_QUESTS_BONUS = 100
+
+--- Whether every quest in a day's list has been claimed (and the list isn't empty).
+function Social.allClaimed(list: { any }): boolean
+	if #list == 0 then
+		return false
+	end
+	for _, e in ipairs(list) do
+		if not e.claimed then
+			return false
+		end
+	end
+	return true
+end
+
+--- Claim a finished quest's coins. (ok, coins or why, bonus coins when this was the last one)
 function Social.claim(player: Player, id: string): (boolean, any)
 	local p = Data.get(player)
 	local q = BY_ID[id]
@@ -275,7 +291,13 @@ function Social.claim(player: Player, id: string): (boolean, any)
 			Data.update(player, function()
 				e.claimed = true
 			end)
-			return true, Economy.give(player, q.reward, "quest:" .. id)
+			local got = Economy.give(player, q.reward, "quest:" .. id)
+			if Social.allClaimed(p.quests.list) then
+				local bonus = Economy.give(player, Social.ALL_QUESTS_BONUS, "quest:all")
+				Social.announce(string.format("📜 %s finished all of today's quests!", player.DisplayName), Color3.fromRGB(140, 220, 255))
+				return true, got, bonus
+			end
+			return true, got
 		end
 	end
 	return false, "That quest isn't one of today's."

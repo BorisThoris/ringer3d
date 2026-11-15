@@ -82,6 +82,11 @@ for _, q in ipairs(Social.QUESTS) do
 	end
 end
 check("a pool of daily quests, each with a goal and a reward", questsOk, #Social.QUESTS)
+check("the all-quests bonus only once every quest is claimed",
+	Social.ALL_QUESTS_BONUS > 0
+		and not Social.allClaimed({})
+		and not Social.allClaimed({ { claimed = true }, { claimed = false }, { claimed = true } })
+		and Social.allClaimed({ { claimed = true }, { claimed = true }, { claimed = true } }))
 local giftFake = { UserId = 2 } :: any
 local gifts = Social.gifts(giftFake)
 local okEarly, whyEarly = Social.claimGift(giftFake, 1)
