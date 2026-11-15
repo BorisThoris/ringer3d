@@ -411,4 +411,14 @@ Config.BADGES = {
 	sweep = idOf("badges", "sweep"), -- capture all 13 in one game
 }
 
+-- The weekend event: double coins all Saturday and Sunday (UTC), for everyone. Shared so the
+-- server's multiplier and the client's banner agree. Returns the event's name and multiplier.
+function Config.event(t: number): (string?, number)
+	local day = (math.floor(t / 86400) + 4) % 7 -- 1 Jan 1970 was a Thursday: 0 is Sunday
+	if day == 0 or day == 6 then
+		return "WEEKEND DOUBLE COINS", 2
+	end
+	return nil, 1
+end
+
 return Config

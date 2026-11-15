@@ -87,6 +87,15 @@ local gifts = Social.gifts(giftFake)
 local okEarly, whyEarly = Social.claimGift(giftFake, 1)
 check("six playtime gifts, none opens early", #gifts == 6 and gifts[1].left > 0 and not okEarly and whyEarly == "Not yet!", whyEarly)
 
+-- The weekend event: Saturday and Sunday (UTC) only. Noon on Fri 13, Sat 14, Sun 15, Mon 16 Nov 2026.
+do
+	local fri = Config.event(1794571200)
+	local sat, satMult = Config.event(1794657600)
+	local sun = Config.event(1794744000)
+	local mon, monMult = Config.event(1794830400)
+	check("double coins on Saturday and Sunday only", fri == nil and sat ~= nil and satMult == 2 and sun ~= nil and mon == nil and monMult == 1)
+end
+
 -- Flex: auras by level tier, codes once each, the friend boost capped.
 do
 	local Flex = require(game.ServerScriptService.Server.Flex)

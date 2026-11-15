@@ -137,6 +137,18 @@ Juice.gui = screen
 -- The live event, under the coins.
 local event = Kit.label(string.format("✨ NEW: every Marble Bag mints a one-of-a-kind marble · %.1f%% hold a phenomenon", Forge.phenomenonOdds()), 20, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 62), Size = UDim2.fromOffset(620, 28), TextColor3 = Color3.fromRGB(255, 170, 60), Parent = hud })
 event.TextWrapped = false
+-- The weekend event (Config.event) takes over the line while it runs, by the server's clock.
+do
+	local plain, plainColour = event.Text, event.TextColor3
+	task.spawn(function()
+		while event.Parent do
+			local name = Config.event(workspace:GetServerTimeNow())
+			event.Text = if name then ("🎉 " .. name .. " · all weekend, every coin you earn x2!") else plain
+			event.TextColor3 = if name then Color3.fromRGB(120, 255, 140) else plainColour
+			task.wait(30)
+		end
+	end)
+end
 
 local side = Kit.new("Frame", { AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 12, 0.5, 30), Size = UDim2.fromOffset(150, 480), BackgroundTransparency = 1, Parent = hud })
 Kit.new("UIListLayout", { Padding = UDim.new(0, 10), Parent = side })
