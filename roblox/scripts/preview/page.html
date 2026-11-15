@@ -105,8 +105,33 @@ for (const [shape, p, r, s, c, t, mat] of dump.parts || []) {
   scene.add(mesh);
 }
 
-// Terrain columns, instanced per material.
-if (dump.terrain) {
+// Coarse terrain (the race's mountain, read every 24 studs) as a smooth surface: one vertex per
+// column top, coloured by its material, two triangles per square of four columns.
+if (dump.terrain && dump.terrain.cellY) {
+  const T = dump.terrain;
+  const top = new Map();
+  for (const [xi, zi, yi, name] of T.cols) top.set(xi * 100000 + zi, [T.min[1] + yi * T.cellY, T.colors[name] || [120, 120, 120]]);
+  const pos = [], col = [];
+  const vert = (xi, zi) => {
+    const [y, c] = top.get(xi * 100000 + zi);
+    pos.push(T.min[0] + (xi - 0.5) * T.cell, y, T.min[2] + (zi - 0.5) * T.cell);
+    col.push(...c.map((v) => Math.pow(v / 255, 2.2)));
+  };
+  for (const key of top.keys()) {
+    const xi = Math.floor(key / 100000), zi = key - xi * 100000;
+    const q = [[xi, zi], [xi + 1, zi], [xi + 1, zi + 1], [xi, zi + 1]];
+    if (!q.every(([a, b]) => top.has(a * 100000 + b))) continue;
+    for (const k of [0, 2, 1, 0, 3, 2]) vert(...q[k]);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  geo.computeVertexNormals();
+  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, side: THREE.DoubleSide }));
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+} else if (dump.terrain) {
+  // Terrain columns, instanced per material.
   const T = dump.terrain;
   const byMat = new Map();
   for (const [xi, zi, yi, name] of T.cols) {

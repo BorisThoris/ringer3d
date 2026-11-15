@@ -78,6 +78,27 @@ if okB then
 	end
 end
 check("the mountain is built: track, gates, scenery", okB and parts > 5000 and gates >= #c.checkpoints + 1, if okB then string.format("%d parts, %d gates", parts, gates) else built)
+-- The mountain is terrain round the track: it must never cover it (the spiral and corkscrew pass
+-- over themselves).
+do
+	local T = workspace.Terrain
+	local over = 0
+	for _, path in pairs(c.paths) do
+		for i = 1, #path.frames, 6 do
+			local f = path.frames[i]
+			if f.floor then
+				for _, u in ipairs({ -f.w / 2 + 1, 0, f.w / 2 - 1 }) do
+					local p = RaceTrack.world(f, u, 3)
+					local _, o = T:ReadVoxels(Region3.new(p - Vector3.new(2, 2, 2), p + Vector3.new(2, 2, 2)):ExpandToGrid(4), 4)
+					if o[1][1][1] > 0.3 then
+						over += 1
+					end
+				end
+			end
+		end
+	end
+	check("terrain never covers the track", over == 0, over)
+end
 local fake = { UserId = 1, DisplayName = "Tester", Character = nil, Parent = game, SetAttribute = function() end, GetAttribute = function() return nil end }
 local okS = pcall(Race.start, fake :: any)
 local _, logC = RaceSim.runBot(0, false)

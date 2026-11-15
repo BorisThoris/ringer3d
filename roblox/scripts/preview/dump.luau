@@ -153,11 +153,13 @@ if PART == "parts" then
 	out.parts = parts
 else
 	local T = workspace.Terrain
+	-- The server sets the game's terrain palette at start; a cloud task runs no scripts, so set it here.
+	require(game.ReplicatedStorage.Ringer.TerrainColors).apply(T)
 	if SCENE:sub(1, 5) == "race:" then
 		-- A mountain is too big to read whole: read one thin column of voxels every 24 studs (cloud
 		-- tasks don't run physics, so raycasts don't hit terrain there).
-		local cell = 24
-		local R = 1500
+		local cell = 48
+		local R = 3600
 		local cols, colors = {}, {}
 		local n = math.floor(R * 2 / cell)
 		for xi = 1, n do

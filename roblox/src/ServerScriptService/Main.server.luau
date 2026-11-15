@@ -111,10 +111,7 @@ disc("Lawn", 110, -1.1, rgb(85, 200, 75), 2)
 -- Bright toy-box terrain colours, and grass you can see blowing: kids first.
 do
 	local T = workspace.Terrain
-	T:SetMaterialColor(Enum.Material.Grass, rgb(96, 205, 70))
-	T:SetMaterialColor(Enum.Material.Sand, rgb(240, 214, 150))
-	T:SetMaterialColor(Enum.Material.Snow, rgb(245, 250, 255))
-	T:SetMaterialColor(Enum.Material.Ground, rgb(150, 132, 110))
+	require(game:GetService("ReplicatedStorage").Ringer.TerrainColors).apply(T)
 	pcall(function()
 		(T :: any).Decoration = true
 	end)

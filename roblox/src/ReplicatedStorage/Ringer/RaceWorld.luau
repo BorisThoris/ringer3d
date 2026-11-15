@@ -100,8 +100,16 @@ local function triangle(parent: Instance, a: Vector3, b: Vector3, c: Vector3, co
 	local back = bc.Unit
 	local height = math.abs(ab:Dot(up))
 	local shift = down * (thick / 2)
-	wedge(parent, Vector3.new(thick, height, math.abs(ab:Dot(back))), CFrame.fromMatrix((a + b) / 2 + shift, right, up, back), color, material, name)
-	wedge(parent, Vector3.new(thick, height, math.abs(ac:Dot(back))), CFrame.fromMatrix((a + c) / 2 + shift, -right, up, -back), color, material, name)
+	local s1, c1 = Vector3.new(thick, height, math.abs(ab:Dot(back))), CFrame.fromMatrix((a + b) / 2 + shift, right, up, back)
+	local s2, c2 = Vector3.new(thick, height, math.abs(ac:Dot(back))), CFrame.fromMatrix((a + c) / 2 + shift, -right, up, -back)
+	if parent == Workspace.Terrain then
+		-- The same two wedges, filled in terrain instead of parts.
+		Workspace.Terrain:FillWedge(c1, s1, material)
+		Workspace.Terrain:FillWedge(c2, s2, material)
+		return
+	end
+	wedge(parent, s1, c1, color, material, name)
+	wedge(parent, s2, c2, color, material, name)
 end
 
 local function box(parent: Instance, p: Vector3, q: Vector3, w: number, h: number, upv: Vector3, color: Color3, name: string, material: Enum.Material?)
@@ -363,9 +371,112 @@ local function mountain(folder: Folder, rng: Random, at: Vector3, h: number, sno
 		local high = if snowy then rgb(238 + shade * 0.5, 244 + shade * 0.4, 255) else rgb(124 + shade, 186 + shade, 104 + shade)
 		local lowM = if snowy then Enum.Material.Rock else Enum.Material.Grass
 		local highM = if snowy then Enum.Material.Snow else Enum.Material.Grass
-		triangle(folder, base[k], base[k2], line[k2], low, lowM, 3, inward, "Peak")
-		triangle(folder, base[k], line[k2], line[k], low, lowM, 3, inward, "Peak")
-		triangle(folder, line[k], line[k2], apex, high, highM, 3, inward, "Peak")
+		-- Hills are terrain, the same grass as the valley they rise from; peaks are faceted parts.
+		local into: Instance = if snowy then folder else Workspace.Terrain
+		local thick = if snowy then 3 else 12
+		triangle(into, base[k], base[k2], line[k2], low, lowM, thick, inward, "Peak")
+		triangle(into, base[k], line[k2], line[k], low, lowM, thick, inward, "Peak")
+		triangle(into, line[k], line[k2], apex, high, highM, thick, inward, "Peak")
+	end
+end
+
+--- The mountain itself: one solid heightfield in terrain, standing on the valley floor. Its
+--- height at any point is the highest of the slopes falling away from the track on every side
+--- (0.9 studs down per stud out), so the track always runs along a ridge of its own mountain. Then
+--- it is cut down wherever it would reach a track (the spiral and corkscrew pass over themselves)
+--- and carved into chasms under the jumps and the Ice Bridge. Filled as triangles of terrain
+--- (grass low down, rock on the steep and the high, snow on top). Returns the surface height
+--- at any (x, z) in track space, for placing trees on it.
+local MOUNTAIN_CELL = 56
+local function buildMountain(course: any): (x: number, z: number) -> number
+	local O = RaceTrack.ORIGIN
+	local sources, cuts = {}, {}
+	local minX, minZ, maxX, maxZ = math.huge, math.huge, -math.huge, -math.huge
+	for id, path in pairs(course.paths) do
+		local fs = path.frames
+		for i, f in ipairs(fs) do
+			minX, maxX = math.min(minX, f.x), math.max(maxX, f.x)
+			minZ, maxZ = math.min(minZ, f.z), math.max(maxZ, f.z)
+			local nearGap = false
+			for k = math.max(1, i - 6), math.min(#fs, i + 6) do
+				if not fs[k].floor then
+					nearGap = true
+				end
+			end
+			if not f.floor or id == "bridge" then
+				-- Chasms: deep under the jumps and the bridge.
+				table.insert(cuts, { f.x, f.z, f.y - 160, f.w / 2 + 26 })
+			elseif i % 2 == 1 and not nearGap and not f.roof then
+				table.insert(sources, { f.x, f.z, f.y - 7, f.w / 2 + 6 })
+			end
+			-- Never above any track: under its whole width.
+			table.insert(cuts, { f.x, f.z, f.y - 5, f.w / 2 + 3 })
+		end
+	end
+	local C = MOUNTAIN_CELL
+	local x0, z0 = math.floor((minX - 500) / C) * C, math.floor((minZ - 500) / C) * C
+	local nx, nz = math.ceil((maxX + 500 - x0) / C), math.ceil((maxZ + 500 - z0) / C)
+	local H = {}
+	for i = 0, nx do
+		H[i] = {}
+		for k = 0, nz do
+			local x, z = x0 + i * C, z0 + k * C
+			local h = 0
+			for _, s in ipairs(sources) do
+				local d = math.sqrt((x - s[1]) ^ 2 + (z - s[2]) ^ 2)
+				h = math.max(h, s[3] - 0.9 * math.max(0, d - s[4]))
+			end
+			H[i][k] = h
+		end
+	end
+	-- Cuts lower every corner of the cells a cut touches, so the interpolated surface stays under it.
+	for _, c in ipairs(cuts) do
+		local r = c[4]
+		for i = math.max(0, math.floor((c[1] - r - x0) / C)), math.min(nx, math.ceil((c[1] + r - x0) / C)) do
+			for k = math.max(0, math.floor((c[2] - r - z0) / C)), math.min(nz, math.ceil((c[2] + r - z0) / C)) do
+				H[i][k] = math.max(0, math.min(H[i][k], c[3]))
+			end
+		end
+	end
+	local function point(i: number, k: number): Vector3
+		return O + Vector3.new(x0 + i * C, H[i][k], z0 + k * C)
+	end
+	local function fill(a: Vector3, b: Vector3, c: Vector3)
+		local n = (b - a):Cross(c - a)
+		if n.Magnitude < 1e-6 then
+			return
+		end
+		n = n.Unit
+		if n.Y < 0 then
+			n = -n
+		end
+		local cy = (a.Y + b.Y + c.Y) / 3 - O.Y
+		local mat = if cy > 560 then Enum.Material.Snow
+			elseif n.Y < 0.62 or cy > 360 then Enum.Material.Rock
+			else Enum.Material.Grass
+		triangle(Workspace.Terrain, a, b, c, Color3.new(), mat, 16, -n, "")
+	end
+	for i = 0, nx - 1 do
+		for k = 0, nz - 1 do
+			if math.max(H[i][k], H[i + 1][k], H[i][k + 1], H[i + 1][k + 1]) > 10 then
+				local p00, p10, p01, p11 = point(i, k), point(i + 1, k), point(i, k + 1), point(i + 1, k + 1)
+				fill(p00, p10, p11)
+				fill(p00, p11, p01)
+			end
+		end
+	end
+	return function(x: number, z: number): number
+		local fx, fz = (x - x0) / C, (z - z0) / C
+		local i, k = math.floor(fx), math.floor(fz)
+		if i < 0 or k < 0 or i >= nx or k >= nz then
+			return 0
+		end
+		local u, v = fx - i, fz - k
+		-- The same split as the fill: (00, 10, 11) and (00, 11, 01).
+		if u >= v then
+			return H[i][k] + u * (H[i + 1][k] - H[i][k]) + v * (H[i + 1][k + 1] - H[i + 1][k])
+		end
+		return H[i][k] + v * (H[i][k + 1] - H[i][k]) + u * (H[i + 1][k + 1] - H[i][k + 1])
 	end
 end
 
@@ -376,33 +487,8 @@ local function buildWorld(folder: Folder, course: any, rng: Random)
 	local T = Workspace.Terrain
 	local O = RaceTrack.ORIGIN
 	local main = course.paths.main
-	-- Ridges: balls whose tops sit 7 studs under the track.
-	for id, path in pairs(course.paths) do
-		if id == "bridge" then
-			continue
-		end
-		for i = 1, #path.frames, 10 do
-			local f = path.frames[i]
-			local near = false
-			for k = math.max(1, i - 12), math.min(#path.frames, i + 12) do
-				if not path.frames[k].floor then
-					near = true
-				end
-			end
-			if not near and not f.roof then
-				local r = 46
-				local c = O + Vector3.new(f.x, f.y - r - 7, f.z)
-				T:FillBall(c, r, materialFor(f.y))
-			end
-		end
-	end
-	-- The massif round the summit and the valley floor.
-	T:FillBall(O + Vector3.new(-120, 640, -60), 260, Enum.Material.Rock)
-	T:FillBall(O + Vector3.new(-200, 820, -180), 120, Enum.Material.Snow)
-	T:FillBall(O + Vector3.new(80, 700, -200), 150, Enum.Material.Snow)
-	T:FillBlock(CFrame.new(O + Vector3.new(1300, 5, 1600)), Vector3.new(2600, 10, 1400), Enum.Material.Grass)
-	-- The lake past the finish.
-	T:FillBlock(CFrame.new(O + Vector3.new(2150, 6, 1720)), Vector3.new(420, 12, 520), Enum.Material.Water)
+	local surface = buildMountain(course)
+	-- (The valley floor and the lake are filled at the end, with the ground out to the far peaks.)
 	-- Forests beside the lower track, snowy pines up high; never on the track.
 	for i = 1, #main.frames, 6 do
 		local f = main.frames[i]
@@ -412,8 +498,12 @@ local function buildWorld(folder: Folder, course: any, rng: Random)
 		for _, sd in ipairs({ -1, 1 }) do
 			if rng:NextNumber() < 0.55 then
 				local off = sd * (f.w / 2 + rng:NextNumber(14, 50))
-				local at = O + Vector3.new(f.x + f.rx * off, f.y - 10 - math.abs(off) * 0.25, f.z + f.rz * off)
-				pine(folder, at, rng:NextNumber(22, 38), f.y > 600)
+				local x, z = f.x + f.rx * off, f.z + f.rz * off
+				local y = surface(x, z)
+				-- On the mountain's own slope, and only where that isn't far down a chasm.
+				if y > f.y - 70 then
+					pine(folder, O + Vector3.new(x, y - 1, z), rng:NextNumber(22, 38), y > 560)
+				end
 			end
 		end
 	end
@@ -477,23 +567,26 @@ local function buildWorld(folder: Folder, course: any, rng: Random)
 		local at = O + Vector3.new(900 + math.cos(a) * d, 0, 850 + math.sin(a) * d)
 		if clearOfCourse(at) then
 			placed += 1
-			mountain(folder, rng, at, rng:NextNumber(70, 160), false)
-			for _ = 1, 5 do
-				local off = Vector3.new(rng:NextNumber(-260, 260), 0, rng:NextNumber(-260, 260))
-				pine(folder, at + off, rng:NextNumber(26, 44), false)
+			local h = rng:NextNumber(70, 160)
+			mountain(folder, rng, at, h, false)
+			-- A grove round its foot, out past the hill's own slope so no tree is buried in it.
+			for _ = 1, 6 do
+				local ga = rng:NextNumber() * math.pi * 2
+				local gd = h * 1.6 * 1.2 + rng:NextNumber(10, 90)
+				pine(folder, at + Vector3.new(math.cos(ga) * gd, 10, math.sin(ga) * gd), rng:NextNumber(26, 44), false)
 			end
 		end
 	end
 	-- The valley floor out to the far peaks.
-	-- A 4x4 grid of 2048-stud tiles (a part's largest size) reaching past the peaks, so no view from
-	-- the summit finds the edge of the world.
-	for gx = -2, 1 do
-		for gz = -2, 1 do
-			local c = O + Vector3.new(900 + (gx + 0.5) * 2048, -2, 850 + (gz + 0.5) * 2048)
-			local far = math.max(math.abs(gx + 0.5), math.abs(gz + 0.5)) > 1
-			part(folder, { Name = "Valley", Size = Vector3.new(2048, 4, 2048), CFrame = CFrame.new(c), Color = if far then rgb(132, 178, 110) else rgb(120, 200, 100), Material = Enum.Material.Grass })
+	-- The valley floor, in terrain, out past the far peaks so no view from the summit finds the edge
+	-- of the world; its top is at 10, where the finish village and the foothills stand. Filled in
+	-- 1024-stud tiles. Then the lake past the finish.
+	for gx = -4, 3 do
+		for gz = -4, 3 do
+			T:FillBlock(CFrame.new(O + Vector3.new(900 + (gx + 0.5) * 1024, 6, 850 + (gz + 0.5) * 1024)), Vector3.new(1024, 8, 1024), Enum.Material.Grass)
 		end
 	end
+	T:FillBlock(CFrame.new(O + Vector3.new(2150, 6, 1720)), Vector3.new(420, 12, 520), Enum.Material.Water)
 	-- The finish village: little pastel chalets by the lake.
 	local fin = main.frames[#main.frames]
 	for k = 1, 6 do
