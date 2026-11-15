@@ -38,12 +38,17 @@ export type Path = {
 -- roof, boost, kicker (only shapes the line). `section` names apply from that waypoint on.
 local W = 30
 local MAIN = {
-	-- Summit Drop: a flat start, then a steep plunge off the peak.
-	{ 0, 900, 0, 34, section = "Summit Drop" },
-	{ 50, 900, 0, 34 },
-	{ 110, 892, 0, 32 },
-	{ 200, 850, 0, W },
-	{ 300, 795, 10, W },
+	-- Summit Drop: the start deck tips straight over into a steep plunge off the peak (no flat to
+	-- crawl along), then two rollers where the slope eases and steepens again. Downhill all the way,
+	-- so nothing ever stalls in a dip.
+	{ 0, 902, 0, 34, section = "Summit Drop" },
+	{ 30, 897, 0, 34 },
+	{ 90, 866, 0, 32 },
+	{ 150, 846, 2, W },
+	{ 190, 836, 4, W },
+	{ 225, 821, 6, W },
+	{ 262, 811, 8, W },
+	{ 300, 796, 10, W },
 	-- Snowcap Esses: three linked curves down the snowfield.
 	{ 390, 770, 50, W, section = "Snowcap Esses" },
 	{ 450, 752, 130, W },
