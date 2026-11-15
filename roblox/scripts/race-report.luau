@@ -16,6 +16,7 @@ local PROFILES = {
 	{ name = "average", noise = 0.35, push = 0.8, brake = 0.04, line = 0, shortcuts = false },
 	{ name = "kid", noise = 0.6, push = 0.5, brake = 0.15, line = 0, shortcuts = false },
 	{ name = "risk-taker", noise = 0.3, push = 0.9, brake = 0.02, line = 0.4, shortcuts = true },
+	{ name = "star-hunter", noise = 0.05, push = 1, brake = 0, line = 0, shortcuts = false, stars = true },
 }
 local RUNS = 8
 local LIMIT = 60 * 240
@@ -28,13 +29,13 @@ local function sec(name: string)
 end
 
 for _, prof in ipairs(PROFILES) do
-	local times, medals, finished, respawns = {}, { Gold = 0, Silver = 0, Bronze = 0, none = 0 }, 0, 0
+	local times, medals, finished, respawns, starsGot = {}, { Gold = 0, Silver = 0, Bronze = 0, none = 0 }, 0, 0, 0
 	for seed = 1, RUNS do
 		local rng = Random.new(seed * 101 + #prof.name)
 		local st = RaceSim.new()
 		local lastSection = ""
 		while not st.finished and st.tick < LIMIT do
-			local b = RaceSim.bot(st, prof.line, prof.shortcuts)
+			local b = RaceSim.bot(st, prof.line, prof.shortcuts, prof.stars)
 			local input = {
 				steer = math.clamp(b.steer + rng:NextNumber(-prof.noise, prof.noise), -1, 1),
 				throttle = if rng:NextNumber() < prof.brake then -1 elseif rng:NextNumber() < prof.push then 1 else 0,
@@ -62,6 +63,7 @@ for _, prof in ipairs(PROFILES) do
 			end
 		end
 		respawns += st.respawns
+		starsGot += st.starCount
 		if st.finished then
 			finished += 1
 			local t = st.finishTick / 60
@@ -85,6 +87,7 @@ for _, prof in ipairs(PROFILES) do
 		worst = times[#times],
 		medals = medals,
 		respawnsPerRun = respawns / RUNS,
+		starsPerRun = starsGot / RUNS,
 	})
 end
 
@@ -95,4 +98,4 @@ end
 table.sort(list, function(a, b)
 	return a.ticks > b.ticks
 end)
-return HttpService:JSONEncode({ runs = RUNS * #PROFILES, profiles = profiles, sections = list })
+return HttpService:JSONEncode({ runs = RUNS * #PROFILES, stars = #course.stars, profiles = profiles, sections = list })

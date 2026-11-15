@@ -13,6 +13,7 @@ local RaceSim = {}
 
 RaceSim.DT = 1 / 60
 RaceSim.R = 2 -- marble radius, studs
+RaceSim.STAR_R = 5 -- a star is picked up within this of the marble's centre
 local G = 110 -- gravity, studs/s^2 (lighter than Roblox's 196 so it feels like a marble, not a rock)
 local STEER = 70 -- sideways acceleration at full steer
 local PUSH = 22 -- forward push (W)
@@ -40,6 +41,8 @@ export type State = {
 	respawns: number,
 	lastJump: boolean,
 	airTicks: number,
+	stars: { [number]: boolean }, -- which of course.stars this run has picked up
+	starCount: number,
 	events: { string }, -- what happened this step: "bump", "jump", "land", "boost", "checkpoint", "respawn", "finish", "path:<id>"
 }
 
@@ -49,7 +52,7 @@ function RaceSim.new(): State
 		tick = 0, path = "main", s = course.checkpoints[1], u = 0, vs = 6, vu = 0,
 		air = false, px = 0, py = 0, pz = 0, vx = 0, vy = 0, vz = 0,
 		checkpoint = 1, finished = false, finishTick = 0, respawns = 0,
-		lastJump = false, airTicks = 0, events = {},
+		lastJump = false, airTicks = 0, stars = {}, starCount = 0, events = {},
 	}
 end
 
@@ -302,8 +305,23 @@ function RaceSim.step(st: State, input: Input)
 		onGround(st, input)
 	end
 	st.lastJump = input.jump
-	-- Checkpoints and the finish, by main-path distance.
 	local course = RaceTrack.get()
+	-- Stars: picked up when the marble passes through one.
+	local x, y, z
+	if st.air then
+		x, y, z = st.px, st.py, st.pz
+	else
+		local f = RaceTrack.frame(course.paths[st.path], st.s)
+		x, y, z = f.x + f.rx * st.u + f.ux * RaceSim.R, f.y + f.ry * st.u + f.uy * RaceSim.R, f.z + f.rz * st.u + f.uz * RaceSim.R
+	end
+	for i, star in ipairs(course.stars) do
+		if not st.stars[i] and (star.x - x) ^ 2 + (star.y - y) ^ 2 + (star.z - z) ^ 2 < RaceSim.STAR_R * RaceSim.STAR_R then
+			st.stars[i] = true
+			st.starCount += 1
+			table.insert(st.events, "star:" .. i)
+		end
+	end
+	-- Checkpoints and the finish, by main-path distance.
 	if st.path == "main" and not st.air then
 		local nxt = course.checkpoints[st.checkpoint + 1]
 		if nxt and st.s >= nxt then
@@ -323,7 +341,7 @@ end
 --- A bot's input for this state: steer toward a target line across the track (`line` -1..1 of the
 --- half-width; positive keeps right, which takes the shortcuts), push on the straights, jump at the
 --- lips of gaps.
-function RaceSim.bot(st: State, line: number, shortcuts: boolean): Input
+function RaceSim.bot(st: State, line: number, shortcuts: boolean, stars: boolean?): Input
 	local course = RaceTrack.get()
 	if st.air then
 		-- Steer toward the track below: its nearest point's centre, seen across the heading.
@@ -338,6 +356,16 @@ function RaceSim.bot(st: State, line: number, shortcuts: boolean): Input
 	local p = course.paths[st.path]
 	local f = RaceTrack.frame(p, st.s)
 	local target = if f.w < 20 then 0 else line * (f.w / 2 - 4)
+	-- A star hunter lines up on the next star on this path within reach.
+	if stars then
+		for i, star in ipairs(course.stars) do
+			if not st.stars[i] and star.path == st.path and star.s > st.s and star.s < st.s + 120 then
+				local _, u = RaceTrack.nearest(p, star.x, star.y, star.z, star.s - 8, star.s + 8)
+				target = u
+				break
+			end
+		end
+	end
 	-- Approaching a fork: line up on the side for the route wanted.
 	if st.path == "main" then
 		for _, id in ipairs(course.order) do
@@ -361,12 +389,12 @@ function RaceSim.bot(st: State, line: number, shortcuts: boolean): Input
 end
 
 --- Run a bot to the finish (or `maxTicks`). Returns the state and the input log.
-function RaceSim.runBot(line: number, shortcuts: boolean, maxTicks: number?): (State, { any })
+function RaceSim.runBot(line: number, shortcuts: boolean, maxTicks: number?, stars: boolean?): (State, { any })
 	local st = RaceSim.new()
 	local log = RaceSim.newLog()
 	local limit = maxTicks or 60 * 60 * 4
 	while not st.finished and st.tick < limit do
-		local input = RaceSim.record(log, st.tick, RaceSim.bot(st, line, shortcuts))
+		local input = RaceSim.record(log, st.tick, RaceSim.bot(st, line, shortcuts, stars))
 		RaceSim.step(st, input)
 	end
 	return st, log

@@ -27,6 +27,9 @@ end
 -- main route is 49.5 s.
 Race.MEDALS = { { "Gold", 39.5, 120 }, { "Silver", 45, 70 }, { "Bronze", 54, 40 } }
 Race.FINISH_COINS = 20
+-- Stars on the learnable lines: a coin each, and a bonus for the whole set in one run.
+Race.STAR_COINS = 1
+Race.ALL_STARS_BONUS = 25
 -- The light the client sets while racing (also the preview's).
 Race.LIGHT = { clock = 15.8, sky = { 110, 175, 255 }, horizon = { 255, 220, 200 }, fog = { 225, 225, 245 }, density = 0.12, sun = { 255, 236, 205 } }
 
@@ -66,7 +69,8 @@ function Race.start(player: Player): (boolean, any)
 		root.Anchored = true
 	end
 	player:SetAttribute("Racing", true)
-	return true, { countdown = 3, medals = Race.MEDALS, best = (Data.get(player) or {}).raceBest }
+	local p = Data.get(player) or {}
+	return true, { countdown = 3, medals = Race.MEDALS, best = p.raceBest, bestStars = p.raceStars }
 end
 
 function Race.leave(player: Player)
@@ -102,6 +106,11 @@ function Race.finish(player: Player, log: any): (boolean, any)
 	end
 	session.started = os.clock() + 3 -- a new run starts after the next countdown
 	local medal, coins = nil, Race.FINISH_COINS
+	local starTotal = #RaceTrack.get().stars
+	coins += st.starCount * Race.STAR_COINS
+	if st.starCount == starTotal then
+		coins += Race.ALL_STARS_BONUS
+	end
 	for _, m in ipairs(Race.MEDALS) do
 		if time <= m[2] then
 			medal = m[1]
@@ -118,6 +127,7 @@ function Race.finish(player: Player, log: any): (boolean, any)
 			if newBest then
 				pp.raceBest = time
 			end
+			pp.raceStars = math.max(pp.raceStars or 0, st.starCount)
 		end)
 	end
 	local got = Economy.give(player, coins, "race")
@@ -151,7 +161,7 @@ function Race.finish(player: Player, log: any): (boolean, any)
 	if medal == "Gold" and newBest then
 		Race.announce(string.format("🥇 %s won GOLD on Marble Mountain in %.2fs!", player.DisplayName, time), Color3.fromRGB(255, 215, 80))
 	end
-	return true, { time = time, medal = medal, coins = got, best = if newBest then time else pb, newBest = newBest, respawns = st.respawns }
+	return true, { time = time, medal = medal, coins = got, best = if newBest then time else pb, newBest = newBest, respawns = st.respawns, stars = st.starCount, starTotal = starTotal, bestStars = math.max(p and p.raceStars or 0, st.starCount) }
 end
 
 --- The top times: { name, time }, all time and this week (cached a minute).

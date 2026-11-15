@@ -16,9 +16,9 @@ const rep = JSON.parse(r.output.results[0]);
 if (out) writeFileSync(out, JSON.stringify(rep, null, 2));
 const t = (x) => (x == null ? '   -  ' : x.toFixed(1).padStart(6));
 console.log(`${rep.runs} runs\n`);
-console.log('profile      finish  median   best  worst  respawns  gold silver bronze none');
+console.log(`profile      finish  median   best  worst  respawns  gold silver bronze none  stars/${rep.stars}`);
 for (const p of rep.profiles) {
-  console.log(`${p.name.padEnd(12)} ${(p.finishRate * 100).toFixed(0).padStart(5)}%  ${t(p.median)} ${t(p.best)} ${t(p.worst)}   ${p.respawnsPerRun.toFixed(2).padStart(6)}   ${String(p.medals.Gold).padStart(4)} ${String(p.medals.Silver).padStart(6)} ${String(p.medals.Bronze).padStart(6)} ${String(p.medals.none).padStart(4)}`);
+  console.log(`${p.name.padEnd(12)} ${(p.finishRate * 100).toFixed(0).padStart(5)}%  ${t(p.median)} ${t(p.best)} ${t(p.worst)}   ${p.respawnsPerRun.toFixed(2).padStart(6)}   ${String(p.medals.Gold).padStart(4)} ${String(p.medals.Silver).padStart(6)} ${String(p.medals.Bronze).padStart(6)} ${String(p.medals.none).padStart(4)}  ${p.starsPerRun.toFixed(1).padStart(7)}`);
 }
 console.log('\nsection            time%  bumps/visit  falls  air%  top speed');
 const total = rep.sections.reduce((a, s) => a + s.ticks, 0);
@@ -35,6 +35,8 @@ for (const p of rep.profiles) {
 }
 for (const s of rep.sections) checks.push([`${s.name} under 2 bumps a visit`, s.bumps / Math.max(1, s.visits) < 2]);
 checks.push(['the expert wins gold', rep.profiles[0].medals.Gold === 8]);
+const hunter = rep.profiles.find((p) => p.name === 'star-hunter');
+checks.push(['the star hunter gets every star', hunter && hunter.starsPerRun === rep.stars]);
 const bad = checks.filter(([, ok]) => !ok);
 for (const [name] of bad) console.log(`FAIL ${name}`);
 console.log(`\nplaythrough: ${checks.length} checks, ${bad.length} failed`);

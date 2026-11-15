@@ -78,6 +78,25 @@ if okB then
 	end
 end
 check("the mountain is built: track, gates, scenery", okB and parts > 5000 and gates >= #c.checkpoints + 1, if okB then string.format("%d parts, %d gates", parts, gates) else built)
+-- Stars: on the learnable lines of the main route, every one reachable in one clean run (passing
+-- up the shortcuts), and the server's replay counts the same.
+do
+	local overGap = 0
+	for _, star in ipairs(c.stars) do
+		local p = c.paths[star.path]
+		local f = RaceTrack.frame(p, star.s)
+		if not f.floor then
+			overGap += 1
+		end
+	end
+	check("stars line the course, none over a gap", #c.stars >= 18 and overGap == 0, string.format("%d stars, %d over gaps", #c.stars, overGap))
+	local hs, hlog = RaceSim.runBot(0, false, nil, true)
+	check("a star hunter collects every star cleanly", hs.finished and hs.starCount == #c.stars and hs.respawns == 0, string.format("%d/%d stars, %.2fs, %d respawns", hs.starCount, #c.stars, hs.finishTick / 60, hs.respawns))
+	local hr = RaceSim.replay(hlog)
+	check("and the replay counts the same stars", hr.starCount == hs.starCount and hr.finishTick == hs.finishTick, string.format("%d vs %d", hr.starCount, hs.starCount))
+	local plain = RaceSim.runBot(0, false)
+	check("the centre line misses stars (they reward a line)", plain.starCount < #c.stars, string.format("%d/%d", plain.starCount, #c.stars))
+end
 -- The mountain is terrain round the track: it must never cover it (the spiral and corkscrew pass
 -- over themselves).
 do

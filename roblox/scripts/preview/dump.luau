@@ -25,6 +25,17 @@ elseif SCENE:sub(1, 5) == "race:" then
 	local Race = require(SSS.Server.Race)
 	local RaceTrack = require(RS.Ringer.RaceTrack)
 	local built = Race.build(workspace)
+	-- The stars the client draws in a run (a neon ball each; the renderer has no billboards).
+	for _, star in ipairs(RaceTrack.get().stars) do
+		local p = Instance.new("Part")
+		p.Shape = Enum.PartType.Ball
+		p.Size = Vector3.new(3, 3, 3)
+		p.Material = Enum.Material.Neon
+		p.Color = Color3.fromRGB(255, 214, 60)
+		p.Anchored = true
+		p.Position = RaceTrack.ORIGIN + Vector3.new(star.x, star.y, star.z)
+		p.Parent = workspace
+	end
 	origin = built.centre
 	radius = 3200
 	light = Race.LIGHT
@@ -48,7 +59,7 @@ elseif SCENE:sub(1, 5) == "race:" then
 		local prev = RaceSim.position(st)
 		local n = 0
 		while not st.finished and st.tick < 60 * 120 do
-			RaceSim.step(st, RaceSim.bot(st, 0.4, true))
+			RaceSim.step(st, RaceSim.bot(st, 0, false, true)) -- the star hunter: the whole main route
 			local pos = RaceSim.position(st)
 			local vel = (pos - prev) * 60
 			prev = pos

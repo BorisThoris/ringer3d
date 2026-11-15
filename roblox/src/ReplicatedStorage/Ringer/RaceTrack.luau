@@ -372,7 +372,55 @@ function RaceTrack.get(): any
 		end
 		s += 450
 	end
+	-- Stars: learnable lines. On the main path, a row of three on the inside of each section's
+	-- sharpest bend (the fast line, but tight against the wall and fighting the turn's pull). Only
+	-- on the main route: a full set means passing up both shortcuts, so stars and the gold medal
+	-- are two different goals. Positions in track-origin space, sorted down the course.
+	local stars = {}
+	local function row(p: Path, s0: number, u: number)
+		for k = 0, 2 do
+			local f = RaceTrack.frame(p, s0 + k * 10)
+			table.insert(stars, { path = p.id, s = s0 + k * 10, x = f.x + f.rx * u + f.ux * 3, y = f.y + f.ry * u + f.uy * 3, z = f.z + f.rz * u + f.uz * 3 })
+		end
+	end
+	local fs = main.frames
+	local best: { [string]: { i: number, turn: number } } = {}
+	for i = 8, #fs - 8 do
+		local f = fs[i]
+		local clear = true
+		for k = i - 12, i + 12 do
+			local g = fs[math.clamp(k, 1, #fs)]
+			if not g.floor then
+				clear = false
+			end
+		end
+		-- Not where the routes split or join: there the player is lining up for a route.
+		local at = (i - 1) * RaceTrack.STEP
+		for _, b in ipairs({ bridge.fork.s, bridge.merge.s, falls.fork.s, falls.merge.s }) do
+			if at > b - 100 and at < b + 160 then
+				clear = false
+			end
+		end
+		if clear and at < finish - 60 then
+			local a, b = fs[i - 6], fs[i + 6]
+			local turn = (b.tx - a.tx) * f.rx + (b.ty - a.ty) * f.ry + (b.tz - a.tz) * f.rz
+			local cur = best[f.section]
+			if not cur or math.abs(turn) > math.abs(cur.turn) then
+				best[f.section] = { i = i, turn = turn }
+			end
+		end
+	end
+	for _, b in pairs(best) do
+		local f = fs[b.i]
+		if math.abs(b.turn) > 0.05 then
+			row(main, (b.i - 1) * RaceTrack.STEP - 10, (if b.turn > 0 then 1 else -1) * (f.w / 2 - 5))
+		end
+	end
+	table.sort(stars, function(p, q)
+		return p.s < q.s
+	end)
 	cache = {
+		stars = stars,
 		paths = { main = main, bridge = bridge, falls = falls },
 		order = { "main", "bridge", "falls" },
 		finish = finish,

@@ -134,6 +134,10 @@ function RaceClient.stop()
 		gui = nil
 	end
 	clearGhosts()
+	if starFolder then
+		starFolder:Destroy()
+		starFolder = nil
+	end
 	snow(false, Vector3.zero)
 	setLight(false)
 	local cam = Workspace.CurrentCamera
@@ -149,6 +153,48 @@ function RaceClient.stop()
 end
 
 local run: () -> () = nil :: any
+
+-- Stars on the learnable lines: a gold star turning over a glow, one per course star.
+local starFolder: Folder? = nil
+local function buildStars(course: any): { BasePart }
+	if starFolder then
+		starFolder:Destroy()
+	end
+	local folder = Instance.new("Folder")
+	folder.Name = "RaceStars"
+	folder.Parent = Workspace
+	starFolder = folder
+	local out = {}
+	for i, star in ipairs(course.stars) do
+		local p = Instance.new("Part")
+		p.Name = "Star" .. i
+		p.Anchored, p.CanCollide, p.CanQuery, p.CanTouch = true, false, false, false
+		p.Shape = Enum.PartType.Ball
+		p.Size = Vector3.new(1.6, 1.6, 1.6)
+		p.Material = Enum.Material.Neon
+		p.Color = Color3.fromRGB(255, 214, 60)
+		p.Position = RaceTrack.ORIGIN + Vector3.new(star.x, star.y, star.z)
+		p.Parent = folder
+		local light = Instance.new("PointLight")
+		light.Color = p.Color
+		light.Range = 10
+		light.Brightness = 1.5
+		light.Parent = p
+		local bb = Instance.new("BillboardGui")
+		bb.Size = UDim2.fromScale(5, 5)
+		bb.LightInfluence = 0
+		bb.MaxDistance = 400
+		bb.Parent = p
+		local t = Instance.new("TextLabel")
+		t.BackgroundTransparency = 1
+		t.Size = UDim2.fromScale(1, 1)
+		t.Text = "⭐"
+		t.TextScaled = true
+		t.Parent = bb
+		out[i] = p
+	end
+	return out
+end
 
 local function results(r: any)
 	local d = RaceClient.deps
@@ -173,7 +219,7 @@ local function results(r: any)
 	label(panel, medal, 48, { Size = UDim2.new(1, 0, 0, 60), Position = UDim2.fromOffset(0, 16) })
 	label(panel, fmt(r.time), 56, { Size = UDim2.new(1, 0, 0, 64), Position = UDim2.fromOffset(0, 80), TextColor3 = Color3.fromRGB(255, 230, 120) })
 	label(panel, if r.newBest then "NEW PERSONAL BEST!" else ("Best " .. fmt(r.best or r.time)), 24, { Size = UDim2.new(1, 0, 0, 30), Position = UDim2.fromOffset(0, 148) })
-	label(panel, string.format("+%d coins", r.coins), 28, { Size = UDim2.new(1, 0, 0, 34), Position = UDim2.fromOffset(0, 182), TextColor3 = Color3.fromRGB(255, 215, 80) })
+	label(panel, if r.starTotal then string.format("+%d coins    ⭐ %d/%d", r.coins, r.stars, r.starTotal) else string.format("+%d coins", r.coins), 28, { Size = UDim2.new(1, 0, 0, 34), Position = UDim2.fromOffset(0, 182), TextColor3 = Color3.fromRGB(255, 215, 80) })
 	local board = label(panel, "Leaderboard loading...", 18, { Size = UDim2.new(1, -40, 0, 120), Position = UDim2.fromOffset(20, 222), TextYAlignment = Enum.TextYAlignment.Top })
 	task.spawn(function()
 		local ok, top = d.ask("raceTop")
@@ -352,6 +398,8 @@ run = function()
 	d.Sfx.music("match")
 	local timer, speedLabel, section, dot = buildHud(info.medals)
 	local course = RaceTrack.get()
+	local starParts = buildStars(course)
+	local starLabel = label(gui :: ScreenGui, string.format("⭐ 0/%d", #course.stars), 30, { Name = "Stars", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -24, 0, 156), Size = UDim2.fromOffset(200, 40), TextXAlignment = Enum.TextXAlignment.Right, TextColor3 = Color3.fromRGB(255, 220, 90) })
 	local st = RaceSim.new()
 	local log = RaceSim.newLog()
 	local look = MarbleLook.lookFor(player:GetAttribute("Marble") or "ember")
@@ -417,6 +465,17 @@ run = function()
 							d.Sfx.ui("whoosh", 0.7)
 						end
 						d.Juice.fovKick = math.max(d.Juice.fovKick, 8)
+					elseif e:sub(1, 5) == "star:" then
+						local sp = starParts[tonumber(e:sub(6)) :: number]
+						if sp then
+							d.Juice.sparks(sp.Position, 300, Color3.fromRGB(255, 220, 80))
+							sp:Destroy()
+						end
+						d.Sfx.ui("coin", 0.7)
+						starLabel.Text = string.format("⭐ %d/%d", st.starCount, #course.stars)
+						if st.starCount == #course.stars then
+							banner("ALL STARS! ⭐", Color3.fromRGB(255, 220, 60))
+						end
 					elseif e == "checkpoint" then
 						d.Sfx.chime("turn")
 						banner("CHECKPOINT  " .. fmt(st.tick / 60), Color3.fromRGB(150, 220, 255))
