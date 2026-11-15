@@ -60,6 +60,18 @@
     "sweep": {
       "name": "Clean Sweep",
       "description": "Capture all 13 marbles in one game."
+    },
+    "raceFinish": {
+      "name": "Down the Mountain",
+      "description": "Finish a race down Marble Mountain."
+    },
+    "raceGold": {
+      "name": "Mountain Gold",
+      "description": "Win gold on Marble Mountain."
+    },
+    "raceStars": {
+      "name": "Star Collector",
+      "description": "Pick up all 24 stars on Marble Mountain in one run."
     }
   },
   "thumbnails": [

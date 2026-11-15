@@ -37,6 +37,9 @@ export type Profile = {
 	receipts: { string },
 	welcomed: boolean,
 	codes: { [string]: boolean }, -- promo codes already redeemed
+	lastSpin: number, -- os.time() of the last daily spin
+	boostUntil: number, -- double coins until this os.time() (a spin prize)
+	favorited: boolean, -- paid once for favouriting the game
 }
 
 local function fresh(): Profile
@@ -59,6 +62,9 @@ local function fresh(): Profile
 		receipts = {},
 		welcomed = false,
 		codes = {},
+		lastSpin = 0,
+		boostUntil = 0,
+		favorited = false,
 	}
 end
 

@@ -203,6 +203,15 @@ function Race.finish(player: Player, log: any): (boolean, any)
 		end)
 	end
 	local got = Economy.give(player, coins, "race")
+	if isPlayer then
+		Economy.badge(player, "raceFinish")
+		if medal == "Gold" then
+			Economy.badge(player, "raceGold")
+		end
+		if st.starCount == starTotal then
+			Economy.badge(player, "raceStars")
+		end
+	end
 	Race.quest(player, "races", 1)
 	if medal == "Gold" then
 		Race.quest(player, "gold", 1)

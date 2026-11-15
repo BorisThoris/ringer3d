@@ -806,6 +806,18 @@ function handlers.redeem(player: Player, code)
 	return Flex.redeemFor(player, code)
 end
 
+function handlers.spinInfo(player: Player)
+	return Flex.spinInfo(player)
+end
+
+function handlers.spin(player: Player)
+	return Flex.spinFor(player, Collectibles)
+end
+
+function handlers.favorited(player: Player)
+	return Flex.favorited(player)
+end
+
 function handlers.daily(player: Player)
 	local p = Data.get(player)
 	local today = math.floor(os.time() / 86400)

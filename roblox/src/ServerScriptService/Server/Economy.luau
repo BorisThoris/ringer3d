@@ -27,6 +27,11 @@ Economy.friends = {} :: { [Player]: number }
 
 function Economy.multiplier(player: Player): number
 	local m = 1 + math.min(Economy.friends[player] or 0, 3) * 0.1
+	-- Double coins for a while (a daily spin prize).
+	local prof = Data.get(player)
+	if prof and (prof.boostUntil or 0) > os.time() then
+		m *= 2
+	end
 	if Economy.hasPass(player, "vip") then
 		m *= Config.VIP_MULTIPLIER
 	end

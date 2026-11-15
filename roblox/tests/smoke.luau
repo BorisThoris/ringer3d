@@ -120,6 +120,29 @@ do
 	Flex.dress(dummy, "Prism", true)
 	local crowned = head:FindFirstChild("Crown") ~= nil
 	Flex.dress(dummy, nil, false)
+	-- The daily spin: once per 20 hours, and the wheel lands at the published odds.
+	local sp = { lastSpin = 0 }
+	local first = Flex.spin(sp, 1000000, Random.new(1))
+	local again, left = Flex.spin(sp, 1000000 + 3600, Random.new(1))
+	local later = Flex.spin(sp, 1000000 + Flex.SPIN_EVERY, Random.new(1))
+	check("one spin per 20 hours, with the time left", first and not again and left == Flex.SPIN_EVERY - 3600 and later ~= false, tostring(left))
+	local counts, total, N = {}, 0, 20000
+	for _, w in ipairs(Flex.WHEEL) do
+		total += w[1]
+	end
+	local rng = Random.new(7)
+	for _ = 1, N do
+		local pp = { lastSpin = 0 }
+		local i = Flex.spin(pp, 10 ^ 9, rng)
+		counts[i] = (counts[i] or 0) + 1
+	end
+	local fair = true
+	for i, w in ipairs(Flex.WHEEL) do
+		if math.abs((counts[i] or 0) / N - w[1] / total) > 0.015 then
+			fair = false
+		end
+	end
+	check("the wheel lands at its published odds", fair)
 	check("every aura dresses a character, one at a time; the crown comes and goes", dressed and crowned and head:FindFirstChild("Crown") == nil and root.Aura:FindFirstChildOfClass("ParticleEmitter") == nil)
 end
 

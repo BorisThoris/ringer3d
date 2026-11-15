@@ -5,7 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const U = 10773508905;
-const ROOT = 'D:/agent-work/ringer3d/main-review/roblox/store';
+const ROOT = process.env.RINGER_STORE || 'D:/agent-work/ringer3d/play-store/roblox/store';
 const ART = 'D:/agent-work/ringer3d/roblox-art/icons';
 
 module.exports = async (ctx, page, out, log) => {

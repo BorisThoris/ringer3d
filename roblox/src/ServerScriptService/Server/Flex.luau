@@ -228,6 +228,106 @@ function Flex.redeemFor(player: Player, raw: any): (boolean, any)
 	return true, { coins = Economy.give(player, res, "code", true) }
 end
 
+-- ---- Daily spin --------------------------------------------------------------------------------
+
+-- The wheel, in order round it: { weight, kind, amount }. Coins are multiplied like any earned
+-- coins; "double" is 15 minutes of double coins; "bag" opens a Marble Bag (coins where bags are
+-- restricted).
+Flex.WHEEL = {
+	{ 30, "coins", 25 },
+	{ 22, "coins", 50 },
+	{ 8, "double", 900 },
+	{ 18, "coins", 100 },
+	{ 5, "bag", 0 },
+	{ 10, "coins", 250 },
+	{ 4, "coins", 500 },
+	{ 3, "coins", 1000 },
+}
+Flex.SPIN_EVERY = 20 * 3600 -- a little under a day, so the same time tomorrow always works
+
+--- Seconds until the next free spin for profile `p` (0 when ready).
+function Flex.spinLeft(p: any, now: number): number
+	return math.max(0, (p.lastSpin or 0) + Flex.SPIN_EVERY - now)
+end
+
+--- Spin for profile `p` (marks the time): the segment won, or false and the seconds left.
+function Flex.spin(p: any, now: number, rng: Random): (any, number)
+	local left = Flex.spinLeft(p, now)
+	if left > 0 then
+		return false, left
+	end
+	local total = 0
+	for _, w in ipairs(Flex.WHEEL) do
+		total += w[1]
+	end
+	local roll = rng:NextNumber() * total
+	local pick = #Flex.WHEEL
+	for i, w in ipairs(Flex.WHEEL) do
+		roll -= w[1]
+		if roll < 0 then
+			pick = i
+			break
+		end
+	end
+	p.lastSpin = now
+	return pick, 0
+end
+
+--- The request handler: spin and pay out. Returns the segment, what it gave, and the next spin.
+function Flex.spinFor(player: Player, collectibles: any): (boolean, any)
+	if not Data.get(player) then
+		return false, "Your profile is still loading."
+	end
+	local pick, left = false, 0
+	Data.update(player, function(pp)
+		pick, left = Flex.spin(pp, os.time(), Random.new())
+	end)
+	if not pick then
+		return false, { left = left }
+	end
+	local seg = Flex.WHEEL[pick]
+	local out: any = { segment = pick, kind = seg[2], left = Flex.SPIN_EVERY }
+	if seg[2] == "coins" then
+		out.coins = Economy.give(player, seg[3], "spin")
+	elseif seg[2] == "double" then
+		Data.update(player, function(pp)
+			pp.boostUntil = math.max(pp.boostUntil or 0, os.time()) + seg[3]
+		end)
+		out.seconds = seg[3]
+	elseif seg[2] == "bag" then
+		local got = if collectibles.bagsRestricted(player) then nil else collectibles.openBag(player, Random.new())
+		if got then
+			out.bag = got
+		else
+			out.kind = "coins"
+			out.coins = Economy.give(player, 300, "spin")
+		end
+	end
+	return true, out
+end
+
+function Flex.spinInfo(player: Player): any
+	local p = Data.get(player)
+	local boost = p and math.max(0, (p.boostUntil or 0) - os.time()) or 0
+	return { left = if p then Flex.spinLeft(p, os.time()) else Flex.SPIN_EVERY, wheel = Flex.WHEEL, boost = boost, favorited = p ~= nil and p.favorited == true }
+end
+
+-- ---- Favourite ------------------------------------------------------------------------------------
+
+Flex.FAVORITE_COINS = 100
+
+--- The client says the player favourited the game (Roblox tells only the client): paid once.
+function Flex.favorited(player: Player): (boolean, any)
+	local p = Data.get(player)
+	if not p or p.favorited then
+		return false, "Thanks again!"
+	end
+	Data.update(player, function(pp)
+		pp.favorited = true
+	end)
+	return true, { coins = Economy.give(player, Flex.FAVORITE_COINS, "favorite", true) }
+end
+
 -- ---- Wiring --------------------------------------------------------------------------------------
 
 --- Start: auras follow levels and characters; the crown follows `leaders()` (user ids), checked

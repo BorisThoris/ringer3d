@@ -840,6 +840,134 @@ task.spawn(function()
 	end
 end)
 
+-- The daily spin (Server/Flex): a wheel of eight prizes, free every 20 hours. Its button sits
+-- by the coins with a "!" when a spin is ready, and the wheel opens by itself once a session.
+local spinPanel, spinBody = Kit.panel(screen, "Daily Spin", UDim2.fromOffset(520, 560))
+panels.spin = spinPanel
+local spinInfo: any = nil
+local spinAt = 0
+local spinning = false
+local wheel = Kit.new("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 10), Size = UDim2.fromOffset(380, 380), BackgroundColor3 = Color3.fromRGB(40, 30, 70), Parent = spinBody })
+Kit.round(wheel, 190)
+Kit.stroke(wheel, Kit.GOLD, 6)
+local SEG_COLORS = { Color3.fromRGB(255, 120, 120), Color3.fromRGB(255, 200, 80), Color3.fromRGB(120, 220, 140), Color3.fromRGB(110, 180, 255), Color3.fromRGB(200, 140, 255), Color3.fromRGB(255, 150, 210), Color3.fromRGB(255, 230, 120), Color3.fromRGB(120, 230, 230) }
+local function segText(seg: any): string
+	if seg[2] == "coins" then
+		return "🪙
+" .. seg[3]
+	elseif seg[2] == "double" then
+		return "2x
+15 min"
+	end
+	return "🎒
+Bag"
+end
+local function drawWheel(list: any)
+	for _, c in ipairs(wheel:GetChildren()) do
+		if c.Name == "Seg" then
+			c:Destroy()
+		end
+	end
+	local n = #list
+	for i, seg in ipairs(list) do
+		local ang = (i - 1) / n * 2 * math.pi
+		local tile = Kit.label(segText(seg), 22, { Name = "Seg", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, math.sin(ang) * 128, 0.5, -math.cos(ang) * 128), Size = UDim2.fromOffset(84, 70), BackgroundTransparency = 0, BackgroundColor3 = SEG_COLORS[(i - 1) % #SEG_COLORS + 1], TextColor3 = Kit.INK, Rotation = math.deg(ang), Parent = wheel })
+		Kit.round(tile, 16)
+		Kit.stroke(tile, Kit.INK, 2)
+	end
+	local hub = Kit.label("🎡", 40, { Name = "Seg", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(80, 80), BackgroundTransparency = 0, BackgroundColor3 = Kit.GOLD, Parent = wheel })
+	Kit.round(hub, 40)
+	Kit.stroke(hub, Kit.INK, 3)
+end
+-- The pointer over the top of the wheel.
+Kit.label("▼", 46, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, -12), Size = UDim2.fromOffset(60, 50), TextColor3 = Kit.RED, ZIndex = 10, Parent = spinBody })
+local spinGo: TextButton = nil :: any
+local function spinLeft(): number
+	return if spinInfo then math.max(0, spinInfo.left - (os.clock() - spinAt)) else 1
+end
+spinGo = Kit.button("SPIN!", Kit.GREEN, function()
+	if spinning then
+		return
+	end
+	if spinLeft() > 0 then
+		toast("Next free spin in " .. fmtLeft(math.ceil(spinLeft())), "info")
+		return
+	end
+	spinning = true
+	local okS, res = ask("spin")
+	if not okS or typeof(res) ~= "table" or not res.segment then
+		spinning = false
+		toast("Not yet!", "info")
+		return
+	end
+	spinInfo.left, spinAt = res.left, os.clock()
+	-- Five turns and land the won segment under the pointer.
+	local n = #spinInfo.wheel
+	local target = 360 * 5 - (res.segment - 1) / n * 360 + (math.random() - 0.5) * (300 / n)
+	wheel.Rotation = 0
+	Sfx.ui("whoosh", 0.8)
+	local tw = TweenService:Create(wheel, TweenInfo.new(4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Rotation = target })
+	tw:Play()
+	tw.Completed:Wait()
+	spinning = false
+	Sfx.ui("fanfare", 0.8)
+	local vp = workspace.CurrentCamera.ViewportSize
+	if res.kind == "coins" then
+		Rewards.coinsFly(Vector2.new(vp.X / 2, vp.Y / 2), res.coins or 0)
+		toast(string.format("You won %d coins!", res.coins or 0), "good")
+	elseif res.kind == "double" then
+		Rewards.confetti(60)
+		toast("DOUBLE COINS for 15 minutes!", "good")
+	elseif res.bag then
+		spinPanel.Visible = false
+		onBag(res.bag)
+	end
+end, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -12), Size = UDim2.fromOffset(240, 64), Parent = spinBody })
+local spinButton = Kit.button("🎡", Kit.PURPLE, function()
+	show("spin")
+end, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(0.5, -112, 0, 8), Size = UDim2.fromOffset(50, 50), Parent = hud })
+Kit.round(spinButton, 25)
+local spinBadge = Kit.label("!", 22, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(1, -2, 0, 2), Size = UDim2.fromOffset(26, 26), BackgroundTransparency = 0, BackgroundColor3 = Kit.RED, Visible = false, ZIndex = 5, Parent = spinButton })
+Kit.round(spinBadge, 13)
+task.spawn(function()
+	task.wait(4)
+	local ok, info = ask("spinInfo")
+	if typeof(info) == "table" and info.wheel then
+		spinInfo, spinAt = info, os.clock()
+		drawWheel(info.wheel)
+		-- Ready on arrival: open the wheel once.
+		if spinLeft() <= 0 then
+			show("spin")
+		end
+		-- Favourite the game, once, six minutes in (Roblox only tells this client the answer).
+		if not info.favorited then
+			task.delay(360, function()
+				local AvatarEditorService = game:GetService("AvatarEditorService")
+				local done
+				done = AvatarEditorService.PromptSetFavoriteCompleted:Connect(function(result)
+					done:Disconnect()
+					if result == Enum.AvatarPromptResult.Success then
+						local okF, got = ask("favorited")
+						if okF and typeof(got) == "table" then
+							toast(string.format("Thanks for the favourite! +%d coins", got.coins or 0), "good")
+						end
+					end
+				end)
+				pcall(AvatarEditorService.PromptSetFavorite, AvatarEditorService, game.PlaceId, Enum.AvatarItemType.Asset, true)
+			end)
+		end
+	end
+	local _ = ok
+	while true do
+		local left = spinLeft()
+		spinBadge.Visible = spinInfo ~= nil and left <= 0
+		if spinGo then
+			spinGo.Text = if left <= 0 then "SPIN!" else ("⏳ " .. fmtLeft(math.ceil(left)))
+		end
+		task.wait(1)
+	end
+end)
+
 local questButton = Kit.button("📜 Quests", Kit.ORANGE, function()
 	refreshQuests()
 	show("quests")
