@@ -429,22 +429,34 @@ function RaceSim.record(log: { any }, tick: number, input: Input): Input
 	return q
 end
 
---- Replay a log from the start. Returns the final state (finished and finishTick if it got there).
-function RaceSim.replay(log: { any }, maxTicks: number?): State
+--- A player for a log: `step()` advances its own state one tick with the log's input. The server's
+--- replay and the client's ghost both use it, so a ghost runs exactly the verified run.
+function RaceSim.player(log: { any }): { st: State, step: () -> () }
 	local st = RaceSim.new()
-	local limit = maxTicks or 60 * 60 * 6
 	local i = 1
 	local cur: Input = { steer = 0, throttle = 0, jump = false, respawn = false }
-	while not st.finished and st.tick < limit do
-		local entry = log[i]
-		if entry and entry[1] == st.tick then
-			cur = { steer = entry[2], throttle = entry[3], jump = entry[4], respawn = entry[5] }
-			i += 1
-		end
-		RaceSim.step(st, cur)
-		cur.respawn = false
+	return {
+		st = st,
+		step = function()
+			local entry = log[i]
+			if entry and entry[1] == st.tick then
+				cur = { steer = entry[2], throttle = entry[3], jump = entry[4], respawn = entry[5] }
+				i += 1
+			end
+			RaceSim.step(st, cur)
+			cur.respawn = false
+		end,
+	}
+end
+
+--- Replay a log from the start. Returns the final state (finished and finishTick if it got there).
+function RaceSim.replay(log: { any }, maxTicks: number?): State
+	local p = RaceSim.player(log)
+	local limit = maxTicks or 60 * 60 * 6
+	while not p.st.finished and p.st.tick < limit do
+		p.step()
 	end
-	return st
+	return p.st
 end
 
 --- Check a log is well formed: ticks rising, values in range. (ok, why)

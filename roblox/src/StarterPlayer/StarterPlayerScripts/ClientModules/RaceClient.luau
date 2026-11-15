@@ -399,6 +399,60 @@ run = function()
 	local timer, speedLabel, section, dot = buildHud(info.medals)
 	local course = RaceTrack.get()
 	local starParts = buildStars(course)
+	-- Your best run as a ghost: the same sim fed its logged inputs, so it runs exactly that run. Its
+	-- checkpoint times, worked out up front, give the splits.
+	local ghost, ghostPart, splits = nil, nil, {}
+	if typeof(info.ghost) == "table" then
+		local pre = RaceSim.player(info.ghost)
+		while not pre.st.finished and pre.st.tick < 60 * 60 * 6 do
+			pre.step()
+			for _, e in ipairs(pre.st.events) do
+				if e == "checkpoint" then
+					splits[pre.st.checkpoint] = pre.st.tick
+				elseif e == "finish" then
+					splits.finish = pre.st.tick
+				end
+			end
+		end
+		ghost = RaceSim.player(info.ghost)
+		local gp = MarbleLook.make(MarbleLook.lookFor(player:GetAttribute("Marble") or "ember"), RaceSim.R)
+		gp.Name = "RaceGhostPB"
+		gp.Anchored, gp.CanCollide, gp.CanQuery, gp.CanTouch = true, false, false, false
+		for _, d2 in ipairs(gp:GetDescendants()) do
+			if d2:IsA("BasePart") then
+				d2.Transparency = math.max(d2.Transparency, 0.65)
+			end
+		end
+		gp.Transparency = 0.65
+		local tag = Instance.new("BillboardGui")
+		tag.Size = UDim2.fromOffset(80, 26)
+		tag.StudsOffset = Vector3.new(0, 4, 0)
+		tag.AlwaysOnTop = true
+		tag.Parent = gp
+		local tl = Instance.new("TextLabel")
+		tl.BackgroundTransparency = 1
+		tl.Size = UDim2.fromScale(1, 1)
+		tl.Font = Enum.Font.FredokaOne
+		tl.TextScaled = true
+		tl.Text = "YOUR BEST"
+		tl.TextColor3 = Color3.fromRGB(255, 255, 255)
+		tl.TextStrokeTransparency = 0.3
+		tl.Parent = tag
+		gp.Parent = Workspace
+		ghostPart = gp
+		if starFolder then
+			gp.Parent = starFolder -- cleared with the stars when the run ends
+		end
+	end
+	local ghostPrev = if ghost then RaceSim.position(ghost.st) else Vector3.zero
+	local ghostCur = ghostPrev
+	local function split(at: number?, now: number): (string, Color3)
+		if not at then
+			return "", Color3.fromRGB(150, 220, 255)
+		end
+		local dt2 = (now - at) / 60
+		return string.format("  %s%.2f", if dt2 <= 0 then "-" else "+", math.abs(dt2)), if dt2 <= 0 then Color3.fromRGB(120, 255, 140) else Color3.fromRGB(255, 120, 120)
+	end
 	local starLabel = label(gui :: ScreenGui, string.format("⭐ 0/%d", #course.stars), 30, { Name = "Stars", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -24, 0, 156), Size = UDim2.fromOffset(200, 40), TextXAlignment = Enum.TextXAlignment.Right, TextColor3 = Color3.fromRGB(255, 220, 90) })
 	local st = RaceSim.new()
 	local log = RaceSim.newLog()
@@ -451,6 +505,11 @@ run = function()
 				prevPos = curPos
 				RaceSim.step(st, input)
 				curPos = RaceSim.position(st)
+				if ghost and not ghost.st.finished then
+					ghostPrev = ghostCur
+					ghost.step()
+					ghostCur = RaceSim.position(ghost.st)
+				end
 				for _, e in ipairs(st.events) do
 					if e == "bump" then
 						d.Sfx.clack(500, "kerb")
@@ -478,7 +537,8 @@ run = function()
 						end
 					elseif e == "checkpoint" then
 						d.Sfx.chime("turn")
-						banner("CHECKPOINT  " .. fmt(st.tick / 60), Color3.fromRGB(150, 220, 255))
+						local txt, col = split(splits[st.checkpoint], st.tick)
+						banner("CHECKPOINT  " .. fmt(st.tick / 60) .. txt, col)
 					elseif e == "respawn" then
 						d.Juice.screenFlash(0.6)
 						d.Sfx.chime("lose")
@@ -487,7 +547,8 @@ run = function()
 						d.Sfx.ui("levelup", 0.7)
 					elseif e == "finish" then
 						done = true
-						banner("FINISH!", Color3.fromRGB(255, 120, 180))
+						local txt = split(splits.finish, st.tick)
+						banner("FINISH!" .. txt, Color3.fromRGB(255, 120, 180))
 						fireworks(curPos)
 						d.Sfx.chime("win")
 						task.spawn(function()
@@ -506,6 +567,19 @@ run = function()
 		end
 		-- The marble: interpolated between sim steps, rolling as it goes.
 		local alpha = math.clamp(acc / RaceSim.DT, 0, 1)
+		if ghostPart then
+			if ghost and ghost.st.finished then
+				ghostPart.Transparency = 1
+				for _, d2 in ipairs(ghostPart:GetDescendants()) do
+					if d2:IsA("BasePart") then
+						d2.Transparency = 1
+					elseif d2:IsA("BillboardGui") then
+						d2.Enabled = false
+					end
+				end
+			end
+			ghostPart.CFrame = CFrame.new(ghostPrev:Lerp(ghostCur, alpha))
+		end
 		local pos = prevPos:Lerp(curPos, alpha)
 		local vel = (curPos - prevPos) / RaceSim.DT
 		local horiz = Vector3.new(vel.X, 0, vel.Z)

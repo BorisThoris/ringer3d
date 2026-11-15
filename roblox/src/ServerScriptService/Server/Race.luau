@@ -36,10 +36,43 @@ Race.LIGHT = { clock = 15.8, sky = { 110, 175, 255 }, horizon = { 255, 220, 200 
 -- ---- Sessions, verification, records ------------------------------------------------------------
 
 local sessions: { [Player]: { started: number } } = {}
+Race.sessions = sessions -- (the tests backdate a session to finish a bot run)
 local board = nil
 pcall(function()
 	board = DataStoreService:GetOrderedDataStore("RaceBest_v1")
 end)
+-- Each player's best run as its input log, for the ghost they race against (its own store: a log
+-- is far bigger than a profile should be). Cached per player while they're here.
+local ghosts = nil
+pcall(function()
+	ghosts = DataStoreService:GetDataStore("RaceGhost_v1")
+end)
+local ghostCache: { [Player]: any } = {}
+Race.GHOST_MAX = 6000 -- input changes; a longer log is not kept as a ghost
+local function loadGhost(player: Player): any
+	if ghostCache[player] ~= nil then
+		return ghostCache[player] or nil
+	end
+	local got = nil
+	if ghosts then
+		pcall(function()
+			got = ghosts:GetAsync(tostring(player.UserId))
+		end)
+	end
+	-- Only a log that still replays to its time on this course is a ghost (the course may change).
+	if got and typeof(got.log) == "table" and RaceSim.validLog(got.log) then
+		local st = RaceSim.replay(got.log)
+		if not (st.finished and math.abs(st.finishTick / 60 - (got.time or -1)) < 1e-6) then
+			got = nil
+		end
+	else
+		got = nil
+	end
+	ghostCache[player] = got or false
+	return got
+end
+Race.loadGhost = loadGhost
+
 -- This week's board: a fresh one every Monday, so there is always a race anyone can win.
 local function week(): number
 	return math.floor((os.time() - 4 * 86400) / (7 * 86400)) -- the Unix epoch was a Thursday
@@ -70,7 +103,8 @@ function Race.start(player: Player): (boolean, any)
 	end
 	player:SetAttribute("Racing", true)
 	local p = Data.get(player) or {}
-	return true, { countdown = 3, medals = Race.MEDALS, best = p.raceBest, bestStars = p.raceStars }
+	local ghost = loadGhost(player)
+	return true, { countdown = 3, medals = Race.MEDALS, best = p.raceBest, bestStars = p.raceStars, ghost = ghost and ghost.log }
 end
 
 function Race.leave(player: Player)
@@ -134,6 +168,17 @@ function Race.finish(player: Player, log: any): (boolean, any)
 	Race.quest(player, "races", 1)
 	if medal == "Gold" then
 		Race.quest(player, "gold", 1)
+	end
+	if newBest and #log <= Race.GHOST_MAX then
+		local entry = { log = log, time = time }
+		ghostCache[player] = entry
+		if ghosts then
+			task.spawn(function()
+				pcall(function()
+					ghosts:SetAsync(tostring(player.UserId), entry)
+				end)
+			end)
+		end
 	end
 	if newBest and board then
 		task.spawn(function()
@@ -276,6 +321,7 @@ end
 
 Players.PlayerRemoving:Connect(function(p)
 	sessions[p] = nil
+	ghostCache[p] = nil
 end)
 
 return Race

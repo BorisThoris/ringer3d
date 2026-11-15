@@ -123,6 +123,23 @@ local okS = pcall(Race.start, fake :: any)
 local _, logC = RaceSim.runBot(0, false)
 local okF, why = Race.finish(fake :: any, logC)
 check("a run claimed faster than real time is refused", okS and not okF and tostring(why):find("real time") ~= nil, why)
+-- The ghost: a verified best run comes back at the next start as the log to race against, and
+-- the client's ghost player runs it to the same time.
+do
+	local fake2 = { UserId = 2, DisplayName = "Ghostly", Character = nil, Parent = game, SetAttribute = function() end, GetAttribute = function() return nil end }
+	Race.start(fake2 :: any)
+	Race.sessions[fake2].started = os.clock() - 120
+	local okG, res = pcall(Race.finish, fake2 :: any, logC)
+	local _, info = Race.start(fake2 :: any)
+	local same = okG and typeof(info) == "table" and info.ghost == logC
+	local g = RaceSim.player(logC)
+	while not g.st.finished and g.st.tick < 60 * 60 * 4 do
+		g.step()
+	end
+	local cs = RaceSim.replay(logC)
+	check("your best run comes back as your ghost", same, if same then string.format("%d inputs", #logC) elseif not okG then tostring(res) elseif typeof(info) == "table" and info.ghost then "different log" else "no ghost")
+	check("and the ghost runs exactly that run", g.st.finished and g.st.finishTick == cs.finishTick, string.format("%d vs %d", g.st.finishTick, cs.finishTick))
+end
 local okBoard, boardPart = pcall(Race.board, CFrame.new(0, 500, 0), workspace)
 check("the lobby race board builds with both tables", okBoard and boardPart:FindFirstChildOfClass("SurfaceGui") ~= nil, if okBoard then nil else boardPart)
 check("weeks roll over on a fixed day", Race.week() == math.floor((os.time() - 4 * 86400) / (7 * 86400)))
