@@ -139,6 +139,19 @@ do
 	local cs = RaceSim.replay(logC)
 	check("your best run comes back as your ghost", same, if same then string.format("%d inputs", #logC) elseif not okG then tostring(res) elseif typeof(info) == "table" and info.ghost then "different log" else "no ghost")
 	check("and the ghost runs exactly that run", g.st.finished and g.st.finishTick == cs.finishTick, string.format("%d vs %d", g.st.finishTick, cs.finishTick))
+	-- The record ghost: with Ghostly leading the board, someone else's start brings Ghostly's run;
+	-- Ghostly's own start doesn't (their own ghost is the record).
+	local realTop = Race.top
+	Race.top = function()
+		return { { name = "Ghostly", time = cs.finishTick / 60, userId = 2 } }
+	end
+	local fake3 = { UserId = 3, DisplayName = "Chaser", Character = nil, Parent = game, SetAttribute = function() end, GetAttribute = function() return nil end }
+	local _, i3 = Race.start(fake3 :: any)
+	local _, i2 = Race.start(fake2 :: any)
+	Race.top = realTop
+	check("everyone races the record holder's ghost", typeof(i3) == "table" and i3.record and i3.record.log == logC, if typeof(i3) == "table" and i3.record then i3.record.name else "no record")
+	check("except the record holder", typeof(i2) == "table" and i2.record == nil)
+	Race.leave(fake3 :: any)
 end
 local okBoard, boardPart = pcall(Race.board, CFrame.new(0, 500, 0), workspace)
 check("the lobby race board builds with both tables", okBoard and boardPart:FindFirstChildOfClass("SurfaceGui") ~= nil, if okBoard then nil else boardPart)

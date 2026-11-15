@@ -399,9 +399,39 @@ run = function()
 	local timer, speedLabel, section, dot = buildHud(info.medals)
 	local course = RaceTrack.get()
 	local starParts = buildStars(course)
-	-- Your best run as a ghost: the same sim fed its logged inputs, so it runs exactly that run. Its
-	-- checkpoint times, worked out up front, give the splits.
-	local ghost, ghostPart, splits = nil, nil, {}
+	-- Ghosts: your best run, and the record holder's. Each is the same sim fed its logged inputs, so
+	-- it runs exactly that run. Your best's checkpoint times, worked out up front, give the splits.
+	local replays: { { p: any, part: BasePart, prev: Vector3, cur: Vector3 } } = {}
+	local splits = {}
+	local function addGhost(glog: any, text: string, color: Color3)
+		local gp = MarbleLook.make(MarbleLook.lookFor(player:GetAttribute("Marble") or "ember"), RaceSim.R)
+		gp.Name = "RaceGhost"
+		gp.Anchored, gp.CanCollide, gp.CanQuery, gp.CanTouch = true, false, false, false
+		for _, d2 in ipairs(gp:GetDescendants()) do
+			if d2:IsA("BasePart") then
+				d2.Transparency = math.max(d2.Transparency, 0.65)
+			end
+		end
+		gp.Transparency = 0.65
+		local tag = Instance.new("BillboardGui")
+		tag.Size = UDim2.fromOffset(120, 26)
+		tag.StudsOffset = Vector3.new(0, 4, 0)
+		tag.AlwaysOnTop = true
+		tag.Parent = gp
+		local tl = Instance.new("TextLabel")
+		tl.BackgroundTransparency = 1
+		tl.Size = UDim2.fromScale(1, 1)
+		tl.Font = Enum.Font.FredokaOne
+		tl.TextScaled = true
+		tl.Text = text
+		tl.TextColor3 = color
+		tl.TextStrokeTransparency = 0.3
+		tl.Parent = tag
+		gp.Parent = starFolder or Workspace -- cleared with the stars when the run ends
+		local gplay = RaceSim.player(glog)
+		local at = RaceSim.position(gplay.st)
+		table.insert(replays, { p = gplay, part = gp, prev = at, cur = at })
+	end
 	if typeof(info.ghost) == "table" then
 		local pre = RaceSim.player(info.ghost)
 		while not pre.st.finished and pre.st.tick < 60 * 60 * 6 do
@@ -414,38 +444,11 @@ run = function()
 				end
 			end
 		end
-		ghost = RaceSim.player(info.ghost)
-		local gp = MarbleLook.make(MarbleLook.lookFor(player:GetAttribute("Marble") or "ember"), RaceSim.R)
-		gp.Name = "RaceGhostPB"
-		gp.Anchored, gp.CanCollide, gp.CanQuery, gp.CanTouch = true, false, false, false
-		for _, d2 in ipairs(gp:GetDescendants()) do
-			if d2:IsA("BasePart") then
-				d2.Transparency = math.max(d2.Transparency, 0.65)
-			end
-		end
-		gp.Transparency = 0.65
-		local tag = Instance.new("BillboardGui")
-		tag.Size = UDim2.fromOffset(80, 26)
-		tag.StudsOffset = Vector3.new(0, 4, 0)
-		tag.AlwaysOnTop = true
-		tag.Parent = gp
-		local tl = Instance.new("TextLabel")
-		tl.BackgroundTransparency = 1
-		tl.Size = UDim2.fromScale(1, 1)
-		tl.Font = Enum.Font.FredokaOne
-		tl.TextScaled = true
-		tl.Text = "YOUR BEST"
-		tl.TextColor3 = Color3.fromRGB(255, 255, 255)
-		tl.TextStrokeTransparency = 0.3
-		tl.Parent = tag
-		gp.Parent = Workspace
-		ghostPart = gp
-		if starFolder then
-			gp.Parent = starFolder -- cleared with the stars when the run ends
-		end
+		addGhost(info.ghost, "YOUR BEST", Color3.fromRGB(255, 255, 255))
 	end
-	local ghostPrev = if ghost then RaceSim.position(ghost.st) else Vector3.zero
-	local ghostCur = ghostPrev
+	if typeof(info.record) == "table" and typeof(info.record.log) == "table" then
+		addGhost(info.record.log, "🥇 " .. tostring(info.record.name), Color3.fromRGB(255, 215, 80))
+	end
 	local function split(at: number?, now: number): (string, Color3)
 		if not at then
 			return "", Color3.fromRGB(150, 220, 255)
@@ -505,10 +508,12 @@ run = function()
 				prevPos = curPos
 				RaceSim.step(st, input)
 				curPos = RaceSim.position(st)
-				if ghost and not ghost.st.finished then
-					ghostPrev = ghostCur
-					ghost.step()
-					ghostCur = RaceSim.position(ghost.st)
+				for _, g in ipairs(replays) do
+					if not g.p.st.finished then
+						g.prev = g.cur
+						g.p.step()
+						g.cur = RaceSim.position(g.p.st)
+					end
 				end
 				for _, e in ipairs(st.events) do
 					if e == "bump" then
@@ -567,18 +572,12 @@ run = function()
 		end
 		-- The marble: interpolated between sim steps, rolling as it goes.
 		local alpha = math.clamp(acc / RaceSim.DT, 0, 1)
-		if ghostPart then
-			if ghost and ghost.st.finished then
-				ghostPart.Transparency = 1
-				for _, d2 in ipairs(ghostPart:GetDescendants()) do
-					if d2:IsA("BasePart") then
-						d2.Transparency = 1
-					elseif d2:IsA("BillboardGui") then
-						d2.Enabled = false
-					end
-				end
+		for _, g in ipairs(replays) do
+			if g.p.st.finished and g.part.Parent then
+				g.part:Destroy() -- over the line: gone
+			elseif g.part.Parent then
+				g.part.CFrame = CFrame.new(g.prev:Lerp(g.cur, alpha))
 			end
-			ghostPart.CFrame = CFrame.new(ghostPrev:Lerp(ghostCur, alpha))
 		end
 		local pos = prevPos:Lerp(curPos, alpha)
 		local vel = (curPos - prevPos) / RaceSim.DT

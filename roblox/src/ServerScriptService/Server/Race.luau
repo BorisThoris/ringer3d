@@ -49,29 +49,56 @@ pcall(function()
 end)
 local ghostCache: { [Player]: any } = {}
 Race.GHOST_MAX = 6000 -- input changes; a longer log is not kept as a ghost
-local function loadGhost(player: Player): any
-	if ghostCache[player] ~= nil then
-		return ghostCache[player] or nil
+-- Read a stored ghost. Only a log that still replays to its time on this course counts (the course
+-- may have changed since).
+local function fetchGhost(userId: number): any
+	-- Someone in this server already has their ghost cached.
+	for pl, g in pairs(ghostCache) do
+		if g and (pl :: any).UserId == userId then
+			return g
+		end
 	end
 	local got = nil
 	if ghosts then
 		pcall(function()
-			got = ghosts:GetAsync(tostring(player.UserId))
+			got = ghosts:GetAsync(tostring(userId))
 		end)
 	end
-	-- Only a log that still replays to its time on this course is a ghost (the course may change).
 	if got and typeof(got.log) == "table" and RaceSim.validLog(got.log) then
 		local st = RaceSim.replay(got.log)
-		if not (st.finished and math.abs(st.finishTick / 60 - (got.time or -1)) < 1e-6) then
-			got = nil
+		if st.finished and math.abs(st.finishTick / 60 - (got.time or -1)) < 1e-6 then
+			return got
 		end
-	else
-		got = nil
 	end
+	return nil
+end
+local function loadGhost(player: Player): any
+	if ghostCache[player] ~= nil then
+		return ghostCache[player] or nil
+	end
+	local got = fetchGhost(player.UserId)
 	ghostCache[player] = got or false
 	return got
 end
 Race.loadGhost = loadGhost
+
+-- The record ghost: the all-time leader's best run, so everyone can race the record holder. Read
+-- again at most every five minutes, or when the leader changes.
+local record: any = nil
+local recordAt, recordId = -math.huge, nil
+function Race.recordGhost(): any
+	local top = Race.top()
+	local lead = top[1]
+	if not lead or not lead.userId then
+		return nil
+	end
+	if lead.userId ~= recordId or os.clock() - recordAt > 300 then
+		recordAt, recordId = os.clock(), lead.userId
+		local g = fetchGhost(lead.userId)
+		record = if g then { userId = lead.userId, name = lead.name, time = g.time, log = g.log } else nil
+	end
+	return record
+end
 
 -- This week's board: a fresh one every Monday, so there is always a race anyone can win.
 local function week(): number
@@ -104,7 +131,15 @@ function Race.start(player: Player): (boolean, any)
 	player:SetAttribute("Racing", true)
 	local p = Data.get(player) or {}
 	local ghost = loadGhost(player)
-	return true, { countdown = 3, medals = Race.MEDALS, best = p.raceBest, bestStars = p.raceStars, ghost = ghost and ghost.log }
+	local rec = Race.recordGhost()
+	if rec and rec.userId == player.UserId then
+		rec = nil -- you hold the record: your own ghost is it
+	end
+	return true, {
+		countdown = 3, medals = Race.MEDALS, best = p.raceBest, bestStars = p.raceStars,
+		ghost = ghost and ghost.log,
+		record = rec and { name = rec.name, time = rec.time, log = rec.log },
+	}
 end
 
 function Race.leave(player: Player)
@@ -139,6 +174,9 @@ function Race.finish(player: Player, log: any): (boolean, any)
 		return false, "That run was faster than real time."
 	end
 	session.started = os.clock() + 3 -- a new run starts after the next countdown
+	-- Only real players reach the shared stores (the tests finish runs as plain tables, and the
+	-- cloud test runs share this game's live DataStores).
+	local isPlayer = typeof(player) == "Instance"
 	local medal, coins = nil, Race.FINISH_COINS
 	local starTotal = #RaceTrack.get().stars
 	coins += st.starCount * Race.STAR_COINS
@@ -172,7 +210,7 @@ function Race.finish(player: Player, log: any): (boolean, any)
 	if newBest and #log <= Race.GHOST_MAX then
 		local entry = { log = log, time = time }
 		ghostCache[player] = entry
-		if ghosts then
+		if ghosts and isPlayer then
 			task.spawn(function()
 				pcall(function()
 					ghosts:SetAsync(tostring(player.UserId), entry)
@@ -180,7 +218,7 @@ function Race.finish(player: Player, log: any): (boolean, any)
 			end)
 		end
 	end
-	if newBest and board then
+	if newBest and board and isPlayer then
 		task.spawn(function()
 			pcall(function()
 				board:SetAsync(tostring(player.UserId), math.floor(time * 1000))
@@ -195,7 +233,7 @@ function Race.finish(player: Player, log: any): (boolean, any)
 			pp.raceWeek = { week = wk, best = time }
 		end)
 		local wb = weekBoard()
-		if wb then
+		if wb and isPlayer then
 			task.spawn(function()
 				pcall(function()
 					wb:SetAsync(tostring(player.UserId), math.floor(time * 1000))
@@ -226,7 +264,7 @@ local function read(store: any): { any }?
 					names[id] = Players:GetNameFromUserIdAsync(id)
 				end)
 			end
-			table.insert(out, { name = names[id] or "?", time = e.value / 1000 })
+			table.insert(out, { name = names[id] or "?", time = e.value / 1000, userId = id })
 		end
 	end)
 	return out
