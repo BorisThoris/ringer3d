@@ -22,8 +22,11 @@ function Economy.hasPass(player: Player, pass: string): boolean
 	return p ~= nil and p[pass] == true
 end
 
+-- Friends playing in the same server (set by Flex): +10% each, up to +30%.
+Economy.friends = {} :: { [Player]: number }
+
 function Economy.multiplier(player: Player): number
-	local m = 1
+	local m = 1 + math.min(Economy.friends[player] or 0, 3) * 0.1
 	if Economy.hasPass(player, "vip") then
 		m *= Config.VIP_MULTIPLIER
 	end

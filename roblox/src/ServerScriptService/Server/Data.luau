@@ -36,6 +36,7 @@ export type Profile = {
 	lastDaily: number, -- day number (UTC) of the last daily claim
 	receipts: { string },
 	welcomed: boolean,
+	codes: { [string]: boolean }, -- promo codes already redeemed
 }
 
 local function fresh(): Profile
@@ -57,6 +58,7 @@ local function fresh(): Profile
 		lastDaily = 0,
 		receipts = {},
 		welcomed = false,
+		codes = {},
 	}
 end
 

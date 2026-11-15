@@ -17,6 +17,7 @@ local Market = require(Server.Market)
 local Leaderboard = require(Server.Leaderboard)
 local Social = require(Server.Social)
 local Race = require(Server.Race)
+local Flex = require(Server.Flex)
 
 -- ---- Remotes --------------------------------------------------------------------------------
 local remotes = Instance.new("Folder")
@@ -801,6 +802,10 @@ function handlers.book(player: Player, setId)
 	return Collectibles.claimBook(player, setId)
 end
 
+function handlers.redeem(player: Player, code)
+	return Flex.redeemFor(player, code)
+end
+
 function handlers.daily(player: Player)
 	local p = Data.get(player)
 	local today = math.floor(os.time() / 86400)
@@ -902,6 +907,16 @@ do
 	Race.board(CFrame.lookAt(at, Vector3.new(0, 10, 0)), lobby)
 end
 Social.start(Announce)
+-- Crowns: the race's all-time record holder and this week's leader.
+Flex.start(function()
+	local ids = {}
+	for _, list in ipairs({ Race.top(), Race.topWeek() }) do
+		if list[1] and list[1].userId then
+			table.insert(ids, list[1].userId)
+		end
+	end
+	return ids
+end)
 
 Data.start()
 Market.start()

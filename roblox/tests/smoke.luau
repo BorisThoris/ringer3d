@@ -88,6 +88,41 @@ local gifts = Social.gifts(giftFake)
 local okEarly, whyEarly = Social.claimGift(giftFake, 1)
 check("six playtime gifts, none opens early", #gifts == 6 and gifts[1].left > 0 and not okEarly and whyEarly == "Not yet!", whyEarly)
 
+-- Flex: auras by level tier, codes once each, the friend boost capped.
+do
+	local Flex = require(game.ServerScriptService.Server.Flex)
+	check("no aura below level 5, then one per tier", Flex.auraFor(1) == nil and Flex.auraFor(4) == nil and Flex.auraFor(5) == "Spark" and Flex.auraFor(19) == "Glow" and Flex.auraFor(20) == "Stars" and Flex.auraFor(60) == "Prism")
+	local prof = { codes = {} }
+	local ok1, c1 = Flex.redeem(prof, "  ringer ")
+	local ok2, why2 = Flex.redeem(prof, "RINGER")
+	local ok3, why3 = Flex.redeem(prof, "NOPE")
+	Flex.CODES.OLDONE = { coins = 10, expired = true }
+	local ok4, why4 = Flex.redeem(prof, "oldone")
+	Flex.CODES.OLDONE = nil
+	local ok5 = Flex.redeem(prof, string.rep("x", 100))
+	check("a code pays once, any case, trimmed", ok1 and c1 == Flex.CODES.RINGER.coins and not ok2 and why2:find("already") ~= nil, tostring(c1) .. " / " .. tostring(why2))
+	check("unknown, expired and junk codes are refused", not ok3 and why3 == "That's not a code." and not ok4 and why4:find("expired") ~= nil and not ok5)
+	check("friends boost coins 10% each, up to 30%", Flex.friendBoost(0) == 1 and math.abs(Flex.friendBoost(2) - 1.2) < 1e-9 and math.abs(Flex.friendBoost(9) - 1.3) < 1e-9)
+	-- Dress a stand-in character in every aura and the crown.
+	local dummy = Instance.new("Model")
+	local root = Instance.new("Part")
+	root.Name = "HumanoidRootPart"
+	root.Parent = dummy
+	local head = Instance.new("Part")
+	head.Name = "Head"
+	head.Parent = dummy
+	local dressed = true
+	for _, a in ipairs(Flex.AURAS) do
+		Flex.dress(dummy, a.name, false)
+		local at = root:FindFirstChild("Aura")
+		dressed = dressed and at ~= nil and at:FindFirstChildOfClass("ParticleEmitter") ~= nil and #root:GetChildren() == 1
+	end
+	Flex.dress(dummy, "Prism", true)
+	local crowned = head:FindFirstChild("Crown") ~= nil
+	Flex.dress(dummy, nil, false)
+	check("every aura dresses a character, one at a time; the crown comes and goes", dressed and crowned and head:FindFirstChild("Crown") == nil and root.Aura:FindFirstChildOfClass("ParticleEmitter") == nil)
+end
+
 -- 3. Rules.
 local cross = Rules.startingCross()
 check("cross has 13", #cross == 13, #cross)

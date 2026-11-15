@@ -97,6 +97,17 @@ Kit.round(coinIcon, 17)
 Kit.stroke(coinIcon, Kit.INK, 2)
 local coinText = Kit.label("0", 30, { Position = UDim2.fromOffset(48, 5), Size = UDim2.new(1, -56, 0, 40), TextXAlignment = Enum.TextXAlignment.Left, Parent = coinPill })
 Kit.gradient(coinText, Color3.fromRGB(255, 250, 170), Kit.GOLD)
+-- Friends in the server earn more (Server/Flex): a pill under the coins says how much.
+local friendPill = Kit.label("", 18, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 62), Size = UDim2.fromOffset(200, 26), BackgroundTransparency = 0.1, BackgroundColor3 = Kit.GREEN, Visible = false, Parent = hud })
+Kit.round(friendPill, 13)
+Kit.stroke(friendPill, Kit.INK, 2)
+local function showFriends()
+	local n = Players.LocalPlayer:GetAttribute("Friends") or 0
+	friendPill.Visible = n > 0
+	friendPill.Text = string.format("👥 %d friend%s here: +%d%% coins", n, if n == 1 then "" else "s", math.min(n, 3) * 10)
+end
+Players.LocalPlayer:GetAttributeChangedSignal("Friends"):Connect(showFriends)
+showFriends()
 local shownCoins: number? = nil
 -- Coins count up to the new total, with a "+N" when they grow.
 local function setCoins(n: number)
@@ -725,8 +736,27 @@ Kit.button("🏔️ Race", Kit.BLUE, function()
 end, { Size = UDim2.fromOffset(150, 58), Parent = side })
 -- Playtime gifts (Server/Social): six boxes across the first hour, the next one counting down
 -- on its button.
-local giftPanel, giftBody = Kit.panel(screen, "Free Gifts", UDim2.fromOffset(620, 400))
+local giftPanel, giftBody = Kit.panel(screen, "Free Gifts", UDim2.fromOffset(620, 470))
 panels.gifts = giftPanel
+-- Codes (Server/Flex): typed at the foot of the Gifts panel, where players look for free stuff.
+do
+	local row = Kit.new("Frame", { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -14), Size = UDim2.new(1, -40, 0, 50), BackgroundTransparency = 1, ZIndex = 20, Parent = giftPanel })
+	local box = Kit.new("TextBox", { Size = UDim2.new(1, -170, 1, 0), BackgroundColor3 = Kit.CREAM, Font = Enum.Font.FredokaOne, TextSize = 24, Text = "", PlaceholderText = "Have a code? Type it here", TextColor3 = Kit.INK, ClearTextOnFocus = false, ZIndex = 20, Parent = row })
+	Kit.round(box, 14)
+	Kit.stroke(box, Kit.INK, 2)
+	Kit.button("Redeem", Kit.GREEN, function()
+		local okR, res = ask("redeem", box.Text)
+		if okR and typeof(res) == "table" then
+			Sfx.ui("buy", 0.9)
+			local vp = workspace.CurrentCamera.ViewportSize
+			Rewards.coinsFly(Vector2.new(vp.X / 2, vp.Y / 2), res.coins or 0)
+			toast(string.format("Code redeemed! +%d coins", res.coins or 0), "good")
+			box.Text = ""
+		else
+			toast(typeof(res) == "string" and res or "That's not a code.", "bad")
+		end
+	end, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.new(0, 160, 1, 0), ZIndex = 20, Parent = row })
+end
 local giftList: any = nil
 local giftAt = 0
 local function fmtLeft(sec: number): string
@@ -1535,8 +1565,23 @@ TextChatService.OnIncomingMessage = function(message: TextChatMessage)
 	local props = Instance.new("TextChatMessageProperties")
 	if message.TextSource then
 		local from = Players:GetPlayerByUserId(message.TextSource.UserId)
-		if from and from:GetAttribute("VIP") then
-			props.PrefixText = "<font color='#FFC83C'>[VIP]</font> " .. message.PrefixText
+		if from then
+			-- Tags: the crown, VIP, and the level in its aura tier's colour (Server/Flex).
+			local tags = {}
+			if from:GetAttribute("Crown") then
+				table.insert(tags, "<font color='#FFD750'>[👑]</font>")
+			end
+			if from:GetAttribute("VIP") then
+				table.insert(tags, "<font color='#FFC83C'>[VIP]</font>")
+			end
+			local level = from:GetAttribute("Level")
+			if level then
+				local colour = ({ Spark = "#E6F0FF", Glow = "#78D2FF", Stars = "#C88CFF", Blaze = "#FF9640", Prism = "#FF6EC8" })[from:GetAttribute("Aura") or ""] or "#B4BCC8"
+				table.insert(tags, string.format("<font color='%s'>[Lv %d]</font>", colour, level))
+			end
+			if #tags > 0 then
+				props.PrefixText = table.concat(tags, " ") .. " " .. message.PrefixText
+			end
 		end
 	end
 	return props
