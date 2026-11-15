@@ -291,6 +291,7 @@ end
 local marblesPage = page("Marbles")
 local bagsPage = page("Bags")
 local robuxPage = page("Robux")
+local aurasPage = page("✨ Auras")
 marblesPage.Visible = true
 
 local function itemCard(parent: Instance, title: string, sub: string, color: Color3)
@@ -303,7 +304,82 @@ local function itemCard(parent: Instance, title: string, sub: string, color: Col
 end
 
 local onBag -- the bag reveal, defined further down
+-- Auras (Server/Flex): the level ones unlock as you level; the shop ones are bought with coins.
+local AURA_LOOK = {
+	Spark = { "✨", Color3.fromRGB(235, 240, 255) }, Glow = { "💠", Color3.fromRGB(120, 210, 255) }, Stars = { "🌟", Color3.fromRGB(200, 140, 255) },
+	Blaze = { "🔥", Color3.fromRGB(255, 150, 60) }, Prism = { "🌈", Color3.fromRGB(255, 110, 200) }, Frost = { "❄️", Color3.fromRGB(170, 230, 255) },
+	Toxic = { "☢️", Color3.fromRGB(140, 255, 90) }, Galaxy = { "🌌", Color3.fromRGB(150, 110, 255) }, Inferno = { "🌋", Color3.fromRGB(255, 90, 40) },
+	Celestial = { "👼", Color3.fromRGB(255, 230, 140) },
+}
+local function fillAuras()
+	for _, c in ipairs(aurasPage:GetChildren()) do
+		if c:IsA("Frame") then
+			c:Destroy()
+		end
+	end
+	local info = ask("auraShop")
+	if typeof(info) ~= "table" then
+		return
+	end
+	local function card(name: string, sub: string, state: string, onClick: (() -> ())?)
+		local look = AURA_LOOK[name] or { "⭕", Kit.CREAM }
+		local c = itemCard(aurasPage, name, sub, look[2])
+		Kit.label(look[1], 64, { Position = UDim2.fromOffset(0, 20), Size = UDim2.new(1, 0, 0, 90), Parent = c })
+		local colour = if state == "Wearing" then Kit.GOLD elseif state == "Wear" then Kit.GREEN elseif state == "Locked" then Color3.fromRGB(120, 120, 140) else Kit.BLUE
+		Kit.button(state, colour, function()
+			if onClick then
+				onClick()
+			end
+		end, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -14), Size = UDim2.new(0.85, 0, 0, 50), Parent = c })
+	end
+	local function pick(name: string)
+		local okP, res = ask("pickAura", name)
+		if okP then
+			Sfx.ui("buy", 0.7)
+			fillAuras()
+		else
+			toast(typeof(res) == "string" and res or "Can't wear that yet.", "info")
+		end
+	end
+	card("No aura", "Just you", if info.pick == "none" then "Wearing" else "Wear", function()
+		pick("none")
+	end)
+	for _, a in ipairs(info.levels) do
+		local unlocked = info.level >= a.level
+		card(a.name, "Free at level " .. a.level, if info.wearing == a.name then "Wearing" elseif unlocked then "Wear" else "Locked", function()
+			if unlocked then
+				pick(a.name)
+			else
+				toast(string.format("Reach level %d to wear %s.", a.level, a.name), "info")
+			end
+		end)
+	end
+	for _, a in ipairs(info.shop) do
+		local owned = info.owned[a.name] == true
+		card(a.name, if owned then "Owned" else ("🪙 " .. Kit.comma(a.price)), if info.wearing == a.name then "Wearing" elseif owned then "Wear" else "Buy", function()
+			if owned then
+				pick(a.name)
+				return
+			end
+			local okB, res = ask("buyAura", a.name)
+			if okB then
+				Sfx.ui("buy", 1)
+				Rewards.confetti(70)
+				toast(a.name .. " aura unlocked!", "good")
+				local prof = ask("profile")
+				if typeof(prof) == "table" and prof.profile then
+					profile = prof.profile
+					setCoins(profile.coins)
+				end
+				fillAuras()
+			else
+				toast(typeof(res) == "string" and res or "Not enough coins.", "bad")
+			end
+		end)
+	end
+end
 local function refreshShop()
+	task.spawn(fillAuras)
 	for _, f in ipairs({ marblesPage, bagsPage, robuxPage }) do
 		for _, c in ipairs(f:GetChildren()) do
 			if c:IsA("Frame") then

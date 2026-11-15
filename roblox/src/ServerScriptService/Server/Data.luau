@@ -40,6 +40,8 @@ export type Profile = {
 	lastSpin: number, -- os.time() of the last daily spin
 	boostUntil: number, -- double coins until this os.time() (a spin prize)
 	favorited: boolean, -- paid once for favouriting the game
+	auras: { [string]: boolean }, -- auras bought in the shop
+	auraPick: string?, -- the aura worn ("none" for none; nil for the level's own)
 }
 
 local function fresh(): Profile
@@ -65,6 +67,7 @@ local function fresh(): Profile
 		lastSpin = 0,
 		boostUntil = 0,
 		favorited = false,
+		auras = {},
 	}
 end
 

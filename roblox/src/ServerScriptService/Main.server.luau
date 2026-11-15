@@ -818,6 +818,18 @@ function handlers.favorited(player: Player)
 	return Flex.favorited(player)
 end
 
+function handlers.auraShop(player: Player)
+	return Flex.auraShop(player)
+end
+
+function handlers.buyAura(player: Player, name)
+	return Flex.buyAura(player, name)
+end
+
+function handlers.pickAura(player: Player, name)
+	return Flex.pickAura(player, name)
+end
+
 function handlers.daily(player: Player)
 	local p = Data.get(player)
 	local today = math.floor(os.time() / 86400)

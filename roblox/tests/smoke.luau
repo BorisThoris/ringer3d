@@ -143,6 +143,24 @@ do
 		end
 	end
 	check("the wheel lands at its published odds", fair)
+	-- The aura shop: shop auras need buying, level auras need the level, "none" is always allowed.
+	local ap = { coins = 3000, auras = {} }
+	local okBuy, price = Flex.buyCheck(ap, "Frost")
+	local okPoor = Flex.buyCheck(ap, "Celestial")
+	local okFake = Flex.buyCheck(ap, "Nope")
+	check("shop auras are bought with enough coins, only real ones", okBuy and price == 2500 and not okPoor and not okFake)
+	ap.auras.Frost = true
+	ap.auraPick = "Frost"
+	local wearsBought = Flex.choose(ap, 1) == "Frost"
+	ap.auraPick = "Prism"
+	local fallsBack = Flex.choose(ap, 12) == "Glow" -- can't wear Prism at 12: the level's own
+	ap.auraPick = "none"
+	check("you wear what you own or unlocked, else your level's aura, or none", wearsBought and fallsBack and Flex.choose(ap, 60) == nil and Flex.canWear(ap, 50, "Prism") and not Flex.canWear(ap, 49, "Prism") and not Flex.canWear(ap, 99, "Inferno"))
+	for name in pairs(Flex.STYLES) do
+		Flex.dress(dummy, name, false)
+		dressed = dressed and root.Aura:FindFirstChildOfClass("ParticleEmitter") ~= nil
+	end
+	Flex.dress(dummy, nil, false)
 	check("every aura dresses a character, one at a time; the crown comes and goes", dressed and crowned and head:FindFirstChild("Crown") == nil and root.Aura:FindFirstChildOfClass("ParticleEmitter") == nil)
 end
 

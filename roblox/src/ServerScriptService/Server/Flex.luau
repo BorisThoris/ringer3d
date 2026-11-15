@@ -65,6 +65,63 @@ local function seq(...: Color3): ColorSequence
 	return ColorSequence.new(keys)
 end
 
+local function light(parent: Instance, color: Color3, range: number, brightness: number)
+	local l = Instance.new("PointLight")
+	l.Color = color
+	l.Range = range
+	l.Brightness = brightness
+	l.Parent = parent
+end
+
+local RGB = Color3.fromRGB
+-- Each aura's look: emitters (and a light) on an attachment at the character's feet.
+Flex.STYLES = {
+	Spark = function(at)
+		emitter(at, { Color = seq(RGB(255, 255, 255)), Size = NumberSequence.new(0.25, 0), Rate = 8, Lifetime = NumberRange.new(0.8, 1.4), Speed = NumberRange.new(1.5, 3), SpreadAngle = Vector2.new(180, 180) })
+	end,
+	Glow = function(at)
+		emitter(at, { Color = seq(RGB(120, 210, 255)), Size = NumberSequence.new(0.4, 0), Rate = 14, Lifetime = NumberRange.new(1, 1.6), Speed = NumberRange.new(2, 4), SpreadAngle = Vector2.new(180, 180) })
+		light(at, RGB(120, 210, 255), 10, 1.2)
+	end,
+	Stars = function(at)
+		emitter(at, { Color = seq(RGB(200, 140, 255), RGB(255, 220, 120)), Size = NumberSequence.new(0.6, 0), Rate = 18, Lifetime = NumberRange.new(1.4, 2), Speed = NumberRange.new(3, 5), Acceleration = Vector3.new(0, 4, 0), SpreadAngle = Vector2.new(40, 40), EmissionDirection = Enum.NormalId.Top })
+		light(at, RGB(200, 140, 255), 12, 1.5)
+	end,
+	Blaze = function(at)
+		emitter(at, { Texture = FIRE, Color = seq(RGB(255, 220, 90), RGB(255, 90, 40)), Size = NumberSequence.new(1.6, 0.2), Transparency = NumberSequence.new(0.2, 1), Rate = 26, Lifetime = NumberRange.new(0.6, 1), Speed = NumberRange.new(4, 7), SpreadAngle = Vector2.new(20, 20), EmissionDirection = Enum.NormalId.Top })
+		light(at, RGB(255, 150, 60), 14, 2)
+	end,
+	Prism = function(at)
+		emitter(at, { Color = seq(RGB(255, 80, 80), RGB(255, 220, 60), RGB(80, 255, 140), RGB(80, 160, 255), RGB(220, 90, 255)), Size = NumberSequence.new(0.8, 0), Rate = 34, Lifetime = NumberRange.new(1.2, 2), Speed = NumberRange.new(3, 6), Acceleration = Vector3.new(0, 3, 0), SpreadAngle = Vector2.new(180, 180), RotSpeed = NumberRange.new(-90, 90) })
+		light(at, RGB(255, 255, 255), 16, 2.2)
+	end,
+	-- The shop's auras.
+	Frost = function(at)
+		emitter(at, { Color = seq(RGB(220, 245, 255), RGB(140, 210, 255)), Size = NumberSequence.new(0.5, 0.1), Rate = 22, Lifetime = NumberRange.new(1.5, 2.2), Speed = NumberRange.new(1, 2), Acceleration = Vector3.new(0, -1, 0), SpreadAngle = Vector2.new(180, 180), RotSpeed = NumberRange.new(-60, 60) })
+		light(at, RGB(170, 230, 255), 12, 1.4)
+	end,
+	Toxic = function(at)
+		emitter(at, { Texture = "rbxasset://textures/particles/smoke_main.dds", Color = seq(RGB(140, 255, 90), RGB(60, 200, 60)), Size = NumberSequence.new(1.2, 2.4), Transparency = NumberSequence.new(0.4, 1), Rate = 12, Lifetime = NumberRange.new(1.2, 1.8), Speed = NumberRange.new(2, 3), EmissionDirection = Enum.NormalId.Top, SpreadAngle = Vector2.new(25, 25) })
+		emitter(at, { Color = seq(RGB(170, 255, 120)), Size = NumberSequence.new(0.4, 0), Rate = 14, Lifetime = NumberRange.new(1, 1.5), Speed = NumberRange.new(3, 5), EmissionDirection = Enum.NormalId.Top, SpreadAngle = Vector2.new(30, 30) })
+		light(at, RGB(120, 255, 90), 12, 1.6)
+	end,
+	Galaxy = function(at)
+		emitter(at, { Texture = "rbxasset://textures/particles/smoke_main.dds", Color = seq(RGB(90, 40, 170), RGB(30, 20, 90)), Size = NumberSequence.new(2, 3), Transparency = NumberSequence.new(0.3, 1), Rate = 10, Lifetime = NumberRange.new(1.5, 2.2), Speed = NumberRange.new(1, 2), SpreadAngle = Vector2.new(180, 180) })
+		emitter(at, { Color = seq(RGB(255, 255, 255), RGB(180, 160, 255)), Size = NumberSequence.new(0.35, 0), Rate = 30, Lifetime = NumberRange.new(1.5, 2.5), Speed = NumberRange.new(2, 4), SpreadAngle = Vector2.new(180, 180) })
+		light(at, RGB(150, 110, 255), 14, 1.8)
+	end,
+	Inferno = function(at)
+		emitter(at, { Texture = FIRE, Color = seq(RGB(255, 240, 150), RGB(255, 60, 20), RGB(120, 0, 0)), Size = NumberSequence.new(2.4, 0.4), Transparency = NumberSequence.new(0.1, 1), Rate = 40, Lifetime = NumberRange.new(0.8, 1.3), Speed = NumberRange.new(6, 10), SpreadAngle = Vector2.new(25, 25), EmissionDirection = Enum.NormalId.Top })
+		emitter(at, { Texture = "rbxasset://textures/particles/smoke_main.dds", Color = seq(RGB(60, 40, 40)), Size = NumberSequence.new(2, 4), Transparency = NumberSequence.new(0.5, 1), Rate = 8, Lifetime = NumberRange.new(1.5, 2), Speed = NumberRange.new(6, 8), EmissionDirection = Enum.NormalId.Top })
+		light(at, RGB(255, 100, 40), 18, 2.5)
+	end,
+	Celestial = function(at)
+		emitter(at, { Color = seq(RGB(255, 250, 220), RGB(255, 215, 90)), Size = NumberSequence.new(1, 0), LightEmission = 1, Rate = 40, Lifetime = NumberRange.new(1.5, 2.5), Speed = NumberRange.new(4, 7), Acceleration = Vector3.new(0, 5, 0), SpreadAngle = Vector2.new(180, 180), RotSpeed = NumberRange.new(-120, 120) })
+		emitter(at, { Color = seq(RGB(255, 80, 80), RGB(255, 220, 60), RGB(80, 255, 140), RGB(80, 160, 255), RGB(220, 90, 255)), Size = NumberSequence.new(0.5, 0), Rate = 24, Lifetime = NumberRange.new(2, 3), Speed = NumberRange.new(1, 2), SpreadAngle = Vector2.new(180, 180) })
+		light(at, RGB(255, 240, 200), 22, 3)
+	end,
+}
+
 --- Dress a character's root in its aura (and crown); replaces whatever it wore.
 function Flex.dress(character: Model, aura: string?, crown: boolean)
 	local root = character:FindFirstChild("HumanoidRootPart") :: BasePart?
@@ -83,36 +140,9 @@ function Flex.dress(character: Model, aura: string?, crown: boolean)
 	at.Name = "Aura"
 	at.Position = Vector3.new(0, -1.5, 0)
 	at.Parent = root
-	if aura == "Spark" then
-		emitter(at, { Color = seq(Color3.fromRGB(255, 255, 255)), Size = NumberSequence.new(0.25, 0), Rate = 8, Lifetime = NumberRange.new(0.8, 1.4), Speed = NumberRange.new(1.5, 3), SpreadAngle = Vector2.new(180, 180) })
-	elseif aura == "Glow" then
-		emitter(at, { Color = seq(Color3.fromRGB(120, 210, 255)), Size = NumberSequence.new(0.4, 0), Rate = 14, Lifetime = NumberRange.new(1, 1.6), Speed = NumberRange.new(2, 4), SpreadAngle = Vector2.new(180, 180) })
-		local l = Instance.new("PointLight")
-		l.Color = Color3.fromRGB(120, 210, 255)
-		l.Range = 10
-		l.Brightness = 1.2
-		l.Parent = at
-	elseif aura == "Stars" then
-		emitter(at, { Color = seq(Color3.fromRGB(200, 140, 255), Color3.fromRGB(255, 220, 120)), Size = NumberSequence.new(0.6, 0), Rate = 18, Lifetime = NumberRange.new(1.4, 2), Speed = NumberRange.new(3, 5), Acceleration = Vector3.new(0, 4, 0), SpreadAngle = Vector2.new(40, 40), EmissionDirection = Enum.NormalId.Top })
-		local l = Instance.new("PointLight")
-		l.Color = Color3.fromRGB(200, 140, 255)
-		l.Range = 12
-		l.Brightness = 1.5
-		l.Parent = at
-	elseif aura == "Blaze" then
-		emitter(at, { Texture = FIRE, Color = seq(Color3.fromRGB(255, 220, 90), Color3.fromRGB(255, 90, 40)), Size = NumberSequence.new(1.6, 0.2), Transparency = NumberSequence.new(0.2, 1), Rate = 26, Lifetime = NumberRange.new(0.6, 1), Speed = NumberRange.new(4, 7), SpreadAngle = Vector2.new(20, 20), EmissionDirection = Enum.NormalId.Top })
-		local l = Instance.new("PointLight")
-		l.Color = Color3.fromRGB(255, 150, 60)
-		l.Range = 14
-		l.Brightness = 2
-		l.Parent = at
-	elseif aura == "Prism" then
-		emitter(at, { Color = seq(Color3.fromRGB(255, 80, 80), Color3.fromRGB(255, 220, 60), Color3.fromRGB(80, 255, 140), Color3.fromRGB(80, 160, 255), Color3.fromRGB(220, 90, 255)), Size = NumberSequence.new(0.8, 0), Rate = 34, Lifetime = NumberRange.new(1.2, 2), Speed = NumberRange.new(3, 6), Acceleration = Vector3.new(0, 3, 0), SpreadAngle = Vector2.new(180, 180), RotSpeed = NumberRange.new(-90, 90) })
-		local l = Instance.new("PointLight")
-		l.Color = Color3.fromRGB(255, 255, 255)
-		l.Range = 16
-		l.Brightness = 2.2
-		l.Parent = at
+	local style = aura and Flex.STYLES[aura]
+	if style then
+		style(at)
 	end
 	if crown and head then
 		local g = Instance.new("BillboardGui")
@@ -128,8 +158,63 @@ function Flex.dress(character: Model, aura: string?, crown: boolean)
 		t.TextScaled = true
 		t.Text = "👑"
 		t.Parent = g
-		emitter(at, { Color = seq(Color3.fromRGB(255, 215, 80)), Size = NumberSequence.new(0.5, 0), Rate = 20, Lifetime = NumberRange.new(1, 1.6), Speed = NumberRange.new(2, 4), SpreadAngle = Vector2.new(180, 180) })
+		emitter(at, { Color = seq(RGB(255, 215, 80)), Size = NumberSequence.new(0.5, 0), Rate = 20, Lifetime = NumberRange.new(1, 1.6), Speed = NumberRange.new(2, 4), SpreadAngle = Vector2.new(180, 180) })
 	end
+end
+
+-- ---- The aura shop -------------------------------------------------------------------------------
+-- Auras for coins: a coin sink that shows. Level auras stay free once their level is reached; a
+-- player wears any aura they own or have unlocked, or none.
+Flex.SHOP = {
+	{ name = "Frost", price = 2500 },
+	{ name = "Toxic", price = 6000 },
+	{ name = "Galaxy", price = 15000 },
+	{ name = "Inferno", price = 40000 },
+	{ name = "Celestial", price = 100000 },
+}
+local SHOP_PRICE = {}
+for _, a in ipairs(Flex.SHOP) do
+	SHOP_PRICE[a.name] = a.price
+end
+
+--- Can profile `p` at `level` wear `name`?
+function Flex.canWear(p: any, level: number, name: string): boolean
+	if SHOP_PRICE[name] then
+		return (p.auras or {})[name] == true
+	end
+	for _, a in ipairs(Flex.AURAS) do
+		if a.name == name then
+			return level >= a.level
+		end
+	end
+	return false
+end
+
+--- What profile `p` at `level` wears: its pick if it can, "none" for none, else its level's aura.
+function Flex.choose(p: any, level: number): string?
+	local pick = p.auraPick
+	if pick == "none" then
+		return nil
+	end
+	if pick and Flex.canWear(p, level, pick) then
+		return pick
+	end
+	return Flex.auraFor(level)
+end
+
+--- Buy a shop aura for profile `p` with `coins`: ok, or why not. (Spending is the caller's.)
+function Flex.buyCheck(p: any, name: any): (boolean, any)
+	local price = typeof(name) == "string" and SHOP_PRICE[name]
+	if not price then
+		return false, "That aura isn't for sale."
+	end
+	if (p.auras or {})[name] then
+		return false, "You already own it."
+	end
+	if (p.coins or 0) < price then
+		return false, string.format("You need %d more coins.", price - (p.coins or 0))
+	end
+	return true, price
 end
 
 -- Who wears the crown: set by the race's boards (Flex.start's refresher).
@@ -137,13 +222,60 @@ Flex.crowned = {} :: { [number]: boolean }
 
 function Flex.refresh(player: Player)
 	local level = player:GetAttribute("Level") or 1
-	local aura = Flex.auraFor(level)
+	local p = Data.get(player)
+	local aura = if p then Flex.choose(p, level) else Flex.auraFor(level)
 	local crown = Flex.crowned[player.UserId] == true
 	player:SetAttribute("Aura", aura)
 	player:SetAttribute("Crown", crown or nil)
 	if player.Character then
 		Flex.dress(player.Character, aura, crown)
 	end
+end
+
+function Flex.auraShop(player: Player): any
+	local p = Data.get(player)
+	if not p then
+		return nil
+	end
+	local level = player:GetAttribute("Level") or 1
+	return { shop = Flex.SHOP, levels = Flex.AURAS, owned = p.auras or {}, pick = p.auraPick, wearing = Flex.choose(p, level), level = level }
+end
+
+function Flex.buyAura(player: Player, name: any): (boolean, any)
+	local p = Data.get(player)
+	if not p then
+		return false, "Your profile is still loading."
+	end
+	local ok, res = Flex.buyCheck(p, name)
+	if not ok then
+		return false, res
+	end
+	if not Economy.spend(player, res, "aura:" .. name) then
+		return false, "Not enough coins."
+	end
+	Data.update(player, function(pp)
+		pp.auras = pp.auras or {}
+		pp.auras[name] = true
+		pp.auraPick = name
+	end)
+	Flex.refresh(player)
+	return true, Flex.auraShop(player)
+end
+
+function Flex.pickAura(player: Player, name: any): (boolean, any)
+	local p = Data.get(player)
+	if not p or typeof(name) ~= "string" then
+		return false, "Which aura?"
+	end
+	local level = player:GetAttribute("Level") or 1
+	if name ~= "none" and not Flex.canWear(p, level, name) then
+		return false, "You haven't unlocked that aura yet."
+	end
+	Data.update(player, function(pp)
+		pp.auraPick = name
+	end)
+	Flex.refresh(player)
+	return true, Flex.auraShop(player)
 end
 
 -- ---- Friend boost --------------------------------------------------------------------------------
