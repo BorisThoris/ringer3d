@@ -143,8 +143,12 @@ end
 function Kit.open(panel: GuiObject)
 	panel.Visible = true
 	local scale = panel:FindFirstChildOfClass("UIScale") or Kit.new("UIScale", { Parent = panel })
-	scale.Scale = 0.85
-	TweenService:Create(scale, TweenInfo.new(0.25, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+	-- Open at a size that fits the screen (a phone in landscape is under 400 pixels tall).
+	local base = panel.AbsoluteSize / math.max(scale.Scale, 0.01)
+	local view = Workspace.CurrentCamera.ViewportSize
+	local fit = if base.X > 0 and base.Y > 0 then math.min(1, (view.Y - 24) / base.Y, (view.X - 24) / base.X) else 1
+	scale.Scale = fit * 0.85
+	TweenService:Create(scale, TweenInfo.new(0.25, Enum.EasingStyle.Back), { Scale = fit }):Play()
 end
 
 --- A slowly turning marble in a ViewportFrame.

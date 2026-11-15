@@ -446,18 +446,15 @@ end
 
 -- ---- Favourite ------------------------------------------------------------------------------------
 
-Flex.FAVORITE_COINS = 100
-
---- The client says the player favourited the game (Roblox tells only the client): paid once.
-function Flex.favorited(player: Player): (boolean, any)
-	local p = Data.get(player)
-	if not p or p.favorited then
-		return false, "Thanks again!"
+--- The client asked the player to favourite the game: remember it, so it never asks again. (No
+--- reward: paying for favourites is the kind of incentive Roblox's rules restrict.)
+function Flex.favoriteAsked(player: Player): boolean
+	if Data.get(player) then
+		Data.update(player, function(pp)
+			pp.favorited = true
+		end)
 	end
-	Data.update(player, function(pp)
-		pp.favorited = true
-	end)
-	return true, { coins = Economy.give(player, Flex.FAVORITE_COINS, "favorite", true) }
+	return true
 end
 
 -- ---- Wiring --------------------------------------------------------------------------------------

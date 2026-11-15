@@ -39,7 +39,7 @@ export type Profile = {
 	codes: { [string]: boolean }, -- promo codes already redeemed
 	lastSpin: number, -- os.time() of the last daily spin
 	boostUntil: number, -- double coins until this os.time() (a spin prize)
-	favorited: boolean, -- paid once for favouriting the game
+	favorited: boolean, -- already asked to favourite the game (asked once, never paid)
 	auras: { [string]: boolean }, -- auras bought in the shop
 	auraPick: string?, -- the aura worn ("none" for none; nil for the level's own)
 }

@@ -4,13 +4,12 @@ local function check(name, ok, detail)
 	table.insert(out, (ok and "PASS " or "FAIL ") .. name .. (detail and (": " .. tostring(detail)) or ""))
 end
 
--- 1. Every script compiles. (Requiring a copy runs its top level too; on a server some client
--- code fails at runtime for want of a LocalPlayer, which is fine: only parse errors count.)
+-- 1. Every script compiles. Each copy is wrapped in a function that is never called (build.mjs),
+-- so loading one runs nothing: any error at all is a compile error. (Roblox reports it only as
+-- "Requested module experienced an error while loading", so the message can't be matched.)
 for _, m in ipairs(game.ServerStorage.SyntaxCheck:GetChildren()) do
-	local ok, err = pcall(require, m)
-	local e = tostring(err)
-	local syntax = not ok and (e:find("Expected") or e:find("Incomplete") or e:find("[Ss]yntax") or e:find("malformed") or e:find("unexpected symbol")) ~= nil
-	check("compiles " .. m.Name, not syntax, (not ok) and e:sub(1, 200) or nil)
+	local ok, res = pcall(require, m)
+	check("compiles " .. m.Name, ok and type(res) == "function", (not ok) and tostring(res):sub(1, 200) or nil)
 end
 local function mod(path)
 	local ok, res = pcall(require, path)

@@ -814,8 +814,8 @@ function handlers.spin(player: Player)
 	return Flex.spinFor(player, Collectibles)
 end
 
-function handlers.favorited(player: Player)
-	return Flex.favorited(player)
+function handlers.favoriteAsked(player: Player)
+	return Flex.favoriteAsked(player)
 end
 
 function handlers.auraShop(player: Player)

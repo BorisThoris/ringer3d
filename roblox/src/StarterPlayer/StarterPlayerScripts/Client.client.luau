@@ -98,7 +98,7 @@ Kit.stroke(coinIcon, Kit.INK, 2)
 local coinText = Kit.label("0", 30, { Position = UDim2.fromOffset(48, 5), Size = UDim2.new(1, -56, 0, 40), TextXAlignment = Enum.TextXAlignment.Left, Parent = coinPill })
 Kit.gradient(coinText, Color3.fromRGB(255, 250, 170), Kit.GOLD)
 -- Friends in the server earn more (Server/Flex): a pill under the coins says how much.
-local friendPill = Kit.label("", 18, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 62), Size = UDim2.fromOffset(200, 26), BackgroundTransparency = 0.1, BackgroundColor3 = Kit.GREEN, Visible = false, Parent = hud })
+local friendPill = Kit.label("", 18, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 94), Size = UDim2.fromOffset(200, 26), BackgroundTransparency = 0.1, BackgroundColor3 = Kit.GREEN, Visible = false, Parent = hud })
 Kit.round(friendPill, 13)
 Kit.stroke(friendPill, Kit.INK, 2)
 local function showFriends()
@@ -138,8 +138,19 @@ Juice.gui = screen
 local event = Kit.label(string.format("✨ NEW: every Marble Bag mints a one-of-a-kind marble · %.1f%% hold a phenomenon", Forge.phenomenonOdds()), 20, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 62), Size = UDim2.fromOffset(620, 28), TextColor3 = Color3.fromRGB(255, 170, 60), Parent = hud })
 event.TextWrapped = false
 
-local side = Kit.new("Frame", { Position = UDim2.new(0, 12, 0.5, -240), Size = UDim2.fromOffset(150, 480), BackgroundTransparency = 1, Parent = hud })
+local side = Kit.new("Frame", { AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 12, 0.5, 30), Size = UDim2.fromOffset(150, 480), BackgroundTransparency = 1, Parent = hud })
 Kit.new("UIListLayout", { Padding = UDim.new(0, 10), Parent = side })
+-- Seven buttons stand 480 pixels tall; a phone in landscape is often under 400. Shrink the column to
+-- the height left under the coins.
+do
+	local sideScale = Kit.new("UIScale", { Parent = side })
+	local function fitSide()
+		local h = workspace.CurrentCamera.ViewportSize.Y
+		sideScale.Scale = math.clamp((h - 130) / 480, 0.5, 1)
+	end
+	fitSide()
+	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fitSide)
+end
 
 local playButton = nil
 local panels: { [string]: GuiObject } = {}
@@ -929,14 +940,11 @@ Kit.stroke(wheel, Kit.GOLD, 6)
 local SEG_COLORS = { Color3.fromRGB(255, 120, 120), Color3.fromRGB(255, 200, 80), Color3.fromRGB(120, 220, 140), Color3.fromRGB(110, 180, 255), Color3.fromRGB(200, 140, 255), Color3.fromRGB(255, 150, 210), Color3.fromRGB(255, 230, 120), Color3.fromRGB(120, 230, 230) }
 local function segText(seg: any): string
 	if seg[2] == "coins" then
-		return "🪙
-" .. seg[3]
+		return "🪙\n" .. seg[3]
 	elseif seg[2] == "double" then
-		return "2x
-15 min"
+		return "2x\n15 min"
 	end
-	return "🎒
-Bag"
+	return "🎒\nBag"
 end
 local function drawWheel(list: any)
 	for _, c in ipairs(wheel:GetChildren()) do
@@ -1007,7 +1015,7 @@ local spinBadge = Kit.label("!", 22, { AnchorPoint = Vector2.new(0.5, 0.5), Posi
 Kit.round(spinBadge, 13)
 task.spawn(function()
 	task.wait(4)
-	local ok, info = ask("spinInfo")
+	local info = ask("spinInfo") -- the handler returns the table itself
 	if typeof(info) == "table" and info.wheel then
 		spinInfo, spinAt = info, os.clock()
 		drawWheel(info.wheel)
@@ -1015,25 +1023,16 @@ task.spawn(function()
 		if spinLeft() <= 0 then
 			show("spin")
 		end
-		-- Favourite the game, once, six minutes in (Roblox only tells this client the answer).
+		-- Ask once, ever, six minutes into a session, to favourite the game. No reward: paying
+		-- for favourites is the kind of incentive Roblox's rules restrict.
 		if not info.favorited then
 			task.delay(360, function()
+				ask("favoriteAsked")
 				local AvatarEditorService = game:GetService("AvatarEditorService")
-				local done
-				done = AvatarEditorService.PromptSetFavoriteCompleted:Connect(function(result)
-					done:Disconnect()
-					if result == Enum.AvatarPromptResult.Success then
-						local okF, got = ask("favorited")
-						if okF and typeof(got) == "table" then
-							toast(string.format("Thanks for the favourite! +%d coins", got.coins or 0), "good")
-						end
-					end
-				end)
 				pcall(AvatarEditorService.PromptSetFavorite, AvatarEditorService, game.PlaceId, Enum.AvatarItemType.Asset, true)
 			end)
 		end
 	end
-	local _ = ok
 	while true do
 		local left = spinLeft()
 		spinBadge.Visible = spinInfo ~= nil and left <= 0
@@ -1805,5 +1804,5 @@ end)
 
 -- On a phone the side buttons sit a little lower so thumbs reach them.
 if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
-	side.Position = UDim2.new(0, 12, 0.5, -120)
+	side.Position = UDim2.new(0, 12, 0.5, 40)
 end
