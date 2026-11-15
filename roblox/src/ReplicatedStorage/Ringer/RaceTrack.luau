@@ -123,13 +123,13 @@ local ICE_BRIDGE = {
 -- The Waterfall Chute: off the outside of the Corkscrew, sweeping down the cliff face beside the
 -- falls, one jump over the plunge pool, rejoining the Valley Sprint (it skips the tunnel).
 local WATERFALL = {
-	{ 1040, 420, 1420, 20, section = "Waterfall Chute" },
-	{ 1100, 408, 1440, 19 },
-	{ 1148, 390, 1468, 18 },
-	{ 1168, 368, 1508, 18 },
-	{ 1172, 356, 1545, 18 },
-	{ 1172, 360, 1575, 18, kicker = true },
-	{ 1172, 356, 1600, 18, gap = true },
+	{ 1040, 420, 1420, 24, section = "Waterfall Chute" },
+	{ 1100, 408, 1440, 23 },
+	{ 1148, 390, 1468, 22 },
+	{ 1168, 368, 1508, 22 },
+	{ 1172, 356, 1545, 22 },
+	{ 1172, 360, 1575, 22, kicker = true },
+	{ 1172, 356, 1600, 22, gap = true },
 	{ 1172, 292, 1650, 26, gap = true },
 	{ 1172, 266, 1700, 26 },
 	{ 1185, 225, 1735, 22 },

@@ -17,6 +17,10 @@ local PROFILES = {
 	{ name = "kid", noise = 0.6, push = 0.5, brake = 0.15, line = 0, shortcuts = false },
 	{ name = "risk-taker", noise = 0.3, push = 0.9, brake = 0.02, line = 0.4, shortcuts = true },
 	{ name = "star-hunter", noise = 0.05, push = 1, brake = 0, line = 0, shortcuts = false, stars = true },
+	-- Keyboard players: steering is all or nothing (A/D), and they react a beat late (delay in ticks).
+	{ name = "keyboard", noise = 0.1, push = 0.95, brake = 0.02, line = 0, shortcuts = false, keys = true, delay = 8 },
+	{ name = "keyboard-kid", noise = 0.3, push = 0.6, brake = 0.1, line = 0, shortcuts = false, keys = true, delay = 15 },
+	{ name = "keyboard-pro", noise = 0.05, push = 1, brake = 0, line = 0.4, shortcuts = true, keys = true, delay = 6 },
 }
 local RUNS = 8
 local LIMIT = 60 * 240
@@ -34,10 +38,21 @@ for _, prof in ipairs(PROFILES) do
 		local rng = Random.new(seed * 101 + #prof.name)
 		local st = RaceSim.new()
 		local lastSection = ""
+		local pending = {} -- inputs decided but not yet acted on (reaction delay)
 		while not st.finished and st.tick < LIMIT do
 			local b = RaceSim.bot(st, prof.line, prof.shortcuts, prof.stars)
+			local steer = math.clamp(b.steer + rng:NextNumber(-prof.noise, prof.noise), -1, 1)
+			if prof.keys then
+				steer = if steer > 0.3 then 1 elseif steer < -0.3 then -1 else 0
+			end
+			if prof.delay then
+				table.insert(pending, { steer = steer, jump = b.jump })
+				local due = if #pending > prof.delay then table.remove(pending, 1) else { steer = 0, jump = false }
+				steer = due.steer
+				b = { steer = due.steer, throttle = b.throttle, jump = due.jump, respawn = false }
+			end
 			local input = {
-				steer = math.clamp(b.steer + rng:NextNumber(-prof.noise, prof.noise), -1, 1),
+				steer = steer,
 				throttle = if rng:NextNumber() < prof.brake then -1 elseif rng:NextNumber() < prof.push then 1 else 0,
 				jump = b.jump,
 				respawn = false,

@@ -23,9 +23,9 @@ function Race.build(parent: Instance?): any
 	return RaceWorld.build(parent)
 end
 
--- Medal times (seconds), set from the bots: the expert takes both shortcuts in 37.0 s; the clean
--- main route is 49.5 s.
-Race.MEDALS = { { "Gold", 39.5, 120 }, { "Silver", 45, 70 }, { "Bronze", 54, 40 } }
+-- Medal times (seconds), set from the playthrough report (scripts/race-report.mjs): the expert
+-- takes both shortcuts in about 36 s; a clean main route is about 50 s, an average one 54.
+Race.MEDALS = { { "Gold", 39.5, 120 }, { "Silver", 45, 70 }, { "Bronze", 55, 40 } }
 Race.FINISH_COINS = 20
 -- Stars on the learnable lines: a coin each, and a bonus for the whole set in one run.
 Race.STAR_COINS = 1
