@@ -39,13 +39,13 @@ local sessions: { [Player]: { started: number } } = {}
 Race.sessions = sessions -- (the tests backdate a session to finish a bot run)
 local board = nil
 pcall(function()
-	board = DataStoreService:GetOrderedDataStore("RaceBest_v1")
+	board = DataStoreService:GetOrderedDataStore("RaceBest_c" .. RaceTrack.VERSION)
 end)
 -- Each player's best run as its input log, for the ghost they race against (its own store: a log
 -- is far bigger than a profile should be). Cached per player while they're here.
 local ghosts = nil
 pcall(function()
-	ghosts = DataStoreService:GetDataStore("RaceGhost_v1")
+	ghosts = DataStoreService:GetDataStore("RaceGhost_c" .. RaceTrack.VERSION)
 end)
 local ghostCache: { [Player]: any } = {}
 Race.GHOST_MAX = 6000 -- input changes; a longer log is not kept as a ghost
@@ -107,7 +107,7 @@ end
 Race.week = week
 local function weekBoard()
 	local ok, b = pcall(function()
-		return DataStoreService:GetOrderedDataStore("RaceWeek_" .. week())
+		return DataStoreService:GetOrderedDataStore("RaceWeek_c" .. RaceTrack.VERSION .. "_" .. week())
 	end)
 	return if ok then b else nil
 end
@@ -118,8 +118,23 @@ function Race.racing(player: Player): boolean
 	return sessions[player] ~= nil
 end
 
+--- A profile's race records belong to the layout they were set on: on a new layout they start
+--- again (the first time the player races it).
+function Race.currentCourse(player: Player)
+	local p = Data.get(player)
+	if p and p.raceCourse ~= RaceTrack.VERSION then
+		Data.update(player, function(pp)
+			pp.raceCourse = RaceTrack.VERSION
+			pp.raceBest = nil
+			pp.raceStars = nil
+			pp.raceWeek = nil
+		end)
+	end
+end
+
 --- Start a race for `player`: their avatar waits on the start deck; the client takes over.
 function Race.start(player: Player): (boolean, any)
+	Race.currentCourse(player)
 	sessions[player] = { started = os.clock() }
 	local startAt = RaceSim.position(RaceSim.new())
 	local char = player.Character
@@ -159,6 +174,7 @@ function Race.finish(player: Player, log: any): (boolean, any)
 	if not session then
 		return false, "You're not racing."
 	end
+	Race.currentCourse(player)
 	local ok, why = RaceSim.validLog(log)
 	if not ok then
 		return false, why

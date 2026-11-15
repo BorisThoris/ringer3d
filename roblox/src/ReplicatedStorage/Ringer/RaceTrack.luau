@@ -140,6 +140,9 @@ local WATERFALL = {
 	{ 1470, 70, 1665, 26 },
 	{ 1540, 55, 1650, W },
 }
+-- The layout's version. Bump it whenever the course changes shape: times, boards and ghosts are
+-- kept per version, so a record set on an old layout never stands on a new one.
+RaceTrack.VERSION = 2
 RaceTrack.FINISH_S_FROM_END = 220 -- the finish line, this far before the main path's end
 
 -- ---- Spline -------------------------------------------------------------------------------------

@@ -12,6 +12,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Ringer.Config)
 local MarbleLook = require(ReplicatedStorage.Ringer.MarbleLook)
+local RaceTrack = require(ReplicatedStorage.Ringer.RaceTrack)
 local Data = require(script.Parent.Data)
 local Economy = require(script.Parent.Economy)
 local Collectibles = require(script.Parent.Collectibles)
@@ -112,7 +113,7 @@ local function plate(player: Player)
 	best.TextColor3 = Config.RARITY_COLOR[rarity or "Common"] or Color3.new(1, 1, 1)
 	local race = (gui :: BillboardGui):FindFirstChild("RaceTime") :: TextLabel?
 	if race then
-		race.Text = if p.raceBest then string.format("🏔️ %d:%05.2f", math.floor(p.raceBest / 60), p.raceBest % 60) else ""
+		race.Text = if p.raceBest and p.raceCourse == RaceTrack.VERSION then string.format("🏔️ %d:%05.2f", math.floor(p.raceBest / 60), p.raceBest % 60) else ""
 		race.TextColor3 = Color3.fromRGB(170, 225, 255)
 	end
 	player:SetAttribute("Level", level)
