@@ -340,6 +340,35 @@ local function materialFor(y: number): Enum.Material
 	return Enum.Material.Grass
 end
 
+--- A faceted low-poly mountain or hill standing on `at`: a jittered base ring, a snow line (or a
+--- grassy shoulder), a leaning summit; each facet a slightly different shade so the light reads it.
+local function mountain(folder: Folder, rng: Random, at: Vector3, h: number, snowy: boolean)
+	local n = 6
+	local r = h * (if snowy then 0.75 else 1.6)
+	local apex = at + Vector3.new(rng:NextNumber(-0.15, 0.15) * r, h, rng:NextNumber(-0.15, 0.15) * r)
+	local lineAt = rng:NextNumber(0.55, 0.68)
+	local base, line = {}, {}
+	local spin = rng:NextNumber() * math.pi
+	for k = 1, n do
+		local ang = spin + k / n * math.pi * 2 + rng:NextNumber(-0.25, 0.25)
+		local rr = r * rng:NextNumber(0.75, 1.15)
+		base[k] = at + Vector3.new(math.cos(ang) * rr, -10, math.sin(ang) * rr)
+		line[k] = base[k]:Lerp(apex, lineAt + rng:NextNumber(-0.06, 0.06))
+	end
+	for k = 1, n do
+		local k2 = k % n + 1
+		local inward = (at + Vector3.new(0, h * 0.4, 0) - (base[k] + base[k2]) / 2).Unit
+		local shade = rng:NextNumber(-12, 12)
+		local low = if snowy then rgb(112 + shade, 128 + shade, 158 + shade) else rgb(104 + shade, 168 + shade, 92 + shade)
+		local high = if snowy then rgb(238 + shade * 0.5, 244 + shade * 0.4, 255) else rgb(124 + shade, 186 + shade, 104 + shade)
+		local lowM = if snowy then Enum.Material.Rock else Enum.Material.Grass
+		local highM = if snowy then Enum.Material.Snow else Enum.Material.Grass
+		triangle(folder, base[k], base[k2], line[k2], low, lowM, 3, inward, "Peak")
+		triangle(folder, base[k], line[k2], line[k], low, lowM, 3, inward, "Peak")
+		triangle(folder, line[k], line[k2], apex, high, highM, 3, inward, "Peak")
+	end
+end
+
 --- The mountain: terrain ridges under every stretch of track (none under the gaps or the bridge,
 --- which cross chasms), the massif round the summit, forests, cliffs, the waterfall, clouds, the
 --- valley and the lake.
@@ -423,14 +452,48 @@ local function buildWorld(folder: Folder, course: any, rng: Random)
 		local d = rng:NextNumber(2400, 3000)
 		local at = O + Vector3.new(900 + math.cos(a) * d, 0, 850 + math.sin(a) * d)
 		local h = rng:NextNumber(500, 950)
-		for k = 0, 4 do
-			local fr = k / 5
-			local r = h * 0.7 * (1 - fr) + 20
-			part(folder, { Name = "Peak", Shape = Enum.PartType.Cylinder, Size = Vector3.new(h / 5 + 2, r * 2, r * 2), CFrame = CFrame.new(at + Vector3.new(0, h * (fr + 0.1), 0)) * CFrame.Angles(0, 0, math.pi / 2), Color = if k >= 3 then rgb(248, 251, 255) else rgb(120, 140, 170), Material = if k >= 3 then Enum.Material.Snow else Enum.Material.Rock })
+		mountain(folder, rng, at, h, true)
+	end
+	-- Foothills and pine groves on the plain between the mountain and the far peaks, kept clear
+	-- of the course's own footprint.
+	local function clearOfCourse(p: Vector3): boolean
+		for _, path in pairs(course.paths) do
+			for i = 1, #path.frames, 8 do
+				local f = path.frames[i]
+				if (f.x + O.X - p.X) ^ 2 + (f.z + O.Z - p.Z) ^ 2 < 260 * 260 then
+					return false
+				end
+			end
+		end
+		return true
+	end
+	local placed = 0
+	for _ = 1, 120 do
+		if placed >= 26 then
+			break
+		end
+		local a = rng:NextNumber() * math.pi * 2
+		local d = rng:NextNumber(1300, 2200)
+		local at = O + Vector3.new(900 + math.cos(a) * d, 0, 850 + math.sin(a) * d)
+		if clearOfCourse(at) then
+			placed += 1
+			mountain(folder, rng, at, rng:NextNumber(70, 160), false)
+			for _ = 1, 5 do
+				local off = Vector3.new(rng:NextNumber(-260, 260), 0, rng:NextNumber(-260, 260))
+				pine(folder, at + off, rng:NextNumber(26, 44), false)
+			end
 		end
 	end
 	-- The valley floor out to the far peaks.
-	part(folder, { Name = "Valley", Shape = Enum.PartType.Cylinder, Size = Vector3.new(4, 2048, 2048), CFrame = CFrame.new(O + Vector3.new(1000, -2, 900)) * CFrame.Angles(0, 0, math.pi / 2), Color = rgb(120, 200, 100), Material = Enum.Material.Grass })
+	-- A 4x4 grid of 2048-stud tiles (a part's largest size) reaching past the peaks, so no view from
+	-- the summit finds the edge of the world.
+	for gx = -2, 1 do
+		for gz = -2, 1 do
+			local c = O + Vector3.new(900 + (gx + 0.5) * 2048, -2, 850 + (gz + 0.5) * 2048)
+			local far = math.max(math.abs(gx + 0.5), math.abs(gz + 0.5)) > 1
+			part(folder, { Name = "Valley", Size = Vector3.new(2048, 4, 2048), CFrame = CFrame.new(c), Color = if far then rgb(132, 178, 110) else rgb(120, 200, 100), Material = Enum.Material.Grass })
+		end
+	end
 	-- The finish village: little pastel chalets by the lake.
 	local fin = main.frames[#main.frames]
 	for k = 1, 6 do
