@@ -110,13 +110,13 @@ local ICE_BRIDGE = {
 -- The Waterfall Chute: off the outside of the Corkscrew, sweeping down the cliff face beside the
 -- falls, one jump over the plunge pool, rejoining the Valley Sprint (it skips the tunnel).
 local WATERFALL = {
-	{ 1040, 420, 1420, 16, section = "Waterfall Chute" },
-	{ 1100, 408, 1440, 15 },
-	{ 1148, 390, 1470, 14 },
-	{ 1168, 368, 1510, 14 },
-	{ 1172, 356, 1545, 14 },
-	{ 1172, 360, 1575, 14, kicker = true },
-	{ 1172, 356, 1600, 16, gap = true },
+	{ 1040, 420, 1420, 20, section = "Waterfall Chute" },
+	{ 1100, 408, 1440, 19 },
+	{ 1148, 390, 1468, 18 },
+	{ 1168, 368, 1508, 18 },
+	{ 1172, 356, 1545, 18 },
+	{ 1172, 360, 1575, 18, kicker = true },
+	{ 1172, 356, 1600, 18, gap = true },
 	{ 1172, 292, 1650, 26, gap = true },
 	{ 1172, 266, 1700, 26 },
 	{ 1185, 225, 1735, 22 },
@@ -240,11 +240,13 @@ local function build(id: string, pts: { any }): Path
 		local h1 = math.atan2(p.tz, p.tx)
 		local h2 = math.atan2(q.tz, q.tx)
 		local d = math.atan2(math.sin(h2 - h1), math.cos(h2 - h1))
-		curv[i] = d / math.max(1, 6 * RaceTrack.STEP)
+		-- On near-vertical stretches the heading is noise: no turn there.
+		local horiz = math.min(math.sqrt(p.tx * p.tx + p.tz * p.tz), math.sqrt(q.tx * q.tx + q.tz * q.tz))
+		curv[i] = if horiz < 0.35 then 0 else d / math.max(1, 6 * RaceTrack.STEP)
 	end
 	for i = 1, m do
 		local sum, cnt = 0, 0
-		for k = math.max(1, i - 6), math.min(m, i + 6) do
+		for k = math.max(1, i - 10), math.min(m, i + 10) do
 			sum += curv[k]
 			cnt += 1
 		end
@@ -254,7 +256,9 @@ local function build(id: string, pts: { any }): Path
 		local rx, rz = -fr.tz, fr.tx
 		local rm = math.sqrt(rx * rx + rz * rz)
 		rx, rz = rx / math.max(rm, 1e-6), rz / math.max(rm, 1e-6)
-		local bank = math.clamp(c * 900, -0.5, 0.5) -- up to ~29 degrees in the tightest turns
+		-- The bank a turn needs at the design speed: tan(bank) = v^2 / (g r), with v = 80 studs/s and
+		-- g = 110, so v^2/g = 58 studs. A 100-stud-radius turn banks 30 degrees, a 300-stud one 11.
+		local bank = math.clamp(math.atan(58 * c), -0.45, 0.45)
 		-- Rodrigues: rotate (rx, 0, rz) about the tangent by `bank`.
 		local tx, ty, tz = fr.tx, fr.ty, fr.tz
 		local cb, sb = math.cos(bank), math.sin(bank)

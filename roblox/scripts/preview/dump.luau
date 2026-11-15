@@ -59,14 +59,7 @@ elseif SCENE:sub(1, 5) == "race:" then
 			if st.tick % 150 == 0 then
 				n += 1
 				local spd = RaceSim.speed(st)
-				local back = 18 + spd * 0.06
-				local camW = pos - heading * back + Vector3.new(0, 7 + spd * 0.02, 0)
-				local behind = RaceTrack.frame(course.paths[st.path], math.max(0, st.s - back))
-				local floorY = RaceTrack.ORIGIN.Y + behind.y + 7
-				if not st.air and camW.Y < floorY then
-					camW = Vector3.new(camW.X, floorY, camW.Z)
-				end
-				local camPos = camW - origin
+				local camPos = RaceSim.chaseCamera(st, pos, heading) - origin
 				local look = pos + heading * 14 + Vector3.new(0, 2, 0) - origin
 				local ball = Instance.new("Part")
 				ball.Shape = Enum.PartType.Ball

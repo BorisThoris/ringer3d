@@ -898,7 +898,6 @@ end)
 Collectibles.onBag = Social.bagOpened
 Race.announce = Social.announce
 Race.quest = Social.quest
-task.spawn(Race.build, workspace)
 -- The race's leaderboard by its gate in the lobby park.
 do
 	local a = math.rad(303)

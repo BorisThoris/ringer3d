@@ -333,6 +333,12 @@ run = function()
 	end
 	RaceClient.racing = true
 	d.hud.Visible = false
+	-- The mountain is built on this client the first time it races (nobody else pays for it).
+	if not Workspace:FindFirstChild("MarbleMountain") then
+		d.toast("Building Marble Mountain...", "info")
+		task.wait()
+		require(ReplicatedStorage.Ringer.RaceWorld).build(Workspace)
+	end
 	if gui then
 		gui:Destroy()
 	end
@@ -452,15 +458,7 @@ run = function()
 		m.CFrame = CFrame.new(pos) * rot
 		-- The chase camera: behind and above, wider and further back with speed.
 		local spd = RaceSim.speed(st)
-		local back = 18 + spd * 0.06
-		local camPos = pos - heading * back + Vector3.new(0, 7 + spd * 0.02, 0)
-		-- Never under the track: stay well above its surface behind the marble (steep drops).
-		local cp = course.paths[st.path]
-		local behind = RaceTrack.frame(cp, math.max(0, st.s - back))
-		local floorY = RaceTrack.ORIGIN.Y + behind.y + 7
-		if not st.air and camPos.Y < floorY then
-			camPos = Vector3.new(camPos.X, floorY, camPos.Z)
-		end
+		local camPos = RaceSim.chaseCamera(st, pos, heading)
 		cam.CFrame = cam.CFrame:Lerp(CFrame.lookAt(camPos, pos + heading * 14 + Vector3.new(0, 2, 0)), math.min(1, dt * 8))
 		d.Juice.apply(cam, pos, 70 + math.min(25, spd * 0.15), dt)
 		if spd > 105 and math.random() < dt * 3 then

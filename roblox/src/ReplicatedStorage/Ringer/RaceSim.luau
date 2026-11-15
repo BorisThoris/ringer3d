@@ -82,6 +82,28 @@ function RaceSim.speed(st: State): number
 	return math.sqrt(st.vs * st.vs + st.vu * st.vu)
 end
 
+--- The chase camera's position for a marble at `pos` moving along `heading`. On the ground it sits
+--- on the track itself `back` studs behind (on the path it forked from, if that's further back), so
+--- it follows the bends instead of cutting through the walls on the inside of a curve; in the air
+--- it trails straight behind.
+function RaceSim.chaseCamera(st: State, pos: Vector3, heading: Vector3): Vector3
+	local spd = RaceSim.speed(st)
+	local back = 18 + spd * 0.06
+	local lift = Vector3.new(0, 7 + spd * 0.02, 0)
+	if st.air then
+		return pos - heading * back + lift
+	end
+	local course = RaceTrack.get()
+	local p = course.paths[st.path]
+	local s = st.s - back
+	if s < 0 and p.fork then
+		p, s = course.paths[p.fork.path], p.fork.s + s
+	end
+	local f = RaceTrack.frame(p, math.max(0, s))
+	local edge = math.max(0, f.w / 2 - 4)
+	return RaceTrack.world(f, math.clamp(st.u * 0.7, -edge, edge), 0) + lift
+end
+
 --- Progress down the course, 0..1 (for the HUD and the ghosts' order), by main-path distance.
 function RaceSim.progress(st: State): number
 	local course = RaceTrack.get()

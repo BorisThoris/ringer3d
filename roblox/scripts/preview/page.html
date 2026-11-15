@@ -62,6 +62,7 @@ function material(colour, transparency, name) {
   else if (name === 'ForceField') m = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.45 });
   else m = new THREE.MeshStandardMaterial({ color: col, roughness: ROUGH[name] ?? 0.7, metalness: name === 'Metal' ? 0.6 : 0, envMapIntensity: 0.6 });
   if (transparency > 0.01 && name !== 'ForceField') { m.transparent = true; m.opacity = 1 - transparency; m.depthWrite = transparency < 0.5; }
+  m.side = THREE.DoubleSide; // the wedge geometry's faces aren't all wound one way
   matCache.set(key, m);
   return m;
 }
