@@ -98,6 +98,23 @@ elseif SCENE:sub(1, 5) == "race:" then
 	camAt("tunnel", "main", 3300)
 	camAt("valley", "main", 3900)
 	camAt("finish", "main", course.finish - 60)
+	-- The River Leap, found from the course: the run-up, and from the bank beside the river.
+	do
+		local m = course.paths.main
+		local gapS = nil
+		for i, f in ipairs(m.frames) do
+			if not f.floor and i > 1 and m.frames[i - 1].floor then
+				gapS = (i - 1) * RaceTrack.STEP
+			end
+		end
+		if gapS then
+			camAt("river", "main", gapS - 70)
+			local g = RaceTrack.frame(m, gapS + 16)
+			local at = RaceTrack.world(g, 90, 6) - origin
+			local look = RaceTrack.world(g, 0, -10) - origin
+			table.insert(cams, { "river-side", { at.X, at.Y, at.Z }, { look.X, look.Y, look.Z }, 65 })
+		end
+	end
 	table.insert(cams, { "overview", { -900, 900, -900 }, { 0, -100, 0 }, 60 })
 	table.insert(cams, { "overview2", { 1600, 700, 1900 }, { 0, -100, 0 }, 60 })
 	if SCENE ~= "race:chase" then
@@ -180,8 +197,9 @@ else
 				local mats, occ = T:ReadVoxels(Region3.new(Vector3.new(x, -8, z), Vector3.new(x + 4, 1000, z + 4)), 4)
 				for yi = mats.Size.Y, 1, -1 do
 					local m = mats[1][yi][1]
-					if occ[1][yi][1] > 0.5 and m ~= Enum.Material.Air and m ~= Enum.Material.Water then
-						colors[m.Name] = colors[m.Name] or (function()
+					if occ[1][yi][1] > 0.5 and m ~= Enum.Material.Air then
+						-- Water shows as its surface (terrain water has no material colour of its own).
+						colors[m.Name] = colors[m.Name] or if m == Enum.Material.Water then { 70, 150, 215 } else (function()
 							local c = T:GetMaterialColor(m)
 							return { math.floor(c.R * 255), math.floor(c.G * 255), math.floor(c.B * 255) }
 						end)()

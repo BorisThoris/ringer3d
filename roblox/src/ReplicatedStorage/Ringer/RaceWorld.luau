@@ -587,6 +587,33 @@ local function buildWorld(folder: Folder, course: any, rng: Random)
 		end
 	end
 	T:FillBlock(CFrame.new(O + Vector3.new(2150, 6, 1720)), Vector3.new(420, 12, 520), Enum.Material.Water)
+	-- A river under each jump down in the valley (the River Leap): a channel cut across the floor
+	-- under the gap, running off to both sides, with water in it.
+	local fs = main.frames
+	local i = 1
+	while i <= #fs do
+		if not fs[i].floor and fs[i].y < 150 then
+			local j = i
+			while j < #fs and not fs[j + 1].floor do
+				j += 1
+			end
+			local a2, b2 = fs[i], fs[j]
+			local mid = O + Vector3.new((a2.x + b2.x) / 2, 0, (a2.z + b2.z) / 2)
+			local along = Vector3.new(b2.x - a2.x, 0, b2.z - a2.z).Unit
+			local across = Vector3.new(-along.Z, 0, along.X)
+			local cf = CFrame.fromMatrix(mid, along, Vector3.yAxis, -across)
+			T:FillBlock(cf + Vector3.new(0, 6, 0), Vector3.new(44, 14, 900), Enum.Material.Air)
+			T:FillBlock(cf + Vector3.new(0, -6, 0), Vector3.new(44, 8, 900), Enum.Material.Sand) -- the bed
+			T:FillBlock(cf + Vector3.new(0, 1, 0), Vector3.new(44, 6, 900), Enum.Material.Water)
+			-- Mud banks either side of the channel.
+			for _, sd in ipairs({ -1, 1 }) do
+				T:FillBlock(cf * CFrame.new(sd * 25, 9, 0), Vector3.new(6, 2, 900), Enum.Material.Mud)
+			end
+			i = j + 1
+		else
+			i += 1
+		end
+	end
 	-- The finish village: little pastel chalets by the lake.
 	local fin = main.frames[#main.frames]
 	for k = 1, 6 do
@@ -622,13 +649,22 @@ function RaceWorld.build(parent: Instance?): any
 	local s0 = RaceTrack.frame(main, 0)
 	part(folder, { Name = "StartDeck", Size = Vector3.new(60, 4, 60), CFrame = frameCF(s0, 0, -2) * CFrame.new(0, 0, 20), Color = rgb(255, 255, 255), CanCollide = true })
 	buildWorld(folder, course, Random.new(42))
-	-- Crowds at the start, the big jump, the Corkscrew and the finish.
+	-- Crowds at the start, the jumps, the Corkscrew and the finish.
 	local crng = Random.new(9)
 	crowd(folder, RaceTrack.frame(main, 40), -1, crng)
 	crowd(folder, RaceTrack.frame(main, 40), 1, crng)
-	crowd(folder, RaceTrack.frame(main, 2260), -1, crng)
-	crowd(folder, RaceTrack.frame(main, 2440), 1, crng)
-	crowd(folder, RaceTrack.frame(main, 2860), -1, crng)
+	-- Found from the course, so they stay put when the track is reshaped: a stand at the lip and
+	-- one past the landing of every jump on the main path, and one round the Corkscrew.
+	for i, f in ipairs(main.frames) do
+		local s = (i - 1) * RaceTrack.STEP
+		if not f.floor and i > 1 and main.frames[i - 1].floor then
+			crowd(folder, RaceTrack.frame(main, s - 44), -1, crng)
+			crowd(folder, RaceTrack.frame(main, s + 136), 1, crng)
+		end
+		if f.section == "Corkscrew" and main.frames[i - 1].section ~= "Corkscrew" then
+			crowd(folder, RaceTrack.frame(main, s + 224), -1, crng)
+		end
+	end
 	crowd(folder, RaceTrack.frame(main, course.finish - 40), -1, crng)
 	crowd(folder, RaceTrack.frame(main, course.finish - 40), 1, crng)
 	crowd(folder, RaceTrack.frame(main, course.finish + 40), -1, crng)

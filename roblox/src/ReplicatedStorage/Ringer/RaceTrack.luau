@@ -99,10 +99,18 @@ local MAIN = {
 	{ 1300, 100, 1660, W },
 	{ 1420, 75, 1640, W },
 	{ 1540, 55, 1650, W, boost = 1 },
-	{ 1660, 40, 1680, 34, section = "Finish" },
-	{ 1760, 34, 1700, 36 },
-	{ 1860, 32, 1710, 40 },
-	{ 1940, 32, 1714, 40 },
+	-- River Leap: the finale, after both routes have rejoined. Boost pads, a kicker, the river
+	-- under the gap, and a long wide landing in sight of the finish line.
+	{ 1610, 49, 1664, W, boost = 1 },
+	{ 1650, 52, 1672, W, kicker = true, boost = 1, section = "River Leap" },
+	{ 1672, 53, 1677, W, gap = true },
+	{ 1700, 44, 1683, 40, gap = true },
+	{ 1740, 38, 1690, 40 },
+	{ 1800, 34, 1700, 36, section = "Finish" },
+	{ 1880, 32, 1710, 40 },
+	{ 1960, 32, 1714, 40 },
+	{ 2040, 32, 1716, 40 },
+	{ 2080, 32, 1716, 40 },
 }
 -- The Ice Bridge: narrow, no walls, straight over the chasm from the fork to the spiral's end.
 local ICE_BRIDGE = {
