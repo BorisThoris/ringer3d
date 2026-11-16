@@ -155,7 +155,21 @@ do
 end
 local okBoard, boardPart = pcall(Race.board, CFrame.new(0, 500, 0), workspace)
 check("the lobby race board builds with both tables", okBoard and boardPart:FindFirstChildOfClass("SurfaceGui") ~= nil, if okBoard then nil else boardPart)
-check("weeks roll over on a fixed day", Race.week() == math.floor((os.time() - 4 * 86400) / (7 * 86400)))
+do
+	local entries = { { key = "11", value = 40000 }, { key = "22", value = 41000 }, { key = "33", value = 42000 } }
+	local descending = true
+	for i = 2, #Race.WEEK_PRIZES do
+		if Race.WEEK_PRIZES[i] > Race.WEEK_PRIZES[i - 1] then
+			descending = false
+		end
+	end
+	check("weekly prizes for the top ten, more for higher places", #Race.WEEK_PRIZES == 10 and descending
+		and Race.rankIn(entries, 22) == 2 and Race.rankIn(entries, 99) == nil
+		and Race.weekPrize(1) == Race.WEEK_PRIZES[1] and Race.weekPrize(nil) == 0 and Race.weekPrize(11) == 0)
+	local r, c = Race.payWeek({ UserId = 2 } :: any)
+	check("test players are never paid a weekly prize", r == nil and c == nil)
+end
+check("weeks roll over on a fixed day",Race.week() == math.floor((os.time() - 4 * 86400) / (7 * 86400)))
 local fans = 0
 for _, d in ipairs(built.folder:GetDescendants()) do
 	if d.Name == "Bleacher" then

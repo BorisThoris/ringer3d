@@ -105,11 +105,26 @@ local function week(): number
 	return math.floor((os.time() - 4 * 86400) / (7 * 86400)) -- the Unix epoch was a Thursday
 end
 Race.week = week
-local function weekBoard()
+local function weekBoard(w: number?)
 	local ok, b = pcall(function()
-		return DataStoreService:GetOrderedDataStore("RaceWeek_c" .. RaceTrack.VERSION .. "_" .. week())
+		return DataStoreService:GetOrderedDataStore("RaceWeek_c" .. RaceTrack.VERSION .. "_" .. (w or week()))
 	end)
 	return if ok then b else nil
+end
+
+-- Weekly prizes: the top ten of last week's board are paid the first time they come back.
+Race.WEEK_PRIZES = { 1000, 600, 400, 250, 250, 150, 150, 150, 150, 150 }
+function Race.weekPrize(rank: number?): number
+	return if rank then Race.WEEK_PRIZES[rank] or 0 else 0
+end
+--- Where `userId` finished in a board's top entries ({ key = "id", ... }), or nil.
+function Race.rankIn(entries: { any }, userId: number): number?
+	for i, e in ipairs(entries) do
+		if tonumber(e.key) == userId then
+			return i
+		end
+	end
+	return nil
 end
 Race.announce = function(_text: string, _color: Color3?) end
 Race.quest = function(_player: Player, _stat: string, _n: number) end
@@ -312,6 +327,44 @@ function Race.topWeek(): { any }
 	return weekCache
 end
 
+-- Last week's top ten, read once per server per week.
+local lastWeekTop: { any }?, lastWeekOf = nil, -1
+--- Pay a player their prize from last week's board, once. (rank, coins) when paid.
+function Race.payWeek(player: Player): (number?, number?)
+	if typeof(player) ~= "Instance" then
+		return nil, nil
+	end
+	local p = Data.get(player)
+	local last = week() - 1
+	if not p or p.weekPaid == last then
+		return nil, nil
+	end
+	if lastWeekOf ~= last then
+		local store = weekBoard(last)
+		local got = nil
+		if store then
+			pcall(function()
+				got = store:GetSortedAsync(true, #Race.WEEK_PRIZES):GetCurrentPage()
+			end)
+		end
+		if not got then
+			return nil, nil -- try again next visit
+		end
+		lastWeekTop, lastWeekOf = got, last
+	end
+	local rank = Race.rankIn(lastWeekTop :: { any }, player.UserId)
+	Data.update(player, function(pp)
+		pp.weekPaid = last
+	end)
+	local prize = Race.weekPrize(rank)
+	if prize <= 0 then
+		return nil, nil
+	end
+	local coins = Economy.give(player, prize, "raceWeek", true)
+	Race.announce(string.format("🏆 %s finished #%d on last week's race board: +%d coins!", player.DisplayName, rank :: number, coins), Color3.fromRGB(255, 215, 80))
+	return rank, coins
+end
+
 --- A board in the lobby by the race gate: the fastest times, all time and this week.
 function Race.board(cf: CFrame, parent: Instance)
 	local part = Instance.new("Part")
@@ -335,7 +388,7 @@ function Race.board(cf: CFrame, parent: Instance)
 	head.TextColor3 = Color3.fromRGB(255, 230, 120)
 	head.Parent = gui
 	local cols = {}
-	for k, title in ipairs({ "THIS WEEK", "ALL TIME" }) do
+	for k, title in ipairs({ "THIS WEEK 🏆 prizes!", "ALL TIME" }) do
 		local l = Instance.new("TextLabel")
 		l.BackgroundTransparency = 1
 		l.Position = UDim2.new((k - 1) * 0.5, 16, 0.18, 0)

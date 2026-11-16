@@ -894,6 +894,9 @@ Players.PlayerAdded:Connect(function(player)
 			end)
 			Economy.badge(player, "welcome")
 		end
+		if p then
+			Race.payWeek(player)
+		end
 	end)
 end)
 

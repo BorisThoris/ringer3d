@@ -42,6 +42,7 @@ export type Profile = {
 	favorited: boolean, -- already asked to favourite the game (asked once, never paid)
 	auras: { [string]: boolean }, -- auras bought in the shop
 	auraPick: string?, -- the aura worn ("none" for none; nil for the level's own)
+	weekPaid: number?, -- the last race week whose board prize was settled
 }
 
 local function fresh(): Profile
