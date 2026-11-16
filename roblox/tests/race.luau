@@ -166,6 +166,13 @@ do
 	check("weekly prizes for the top ten, more for higher places", #Race.WEEK_PRIZES == 10 and descending
 		and Race.rankIn(entries, 22) == 2 and Race.rankIn(entries, 99) == nil
 		and Race.weekPrize(1) == Race.WEEK_PRIZES[1] and Race.weekPrize(nil) == 0 and Race.weekPrize(11) == 0)
+	local top = { { userId = 1, name = "a", time = 40 }, { userId = 2, name = "b", time = 42 }, { userId = 3, name = "c", time = 45 }, { userId = 4, name = "d", time = 50 } }
+	check("the rival is the time just ahead of yours, never the leader or you",
+		Race.rivalFor(top, 9, 47).userId == 3
+			and Race.rivalFor(top, 9, nil).userId == 4
+			and Race.rivalFor(top, 3, 45).userId == 2
+			and Race.rivalFor(top, 9, 41) == nil
+			and Race.rivalFor({ top[1] }, 9, nil) == nil)
 	local r, c = Race.payWeek({ UserId = 2 } :: any)
 	check("test players are never paid a weekly prize", r == nil and c == nil)
 end

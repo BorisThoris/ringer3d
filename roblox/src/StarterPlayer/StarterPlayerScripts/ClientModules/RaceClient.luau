@@ -449,6 +449,9 @@ run = function()
 	if typeof(info.record) == "table" and typeof(info.record.log) == "table" then
 		addGhost(info.record.log, "🥇 " .. tostring(info.record.name), Color3.fromRGB(255, 215, 80))
 	end
+	if typeof(info.rival) == "table" and typeof(info.rival.log) == "table" then
+		addGhost(info.rival.log, "⚔️ " .. tostring(info.rival.name), Color3.fromRGB(255, 120, 120))
+	end
 	local function split(at: number?, now: number): (string, Color3)
 		if not at then
 			return "", Color3.fromRGB(150, 220, 255)

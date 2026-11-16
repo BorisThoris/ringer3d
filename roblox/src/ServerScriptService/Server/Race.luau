@@ -100,6 +100,33 @@ function Race.recordGhost(): any
 	return record
 end
 
+--- Your rival on the board: the slowest time still faster than your best (the bottom of the board
+--- before you have a best), never you and never the leader (the record ghost already is). Entries
+--- are { userId, name, time }, fastest first.
+function Race.rivalFor(top: { any }, userId: number, best: number?): any
+	local pick = nil
+	for i, e in ipairs(top) do
+		if i > 1 and e.userId ~= userId and (best == nil or e.time < best) then
+			pick = e
+		end
+	end
+	return pick
+end
+-- Ghosts of rivals, read at most every five minutes each.
+local rivalCache: { [number]: { at: number, g: any } } = {}
+function Race.rivalGhost(player: Player, best: number?): any
+	local r = Race.rivalFor(Race.top(), player.UserId, best)
+	if not r then
+		return nil
+	end
+	local c = rivalCache[r.userId]
+	if not c or os.clock() - c.at > 300 then
+		c = { at = os.clock(), g = fetchGhost(r.userId) }
+		rivalCache[r.userId] = c
+	end
+	return if c.g then { name = r.name, time = c.g.time, log = c.g.log } else nil
+end
+
 -- This week's board: a fresh one every Monday, so there is always a race anyone can win.
 local function week(): number
 	return math.floor((os.time() - 4 * 86400) / (7 * 86400)) -- the Unix epoch was a Thursday
@@ -169,6 +196,7 @@ function Race.start(player: Player): (boolean, any)
 		countdown = 3, medals = Race.MEDALS, best = p.raceBest, bestStars = p.raceStars,
 		ghost = ghost and ghost.log,
 		record = rec and { name = rec.name, time = rec.time, log = rec.log },
+		rival = Race.rivalGhost(player, p.raceBest),
 	}
 end
 
