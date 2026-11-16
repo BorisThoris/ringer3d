@@ -173,6 +173,8 @@ do
 			and Race.rivalFor(top, 3, 45).userId == 2
 			and Race.rivalFor(top, 9, 41) == nil
 			and Race.rivalFor({ top[1] }, 9, nil) == nil)
+	check("the first races of the day pay in full, later ones a quarter",
+		Race.payShare(1) == 1 and Race.payShare(Race.FULL_PAY_RUNS) == 1 and Race.payShare(Race.FULL_PAY_RUNS + 1) == Race.LATER_SHARE)
 	local r, c = Race.payWeek({ UserId = 2 } :: any)
 	check("test players are never paid a weekly prize", r == nil and c == nil)
 end

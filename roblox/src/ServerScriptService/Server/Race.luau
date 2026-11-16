@@ -27,6 +27,14 @@ end
 -- takes both shortcuts in about 36 s; a clean main route is about 50 s, an average one 54.
 Race.MEDALS = { { "Gold", 39.5, 120 }, { "Silver", 45, 70 }, { "Bronze", 55, 40 } }
 Race.FINISH_COINS = 20
+-- A gold run takes under a minute and pays ~190 coins, ten times a duel's rate: the first few
+-- finishes each day pay in full, the rest a quarter, so racing never replaces the duels.
+Race.FULL_PAY_RUNS = 5
+Race.LATER_SHARE = 0.25
+--- The share of a finish's coins paid for the `n`th finish of the day (1 = the first).
+function Race.payShare(n: number): number
+	return if n <= Race.FULL_PAY_RUNS then 1 else Race.LATER_SHARE
+end
 -- Stars on the learnable lines: a coin each, and a bonus for the whole set in one run.
 Race.STAR_COINS = 1
 Race.ALL_STARS_BONUS = 25
@@ -252,8 +260,14 @@ function Race.finish(player: Player, log: any): (boolean, any)
 	local p = Data.get(player)
 	local pb = p and p.raceBest
 	local newBest = pb == nil or time < pb
+	local day = math.floor(os.time() / 86400)
+	local today = if p and p.raceDay == day then (p.raceDayRuns or 0) + 1 else 1
+	local share = Race.payShare(today)
+	coins = math.max(1, math.floor(coins * share + 0.5))
 	if p then
 		Data.update(player, function(pp)
+			pp.raceDay = day
+			pp.raceDayRuns = today
 			pp.raceRuns = (pp.raceRuns or 0) + 1
 			if newBest then
 				pp.raceBest = time
@@ -312,7 +326,7 @@ function Race.finish(player: Player, log: any): (boolean, any)
 	if medal == "Gold" and newBest then
 		Race.announce(string.format("🥇 %s won GOLD on Marble Mountain in %.2fs!", player.DisplayName, time), Color3.fromRGB(255, 215, 80))
 	end
-	return true, { time = time, medal = medal, coins = got, best = if newBest then time else pb, newBest = newBest, respawns = st.respawns, stars = st.starCount, starTotal = starTotal, bestStars = math.max(p and p.raceStars or 0, st.starCount) }
+	return true, { time = time, medal = medal, coins = got, reduced = share < 1,best = if newBest then time else pb, newBest = newBest, respawns = st.respawns, stars = st.starCount, starTotal = starTotal, bestStars = math.max(p and p.raceStars or 0, st.starCount) }
 end
 
 --- The top times: { name, time }, all time and this week (cached a minute).
