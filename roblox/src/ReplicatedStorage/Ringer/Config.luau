@@ -365,7 +365,20 @@ Config.COINS = {
 	loss = 10,
 	pvpWinBonus = 30,
 	daily = { 50, 60, 75, 90, 110, 130, 200 }, -- streak days 1..7, then 200 a day
+	comeback = 300, -- on top of the daily, for a player back after COMEBACK_DAYS or more away
 }
+Config.COMEBACK_DAYS = 3
+
+--- Today's daily reward from the last claim's day and streak: (streak, coins, welcome back?).
+function Config.daily(lastDaily: number, streak: number, today: number): (number, number, boolean)
+	local s = if lastDaily == today - 1 then streak + 1 else 1
+	local coins = Config.COINS.daily[math.min(s, #Config.COINS.daily)]
+	local back = lastDaily > 0 and today - lastDaily >= Config.COMEBACK_DAYS
+	if back then
+		coins += Config.COINS.comeback
+	end
+	return s, coins, back
+end
 -- Coins lying about the lobby lawn: run through one and it's yours; it comes back a while later.
 -- Each player sees and takes their own. A trickle, never a farm: at most `hourCap` coins an hour.
 Config.LOBBY_COIN = { value = 1, respawn = 40, hourCap = 120, reach = 12 }

@@ -772,7 +772,11 @@ end, { Size = UDim2.fromOffset(150, 58), Parent = side })
 local dailyButton = Kit.button("🎁 Daily", Kit.GREEN, function()
 	local ok, got = ask("daily")
 	if ok then
-		toast(string.format("Day %d streak: +%d coins!", got.streak, got.coins), "good")
+		if got.comeback then
+			toast(string.format("Welcome back! +%d coins and a free spin 🎡", got.coins), "good")
+		else
+			toast(string.format("Day %d streak: +%d coins!", got.streak, got.coins), "good")
+		end
 	else
 		toast(typeof(got) == "string" and got or "Come back tomorrow!", "info")
 	end

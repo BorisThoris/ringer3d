@@ -87,6 +87,17 @@ check("the all-quests bonus only once every quest is claimed",
 		and not Social.allClaimed({})
 		and not Social.allClaimed({ { claimed = true }, { claimed = false }, { claimed = true } })
 		and Social.allClaimed({ { claimed = true }, { claimed = true }, { claimed = true } }))
+do
+	local s1, c1, b1 = Config.daily(0, 0, 100) -- first ever claim
+	local s2, c2, b2 = Config.daily(99, 4, 100) -- yesterday: the streak goes on
+	local s3, c3, b3 = Config.daily(98, 6, 100) -- missed one day: streak resets, no gift yet
+	local s4, c4, b4 = Config.daily(90, 6, 100) -- ten days away: welcome back
+	check("daily streaks, and a welcome-back gift after days away",
+		s1 == 1 and c1 == Config.COINS.daily[1] and not b1
+			and s2 == 5 and c2 == Config.COINS.daily[5] and not b2
+			and s3 == 1 and not b3
+			and s4 == 1 and b4 and c4 == Config.COINS.daily[1] + Config.COINS.comeback)
+end
 local giftFake = { UserId = 2 } :: any
 local gifts = Social.gifts(giftFake)
 local okEarly, whyEarly = Social.claimGift(giftFake, 1)

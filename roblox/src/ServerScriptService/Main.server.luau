@@ -837,14 +837,16 @@ function handlers.daily(player: Player)
 	if not p or p.lastDaily >= today then
 		return false, "Come back tomorrow!"
 	end
-	local streak = (p.lastDaily == today - 1) and p.streak + 1 or 1
-	local amount = Config.COINS.daily[math.min(streak, #Config.COINS.daily)]
+	local streak, amount, back = Config.daily(p.lastDaily, p.streak, today)
 	Data.update(player, function(pp)
 		pp.streak = streak
 		pp.lastDaily = today
+		if back then
+			pp.lastSpin = 0 -- and the wheel is ready for them
+		end
 	end)
-	local got = Economy.give(player, amount, "daily")
-	return true, { coins = got, streak = streak }
+	local got = Economy.give(player, amount, if back then "daily:comeback" else "daily")
+	return true, { coins = got, streak = streak, comeback = back }
 end
 
 Request.OnServerInvoke = function(player: Player, action: string, args: any)
