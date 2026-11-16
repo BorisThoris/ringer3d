@@ -16,6 +16,7 @@ local RaceTrack = require(ReplicatedStorage.Ringer.RaceTrack)
 local Data = require(script.Parent.Data)
 local Economy = require(script.Parent.Economy)
 local Collectibles = require(script.Parent.Collectibles)
+local Aura = require(script.Parent.Aura)
 
 local Social = {}
 
@@ -68,6 +69,18 @@ end
 
 -- ---- Nameplates ---------------------------------------------------------------------------------
 
+--- A count the way games print them: 950, 1.2K, 34K, 1.5M.
+function Social.short(n: number): string
+	if n >= 1e6 then
+		return (string.format("%.1fM", n / 1e6):gsub("%.0M", "M"))
+	elseif n >= 1e4 then
+		return string.format("%dK", math.floor(n / 1000))
+	elseif n >= 1000 then
+		return (string.format("%.1fK", n / 1000):gsub("%.0K", "K"))
+	end
+	return tostring(math.floor(n))
+end
+
 local function plate(player: Player)
 	local char = player.Character
 	local head = char and char:FindFirstChild("Head")
@@ -79,7 +92,7 @@ local function plate(player: Player)
 	if not gui then
 		local g = Instance.new("BillboardGui")
 		g.Name = "Nameplate"
-		g.Size = UDim2.fromOffset(220, 80)
+		g.Size = UDim2.fromOffset(220, 104)
 		g.StudsOffset = Vector3.new(0, 2.6, 0)
 		g.MaxDistance = 80
 		g.LightInfluence = 0
@@ -96,9 +109,10 @@ local function plate(player: Player)
 			l.TextStrokeTransparency = 0.1
 			l.Parent = g
 		end
-		line("Title", 0, 0.36)
-		line("Best", 0.36, 0.3)
-		line("RaceTime", 0.66, 0.3)
+		line("Title", 0, 0.28)
+		line("Aura", 0.28, 0.24)
+		line("Best", 0.52, 0.24)
+		line("RaceTime", 0.76, 0.24)
 		gui = g
 		-- Roblox's own name stays; ours sits above it.
 	end
@@ -107,6 +121,12 @@ local function plate(player: Player)
 	local title = (gui :: BillboardGui):FindFirstChild("Title") :: TextLabel
 	title.Text = (if vip then "👑 " else "") .. "Lv " .. level .. " · " .. Social.title(level)
 	title.TextColor3 = if vip then Color3.fromRGB(255, 215, 80) else Color3.new(1, 1, 1)
+	local auraLine = (gui :: BillboardGui):FindFirstChild("Aura") :: TextLabel?
+	if auraLine then
+		local pts = p.aura or 0
+		auraLine.Text = string.format("⚡ %s aura · %s", Social.short(pts), Aura.rank(pts))
+		auraLine.TextColor3 = if pts >= 2000 then Color3.fromRGB(255, 225, 120) else Color3.fromRGB(205, 170, 255)
+	end
 	local name, rarity = Social.best(p)
 	local best = (gui :: BillboardGui):FindFirstChild("Best") :: TextLabel
 	best.Text = if name then "✨ " .. name else ""

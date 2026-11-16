@@ -18,6 +18,7 @@ local Leaderboard = require(Server.Leaderboard)
 local Social = require(Server.Social)
 local Race = require(Server.Race)
 local Flex = require(Server.Flex)
+local Aura = require(Server.Aura)
 
 -- ---- Remotes --------------------------------------------------------------------------------
 local remotes = Instance.new("Folder")
@@ -38,6 +39,7 @@ local Notify = remote("RemoteEvent", "Notify") :: RemoteEvent
 local BagOpened = remote("RemoteEvent", "BagOpened") :: RemoteEvent
 local Announce = remote("RemoteEvent", "Announce") :: RemoteEvent -- server-wide news (Social)
 local RaceGhost = remote("RemoteEvent", "RaceGhost") :: RemoteEvent -- racers' marbles, relayed
+local AuraEvent = remote("RemoteEvent", "AuraEvent") :: RemoteEvent -- "+250 AURA" popups
 remotes.Parent = ReplicatedStorage.Ringer
 
 local function notify(player: Player, text: string, kind: string?)
@@ -416,6 +418,11 @@ local function pay(tbl, result: Table.Result)
 				Economy.progression(player, floor, Enum.AnalyticsProgressionType.Fail)
 			end
 		end
+		if not result.abandoned then
+			local other = if i == 1 then 2 else 1
+			local vsPlayer = tbl.seats[other] ~= nil and tbl.seats[other].player ~= nil
+			Aura.give(player, Aura.forGame(won, score, result.scores[other] or 0, (result.behindBy or {})[i] or 0, vsPlayer), 1.5)
+		end
 		Social.gameOver(player, won, score, tbl.arena.id, levelBefore)
 		Economy.funnel(player, 4, "Finished a match")
 		TableEvent:FireClient(player, "result", {
@@ -451,6 +458,14 @@ startTable = function(seats: { Table.Seat }, arena: string, mode: string, floor:
 		send = send,
 	})
 	tbl.fighter = extra and extra.fighter
+	-- Each shot's aura, shown once the shot has played out on the clients.
+	tbl.onShot = function(t, seat: number, took: number, shooterOut: boolean)
+		local s = t.seats[seat]
+		local gain = s and s.player and Aura.forShot(took, shooterOut)
+		if gain then
+			Aura.give(s.player, { gain }, 2.4)
+		end
+	end
 	tables[slot] = tbl
 	for i, seat in ipairs(seats) do
 		if seat.player then
@@ -945,6 +960,35 @@ do
 	Race.board(CFrame.lookAt(at, Vector3.new(0, 10, 0)), lobby)
 end
 Social.start(Announce)
+-- Aura: popups, and the server's Main Character (most aura) handed on as totals change.
+Aura.remote = AuraEvent
+local function pickMain()
+	local entries = {}
+	for _, pl in ipairs(Players:GetPlayers()) do
+		local p = Data.get(pl)
+		if p then
+			table.insert(entries, { id = pl.UserId, aura = p.aura or 0 })
+		end
+	end
+	local id = Aura.mainOf(entries)
+	if Flex.setMain(id) and id then
+		local who = Players:GetPlayerByUserId(id)
+		if who then
+			Social.announce(string.format("⭐ %s is the server's MAIN CHARACTER (%s aura)", who.DisplayName, Social.short(Data.get(who) and (Data.get(who) :: any).aura or 0)), Color3.fromRGB(255, 230, 140))
+		end
+	end
+end
+Aura.changed = function()
+	pickMain()
+end
+Players.PlayerAdded:Connect(function(pl)
+	if Data.await(pl) then
+		pickMain()
+	end
+end)
+Players.PlayerRemoving:Connect(function()
+	task.defer(pickMain)
+end)
 -- Crowns: the race's all-time record holder and this week's leader.
 Flex.start(function()
 	local ids = {}

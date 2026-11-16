@@ -425,6 +425,31 @@ for i = 1, 200 do
 	table.insert(some, Forge.mint("Rbook" .. i))
 end
 local rows = Forge.bookProgress(some)
+-- Aura: the status score.
+do
+	local Aura = require(game.ServerScriptService.Server.Aura)
+	check("aura ranks climb from NPC", Aura.rank(0) == "NPC" and Aura.rank(499) == "NPC" and Aura.rank(500) == "Side Character" and Aura.rank(2000) == "Main Character" and Aura.rank(30000) == "Infinite Aura", Aura.rank(2000))
+	local d, t, q, five = Aura.forShot(2, false), Aura.forShot(3, true), Aura.forShot(4, false), Aura.forShot(5, false)
+	check("knockouts farm aura, bigger for more", d.amount == 100 and t.amount == 250 and q.amount == 400 and five.amount == 500 and five.reason == "UNREAL KNOCKOUT")
+	check("one capture is no aura; a shooter lost for nothing costs it", Aura.forShot(1, false) == nil and Aura.forShot(0, false) == nil and Aura.forShot(0, true).amount < 0 and Aura.forShot(1, true) == nil)
+	local function sum(list)
+		local s = 0
+		for _, g in ipairs(list) do
+			s += g.amount
+		end
+		return s
+	end
+	local flawless = Aura.forGame(true, 8, 0, 0, false)
+	local comeback = Aura.forGame(true, 7, 5, 4, true)
+	check("a flawless win and a comeback win pay big", sum(flawless) == 350 and sum(comeback) == 500, sum(flawless) .. " " .. sum(comeback))
+	check("losing with no captures is cooked; a close loss costs nothing", sum(Aura.forGame(false, 0, 7, 7, true)) == -100 and #Aura.forGame(false, 3, 7, 4, true) == 0)
+	check("race aura: gold, rival, new best", sum(Aura.forRace("Gold", true, true)) == 425 and #Aura.forRace("Silver", false, false) == 0)
+	check("aura never goes below zero", Aura.apply(30, { { amount = -100, reason = "x" } }) == 0 and Aura.apply(30, { { amount = -100, reason = "x" }, { amount = 50, reason = "y" } }) == 50)
+	check("main character: most aura, at least the minimum", Aura.mainOf({ { id = 1, aura = 400 }, { id = 2, aura = 900 }, { id = 3, aura = 700 } }) == 2 and Aura.mainOf({ { id = 1, aura = 499 } }) == nil)
+	check("aura on a fake player touches nothing", Aura.give({ UserId = 9 } :: any, { { amount = 10, reason = "x" } }) == nil)
+	check("counts print short", Social.short(950) == "950" and Social.short(1200) == "1.2K" and Social.short(2000) == "2K" and Social.short(34567) == "34K" and Social.short(1500000) == "1.5M", Social.short(2000))
+end
+
 check("book has 6 sets", #rows == 6, #rows)
 check("200 marbles cover every rarity but maybe Mythic", #rows[3].got >= 4, #rows[3].got)
 

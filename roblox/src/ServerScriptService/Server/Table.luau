@@ -41,6 +41,7 @@ export type Result = {
 	captured: { { string } },
 	shots: number,
 	abandoned: number?, -- seat that left mid-game
+	behindBy: { number }?, -- the most each seat ever trailed by
 }
 
 local Table = {}
@@ -443,6 +444,20 @@ function Table:resolve(after, holed): boolean
 	end
 	self.layout = after
 	self:botReactions(seat, took, shooterOut)
+	-- The most each seat has trailed by (a comeback is worth aura), and the shot's hook.
+	self.behindBy = self.behindBy or {}
+	for i = 1, #self.seats do
+		local lead = 0
+		for j = 1, #self.seats do
+			if j ~= i then
+				lead = math.max(lead, self.scores[j] - self.scores[i])
+			end
+		end
+		self.behindBy[i] = math.max(self.behindBy[i] or 0, lead)
+	end
+	if self.onShot then
+		task.spawn(self.onShot, self, seat, took, shooterOut)
+	end
 
 	local winners = Rules.gameOver(self.scores, #after.targets, self.dryShots)
 	if winners then
@@ -585,6 +600,7 @@ function Table:run(): Result
 		captured = self.captured,
 		shots = self.shots,
 		abandoned = self.abandoned,
+		behindBy = table.clone(self.behindBy or {}),
 	}
 	if self.abandoned then
 		-- Whoever stayed wins.

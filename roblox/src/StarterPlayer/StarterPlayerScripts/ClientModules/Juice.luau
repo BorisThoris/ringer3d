@@ -497,6 +497,85 @@ function Juice.stamp(text: string, color: Color3?)
 	Debris:AddItem(edge, 1.7)
 end
 
+--- Aura gained or lost: "+250 AURA" rising on the right with the reason under it (one after
+--- another when several land at once), the new total, and a stamp when the rank goes up.
+local auraQueue = 0
+function Juice.aura(gains: { { amount: number, reason: string } }, total: number, rank: string, rankUp: boolean?)
+	local g = Juice.gui
+	if not g then
+		return
+	end
+	for k, gain in ipairs(gains) do
+		local wait = auraQueue * 0.55
+		auraQueue += 1
+		task.delay(wait, function()
+			auraQueue = math.max(0, auraQueue - 1)
+			local up = gain.amount > 0
+			local box = Instance.new("Frame")
+			box.Name = "AuraPop"
+			box.AnchorPoint = Vector2.new(1, 0.5)
+			box.Position = UDim2.fromScale(0.97, 0.38)
+			box.Size = UDim2.fromScale(0.3, 0.13)
+			box.BackgroundTransparency = 1
+			box.ZIndex = 85
+			box.Active = false
+			box.Parent = g
+			local amount = Instance.new("TextLabel")
+			amount.BackgroundTransparency = 1
+			amount.Size = UDim2.fromScale(1, 0.62)
+			amount.Font = Enum.Font.FredokaOne
+			amount.TextScaled = true
+			amount.TextXAlignment = Enum.TextXAlignment.Right
+			amount.Text = string.format("%s%d AURA", if up then "+" else "", gain.amount)
+			amount.TextColor3 = Color3.new(1, 1, 1)
+			amount.ZIndex = 86
+			amount.Parent = box
+			local grad = Instance.new("UIGradient")
+			grad.Rotation = 90
+			grad.Color = if up
+				then ColorSequence.new(Color3.fromRGB(255, 240, 160), Color3.fromRGB(200, 120, 255))
+				else ColorSequence.new(Color3.fromRGB(220, 220, 230), Color3.fromRGB(255, 90, 90))
+			grad.Parent = amount
+			local stroke = Instance.new("UIStroke")
+			stroke.Thickness = 4
+			stroke.Color = Color3.fromRGB(30, 18, 50)
+			stroke.Parent = amount
+			local why = Instance.new("TextLabel")
+			why.BackgroundTransparency = 1
+			why.Position = UDim2.fromScale(0, 0.62)
+			why.Size = UDim2.fromScale(1, 0.38)
+			why.Font = Enum.Font.FredokaOne
+			why.TextScaled = true
+			why.TextXAlignment = Enum.TextXAlignment.Right
+			why.Text = if k == #gains then string.format("%s  ·  ⚡ %d", gain.reason, total) else gain.reason
+			why.TextColor3 = if up then Color3.fromRGB(255, 230, 140) else Color3.fromRGB(255, 170, 170)
+			why.TextStrokeTransparency = 0.2
+			why.ZIndex = 86
+			why.Parent = box
+			local scale = Instance.new("UIScale")
+			scale.Scale = if up then 1.8 else 1.2
+			scale.Parent = box
+			TweenService:Create(scale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+			if up and gain.amount >= 250 then
+				Juice.kick(0.25)
+			end
+			task.delay(1.4, function()
+				TweenService:Create(box, TweenInfo.new(0.6), { Position = UDim2.fromScale(0.97, 0.3) }):Play()
+				for _, l in ipairs({ amount, why }) do
+					TweenService:Create(l, TweenInfo.new(0.6), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+				end
+				TweenService:Create(stroke, TweenInfo.new(0.6), { Transparency = 1 }):Play()
+			end)
+			Debris:AddItem(box, 2.2)
+			if rankUp and k == #gains then
+				task.delay(0.7, function()
+					Juice.stamp(string.upper(rank) .. "!", Color3.fromRGB(255, 220, 110))
+				end)
+			end
+		end)
+	end
+end
+
 --- Anime speed lines rushing in from the screen's edges on a hard flick.
 function Juice.speedLines(power: number)
 	local g = Juice.gui

@@ -13,6 +13,7 @@ local RaceTrack = require(ReplicatedStorage.Ringer.RaceTrack)
 local RaceSim = require(ReplicatedStorage.Ringer.RaceSim)
 local Data = require(script.Parent.Data)
 local Economy = require(script.Parent.Economy)
+local Aura = require(script.Parent.Aura)
 
 local RaceWorld = require(ReplicatedStorage.Ringer.RaceWorld)
 
@@ -200,11 +201,13 @@ function Race.start(player: Player): (boolean, any)
 	if rec and rec.userId == player.UserId then
 		rec = nil -- you hold the record: your own ghost is it
 	end
+	local rival = Race.rivalGhost(player, p.raceBest)
+	sessions[player].rivalTime = rival and rival.time
 	return true, {
 		countdown = 3, medals = Race.MEDALS, best = p.raceBest, bestStars = p.raceStars,
 		ghost = ghost and ghost.log,
 		record = rec and { name = rec.name, time = rec.time, log = rec.log },
-		rival = Race.rivalGhost(player, p.raceBest),
+		rival = rival,
 	}
 end
 
@@ -323,6 +326,8 @@ function Race.finish(player: Player, log: any): (boolean, any)
 			end)
 		end
 	end
+	local beatRival = session.rivalTime ~= nil and time < session.rivalTime
+	Aura.give(player, Aura.forRace(medal, newBest and pb ~= nil, beatRival), 1)
 	if medal == "Gold" and newBest then
 		Race.announce(string.format("🥇 %s won GOLD on Marble Mountain in %.2fs!", player.DisplayName, time), Color3.fromRGB(255, 215, 80))
 	end

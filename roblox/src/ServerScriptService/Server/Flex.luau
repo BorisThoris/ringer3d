@@ -123,7 +123,7 @@ Flex.STYLES = {
 }
 
 --- Dress a character's root in its aura (and crown); replaces whatever it wore.
-function Flex.dress(character: Model, aura: string?, crown: boolean)
+function Flex.dress(character: Model, aura: string?, crown: boolean, main: boolean?)
 	local root = character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	local head = character:FindFirstChild("Head") :: BasePart?
 	if not root then
@@ -135,6 +135,9 @@ function Flex.dress(character: Model, aura: string?, crown: boolean)
 	end
 	if head and head:FindFirstChild("Crown") then
 		(head :: any).Crown:Destroy()
+	end
+	if head and head:FindFirstChild("MainCharacter") then
+		(head :: any).MainCharacter:Destroy()
 	end
 	local at = Instance.new("Attachment")
 	at.Name = "Aura"
@@ -159,6 +162,30 @@ function Flex.dress(character: Model, aura: string?, crown: boolean)
 		t.Text = "👑"
 		t.Parent = g
 		emitter(at, { Color = seq(RGB(255, 215, 80)), Size = NumberSequence.new(0.5, 0), Rate = 20, Lifetime = NumberRange.new(1, 1.6), Speed = NumberRange.new(2, 4), SpreadAngle = Vector2.new(180, 180) })
+	end
+	-- The server's Main Character (most aura): a pillar of light and a title everyone can see.
+	if main then
+		emitter(at, { Color = seq(RGB(255, 255, 255), RGB(255, 230, 140)), Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.4), NumberSequenceKeypoint.new(1, 0) }), Transparency = NumberSequence.new(0.2, 1), Rate = 45, Lifetime = NumberRange.new(1.2, 1.8), Speed = NumberRange.new(10, 15), SpreadAngle = Vector2.new(5, 5), EmissionDirection = Enum.NormalId.Top })
+		light(at, RGB(255, 236, 170), 18, 4)
+		if head then
+			local g = Instance.new("BillboardGui")
+			g.Name = "MainCharacter"
+			g.Size = UDim2.fromOffset(240, 34)
+			g.StudsOffset = Vector3.new(0, if crown then 7.4 else 5.4, 0)
+			g.LightInfluence = 0
+			g.MaxDistance = 160
+			g.Parent = head
+			local t = Instance.new("TextLabel")
+			t.BackgroundTransparency = 1
+			t.Size = UDim2.fromScale(1, 1)
+			t.TextScaled = true
+			t.Font = Enum.Font.FredokaOne
+			t.Text = "⭐ MAIN CHARACTER ⭐"
+			t.TextColor3 = RGB(255, 236, 150)
+			t.TextStrokeTransparency = 0
+			t.TextStrokeColor3 = RGB(90, 50, 0)
+			t.Parent = g
+		end
 	end
 end
 
@@ -225,11 +252,30 @@ function Flex.refresh(player: Player)
 	local p = Data.get(player)
 	local aura = if p then Flex.choose(p, level) else Flex.auraFor(level)
 	local crown = Flex.crowned[player.UserId] == true
+	local main = Flex.mainId == player.UserId
 	player:SetAttribute("Aura", aura)
 	player:SetAttribute("Crown", crown or nil)
+	player:SetAttribute("MainCharacter", main or nil)
 	if player.Character then
-		Flex.dress(player.Character, aura, crown)
+		Flex.dress(player.Character, aura, crown, main)
 	end
+end
+
+-- The server's Main Character: the UserId with the most aura (set by Main from Aura.mainOf).
+Flex.mainId = nil :: number?
+--- Hand the Main Character title to `id` (or nobody); redresses whoever gained or lost it.
+function Flex.setMain(id: number?): boolean
+	if Flex.mainId == id then
+		return false
+	end
+	local was = Flex.mainId
+	Flex.mainId = id
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p.UserId == was or p.UserId == id then
+			Flex.refresh(p)
+		end
+	end
+	return true
 end
 
 function Flex.auraShop(player: Player): any

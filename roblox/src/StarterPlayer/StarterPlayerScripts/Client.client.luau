@@ -1731,6 +1731,11 @@ Remotes:WaitForChild("ProfileSync").OnClientEvent:Connect(function(p)
 end)
 
 Remotes:WaitForChild("Notify").OnClientEvent:Connect(toast)
+Remotes:WaitForChild("AuraEvent").OnClientEvent:Connect(function(gains, total, rank, rankUp)
+	if typeof(gains) == "table" and typeof(total) == "number" then
+		Juice.aura(gains, total, tostring(rank), rankUp == true)
+	end
+end)
 
 Remotes:WaitForChild("BagOpened").OnClientEvent:Connect(onBag)
 

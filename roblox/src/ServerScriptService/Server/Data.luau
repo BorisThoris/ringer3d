@@ -43,6 +43,7 @@ export type Profile = {
 	auras: { [string]: boolean }, -- auras bought in the shop
 	auraPick: string?, -- the aura worn ("none" for none; nil for the level's own)
 	weekPaid: number?, -- the last race week whose board prize was settled
+	aura: number, -- aura points: the status score (Aura)
 }
 
 local function fresh(): Profile
@@ -69,6 +70,7 @@ local function fresh(): Profile
 		boostUntil = 0,
 		favorited = false,
 		auras = {},
+		aura = 0,
 	}
 end
 
@@ -132,6 +134,13 @@ local function leaderstats(player: Player, p: Profile)
 	marbles.Name = "Marbles"
 	marbles.Value = p.captured
 	marbles.Parent = ls
+	local aura = ls:FindFirstChild("Aura") or Instance.new("IntValue")
+	aura.Name = "Aura"
+	aura.Value = p.aura or 0
+	aura.Parent = ls
+	if player:GetAttribute("AuraPoints") ~= (p.aura or 0) then
+		player:SetAttribute("AuraPoints", p.aura or 0)
+	end
 	ls.Parent = player
 end
 
