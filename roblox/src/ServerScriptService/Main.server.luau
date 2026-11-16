@@ -525,9 +525,17 @@ task.spawn(function()
 			local b = table.remove(queue, 1)
 			startTable({ seatFor(a.player), seatFor(b.player) }, randomArena(rng), "duel")
 		end
-		if #queue == 1 and os.clock() - queue[1].since > 25 then
+		local free = 0
+		if #queue == 1 then
+			for _, pl in ipairs(Players:GetPlayers()) do
+				if pl ~= queue[1].player and not active[pl] and not Race.racing(pl) then
+					free += 1
+				end
+			end
+		end
+		if #queue == 1 and os.clock() - queue[1].since > Config.queueWait(free) then
 			local q = table.remove(queue, 1)
-			notify(q.player, "No one else is free right now: a bot takes the other seat.", "info")
+			notify(q.player, if free > 0 then "No one took the seat: a bot plays you instead." else "You're the only one free here: a bot takes the other seat.", "info")
 			startTable({ seatFor(q.player), botSeat("regular") }, randomArena(rng), "bot")
 		end
 	end

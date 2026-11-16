@@ -369,6 +369,12 @@ Config.COINS = {
 }
 Config.COMEBACK_DAYS = 3
 
+--- How long a lone duellist waits before a bot takes the other seat: long enough for someone to
+--- join when anyone else in the server is free, a moment when no one is.
+function Config.queueWait(othersFree: number): number
+	return if othersFree > 0 then 20 else 4
+end
+
 --- Today's daily reward from the last claim's day and streak: (streak, coins, welcome back?).
 function Config.daily(lastDaily: number, streak: number, today: number): (number, number, boolean)
 	local s = if lastDaily == today - 1 then streak + 1 else 1

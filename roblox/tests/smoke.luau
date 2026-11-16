@@ -98,6 +98,7 @@ do
 			and s3 == 1 and not b3
 			and s4 == 1 and b4 and c4 == Config.COINS.daily[1] + Config.COINS.comeback)
 end
+check("a lone duellist gets a bot fast when no one else is free", Config.queueWait(0) <= 5 and Config.queueWait(2) > Config.queueWait(0))
 local giftFake = { UserId = 2 } :: any
 local gifts = Social.gifts(giftFake)
 local okEarly, whyEarly = Social.claimGift(giftFake, 1)
