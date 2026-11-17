@@ -75,6 +75,70 @@ def words(img, text, font="lucky", size=170, x=0.5, y=0.16, colors=((255, 250, 1
     return img
 
 
+def key_mask(matte):
+    """The subject's alpha from a green-box matte: not-green is subject, edges softened."""
+    import numpy as np
+    a = np.asarray(matte.convert("RGB")).astype(np.int16)
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    # Only near-pure green is background: glass seen against the green box is green-tinted and
+    # must stay subject (the marble's shell was keyed away at a looser threshold).
+    green = (g > 170) & (g - r > 150) & (g - b > 150)
+    m = Image.fromarray(np.where(green, 0, 255).astype(np.uint8), "L")
+    m = m.filter(ImageFilter.MedianFilter(5))
+    # Open: drop loose sparkle specks, which otherwise each get a sticker outline.
+    k = max(5, (matte.size[0] // 240) | 1)
+    m = m.filter(ImageFilter.MinFilter(k)).filter(ImageFilter.MaxFilter(k))
+    return m.filter(ImageFilter.GaussianBlur(1.2))
+
+
+def sunburst(size, centre, rays=18, color=(255, 255, 255), alpha=46):
+    """Alternating soft rays from `centre` (pixels), the charts' radial burst."""
+    import math
+    W, H = size
+    layer = Image.new("RGBA", size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    R = (W + H) * 1.5
+    cx, cy = centre
+    for i in range(rays):
+        a0 = (i / rays) * math.tau
+        a1 = a0 + math.tau / rays / 2
+        d.polygon([(cx, cy), (cx + R * math.cos(a0), cy + R * math.sin(a0)), (cx + R * math.cos(a1), cy + R * math.sin(a1))], fill=color + (alpha,))
+    glow = Image.new("L", size, 0)
+    gr = min(W, H) * 0.42
+    ImageDraw.Draw(glow).ellipse((cx - gr, cy - gr, cx + gr, cy + gr), fill=120)
+    glow = glow.filter(ImageFilter.GaussianBlur(gr * 0.5))
+    layer = layer.filter(ImageFilter.GaussianBlur(3))
+    white = Image.new("RGBA", size, color + (255,))
+    layer = Image.alpha_composite(layer, Image.composite(white, Image.new("RGBA", size, (0, 0, 0, 0)), glow))
+    return layer
+
+
+def cutout(img, mask, outline=22, rim=7, blur=14):
+    """The subject cut out with a white sticker outline and a dark rim, over its own scene
+    blurred and lit by a sunburst."""
+    W, H = img.size
+    bb = mask.point(lambda v: 255 if v > 128 else 0).getbbox() or (0, 0, W, H)
+    centre = ((bb[0] + bb[2]) / 2, (bb[1] + bb[3]) / 2)
+    bg = ImageEnhance.Color(img.filter(ImageFilter.GaussianBlur(blur))).enhance(1.15).convert("RGBA")
+    bg = Image.alpha_composite(bg, sunburst((W, H), centre))
+    hard = mask.point(lambda v: 255 if v > 100 else 0)
+    def grow(px):
+        size = px * 2 + 1
+        g = hard
+        # MaxFilter is slow for big kernels: grow in steps.
+        while size > 1:
+            k = min(size, 9) | 1
+            g = g.filter(ImageFilter.MaxFilter(k))
+            size -= k - 1
+        return g.filter(ImageFilter.GaussianBlur(1.5))
+    rim_m = grow(outline + rim)
+    white_m = grow(outline)
+    bg.paste(Image.new("RGBA", (W, H), (30, 20, 60, 255)), (0, 0), rim_m)
+    bg.paste(Image.new("RGBA", (W, H), (255, 255, 255, 255)), (0, 0), white_m)
+    bg.paste(img.convert("RGBA"), (0, 0), mask)
+    return bg.convert("RGB")
+
+
 def main():
     spec = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
     out = Path(sys.argv[2])
@@ -84,7 +148,14 @@ def main():
         src = Image.open(base / item["src"]).convert("RGB")
         w, h = item.get("size", [1920, 1080])
         img = crop(src, w, h, item.get("cx", 0.5), item.get("cy", 0.5), item.get("zoom", 1.0))
-        img = grade(img, item.get("sat", 1.18), item.get("con", 1.08), item.get("vignette", 0.28))
+        if "matte" in item:
+            mask = key_mask(crop(Image.open(base / item["matte"]).convert("RGB"), w, h, item.get("cx", 0.5), item.get("cy", 0.5), item.get("zoom", 1.0)))
+            img = grade(img, item.get("sat", 1.18), item.get("con", 1.08), 0)
+            scale = w / 1920
+            img = cutout(img, mask, int(item.get("outline", 22) * scale), int(item.get("rim", 7) * scale), item.get("blur", 14) * scale)
+            img = grade(img, 1.0, 1.0, item.get("vignette", 0.22))
+        else:
+            img = grade(img, item.get("sat", 1.18), item.get("con", 1.08), item.get("vignette", 0.28))
         for t in item.get("text", []):
             t = dict(t)
             if "colors" in t:

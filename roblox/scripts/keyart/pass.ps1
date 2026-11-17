@@ -16,7 +16,7 @@ $start = Get-Date
 Remove-Item (Join-Path $plugins 'RingerPageShots.lua') -Force -ErrorAction SilentlyContinue
 $f = Get-ChildItem "$env:LOCALAPPDATA\Roblox\logs\*Studio*.log" | Where-Object { $_.LastWriteTime -gt $start -and (Select-String -Path $_.FullName -Pattern 'keyart\] viewport' -Quiet) } | Select-Object -First 1
 if (-not $f) { 'no pageshots log found'; exit 1 }
-$labels = @(Select-String -Path $f.FullName -Pattern '\[keyart\] capture (\S+)' | ForEach-Object { $_.Matches[0].Groups[1].Value })
+$labels = @(Select-String -Path $f.FullName -Pattern '\[keyart\] capture (?!timeout )(\S+)' | ForEach-Object { $_.Matches[0].Groups[1].Value })
 $files = @(Get-ChildItem "$env:LOCALAPPDATA\Roblox\tmp-capture-storage" | Where-Object { $_.LastWriteTime -gt $start } | Sort-Object LastWriteTime)
 "labels $($labels.Count) files $($files.Count)"
 for ($i = 0; $i -lt [Math]::Min($labels.Count, $files.Count); $i++) { Copy-Item $files[$i].FullName (Join-Path $out ("{0:d2}-{1}.png" -f $i, $labels[$i])) }

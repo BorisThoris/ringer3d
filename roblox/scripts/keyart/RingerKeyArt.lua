@@ -173,6 +173,81 @@ local function marble(id, r, at)
 	return b
 end
 
+-- A matte of the last shot: everything but `keep` hidden, the camera inside a flat neon-green
+-- box (floor at the subject's feet), no grade. The compositor keys the green to cut the subject
+-- out (the charts' white-outlined cutouts over a sunburst). Everything is put back after.
+local GREEN = Color3.fromRGB(0, 255, 0)
+local function matte(label, keep: { Instance }, from, at, fov, floorY)
+	local function kept(x)
+		for _, k in ipairs(keep) do
+			if x == k or x:IsDescendantOf(k) then return true end
+		end
+		return false
+	end
+	local undo = {}
+	for _, d in ipairs(workspace:GetDescendants()) do
+		if kept(d) then
+			-- The subject's silhouette must be solid: glass seen against green keys patchily, and
+			-- loose sparkles become specks. Opaque white glass and no particles, in the matte only.
+			if d:IsA("BasePart") and d.Transparency > 0 and d.Transparency < 1 then
+				table.insert(undo, { d, "Transparency", d.Transparency })
+				table.insert(undo, { d, "Material", d.Material })
+				table.insert(undo, { d, "Color", d.Color })
+				d.Transparency = 0
+				d.Material = Enum.Material.SmoothPlastic
+				d.Color = Color3.new(1, 1, 1)
+			elseif d:IsA("ParticleEmitter") or d:IsA("Sparkles") then
+				table.insert(undo, { d, "Enabled", d.Enabled })
+				d.Enabled = false
+			end
+		elseif not kept(d) then
+			if d:IsA("BasePart") or d:IsA("Decal") or d:IsA("Texture") then
+				table.insert(undo, { d, "Transparency", d.Transparency })
+				d.Transparency = 1
+			elseif d:IsA("ParticleEmitter") or d:IsA("Beam") or d:IsA("Trail") or d:IsA("BillboardGui") or d:IsA("SurfaceGui") or d:IsA("Light") then
+				table.insert(undo, { d, "Enabled", d.Enabled })
+				d.Enabled = false
+			end
+		end
+	end
+	cc.Enabled = false
+	bloom.Enabled = false
+	local box = Instance.new("Model")
+	box.Name = "MatteBox"
+	-- Small: terrain doesn't hide like parts, so the walls must sit inside the far hills.
+	local S = 80
+	local T = workspace.Terrain
+	local deco = T.Decoration
+	pcall(function() T.Decoration = false end)
+	local function wall(size, pos)
+		local p = Instance.new("Part")
+		p.Anchored = true
+		p.CanCollide = false
+		p.Material = Enum.Material.Neon
+		p.Color = GREEN
+		p.CastShadow = false
+		p.Size = size
+		p.CFrame = CFrame.new(pos)
+		p.Parent = box
+	end
+	local c = Vector3.new(at.X, floorY + 0.25, at.Z) -- a hair above the grass surface
+	wall(Vector3.new(S, 1, S), c - Vector3.new(0, 0.5, 0)) -- floor, top at floorY
+	wall(Vector3.new(S, 1, S), c + Vector3.new(0, S / 2, 0))
+	wall(Vector3.new(1, S, S), c + Vector3.new(S / 2, 0, 0))
+	wall(Vector3.new(1, S, S), c - Vector3.new(S / 2, 0, 0))
+	wall(Vector3.new(S, S, 1), c + Vector3.new(0, 0, S / 2))
+	wall(Vector3.new(S, S, 1), c - Vector3.new(0, 0, S / 2))
+	box.Parent = workspace
+	snap(label .. "-matte", from, at, fov, 1.5)
+	box:Destroy()
+	pcall(function() T.Decoration = deco end)
+	for _, u in ipairs(undo) do
+		pcall(function() (u[1] :: any)[u[2]] = u[3] end)
+	end
+	cc.Enabled = true
+	bloom.Enabled = true
+end
+
 -- 1. THE FLICK: the avatar at the ring's edge, arm out, marbles bursting out of the ring.
 step("flick", function()
 	local Table = require(SSS.Server.Table)
@@ -184,7 +259,8 @@ step("flick", function()
 	log("table", ok)
 	task.wait(3)
 	-- Burst: the cross flying outward and up from the middle.
-	local ids = { "ember", "tide", "aurora", "comet", "jade", "pumpkin", "volt", "rime", "ironside", "pip", "ember", "tide", "comet" }
+	-- No green marbles: the matte keys green.
+	local ids = { "ember", "tide", "aurora", "comet", "pumpkin", "pumpkin", "volt", "rime", "ironside", "pip", "ember", "tide", "comet" }
 	local burst = {}
 	for i, id in ipairs(ids) do
 		local a = (i / #ids) * math.pi * 2
@@ -219,10 +295,14 @@ step("flick", function()
 	-- Low and wide: the avatar big on the left, the burst on the right.
 	local back = (o - at).Unit
 	local across = back:Cross(Vector3.yAxis)
-	snap("flick-a", o + back * 3.5 + across * 1.2 + Vector3.new(0, 1.1, 0), face + Vector3.new(0, -0.6, 0), 62, 3)
-	snap("flick-b", o + back * 2 - across * 2.5 + Vector3.new(0, 0.7, 0), face:Lerp(o, 0.35), 66, 2)
-	snap("flick-c", o + back * 6 + Vector3.new(0, 2.6, 0), face:Lerp(o, 0.5), 58, 2)
-	snap("flick-face", face + (o - at).Unit * 5 + Vector3.new(1.5, 0.4, 0), face, 50, 2)
+	local keep = { m, shooter }
+	for _, b in ipairs(burst) do table.insert(keep, b) end
+	local camA, aimA = o + back * 3.5 + across * 1.2 + Vector3.new(0, 1.1, 0), face + Vector3.new(0, -0.6, 0)
+	snap("flick-a", camA, aimA, 62, 3)
+	matte("flick-a", keep, camA, aimA, 62, o.Y)
+	local camF, aimF = face + (o - at).Unit * 5 + Vector3.new(1.5, 0.4, 0), face
+	snap("flick-face", camF, aimF, 50, 2)
+	matte("flick-face", keep, camF, aimF, 50, o.Y)
 	m:Destroy()
 	shooter:Destroy()
 	for _, b in ipairs(burst) do b:Destroy() end
@@ -253,9 +333,16 @@ step("mythic", function()
 	glow.Parent = ball
 	task.wait(2)
 	local front = at + look * 10 + Vector3.new(0, 0.2, 0)
-	snap("mythic-a", at + look * 7.5 + Vector3.new(0, -0.6, 0) + look:Cross(Vector3.yAxis) * 1.5, at + Vector3.new(0, 3.6, 0), 62, 3)
-	snap("mythic-b", at + look * 7 + look:Cross(Vector3.yAxis) * -3 + Vector3.new(0, 0.5, 0), at + Vector3.new(0, 4.2, 0), 62, 2)
-	snap("mythic-icon", at + look * 6.5 + Vector3.new(0, 4.5, 0), at + Vector3.new(0, 4.4, 0), 55, 2)
+	local _ = front
+	local feet = at.Y - 2.95
+	-- Wider and a touch further back than before, so the whole pose and the marble fit with room
+	-- for the outline.
+	local camM, aimM = at + look * 10 + Vector3.new(0, -0.2, 0) + look:Cross(Vector3.yAxis) * 1.5, at + Vector3.new(0, 3.2, 0)
+	snap("mythic-a", camM, aimM, 60, 3)
+	matte("mythic-a", { m, ball }, camM, aimM, 60, feet)
+	local camI, aimI = at + look * 6.5 + Vector3.new(0, 4.5, 0), at + Vector3.new(0, 4.4, 0)
+	snap("mythic-icon", camI, aimI, 55, 2)
+	matte("mythic-icon", { m, ball }, camI, aimI, 55, feet)
 	m:Destroy()
 	ball:Destroy()
 end)
