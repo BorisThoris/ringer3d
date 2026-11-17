@@ -1,0 +1,18 @@
+[
+ {"src": "pass7/03-flick-face.png", "out": "1-duel.jpg", "cx": 0.48, "cy": 0.56,
+  "text": [{"text": "MARBLE DUELS", "font": "lucky", "size": 165, "x": 0.5, "y": 0.13, "colors": [[255,255,255],[130,215,255],[40,110,255]], "tilt": -3}]},
+ {"src": "pass7/04-mythic-a.png", "out": "2-mythic.jpg", "cx": 0.5, "cy": 0.6,
+  "text": [{"text": "MYTHIC!", "font": "lucky", "size": 200, "x": 0.2, "y": 0.2, "colors": [[255,140,230],[190,90,255],[90,160,255]], "tilt": -7}]},
+ {"src": "pass7/07-aura-a.png", "out": "3-aura.jpg", "cx": 0.5, "cy": 0.6,
+  "text": [{"text": "MAIN CHARACTER", "font": "lucky", "size": 150, "x": 0.5, "y": 0.13, "colors": [[255,250,190],[255,196,40],[255,120,20]], "tilt": -3},
+           {"text": "+400 AURA", "font": "lucky", "size": 125, "x": 0.8, "y": 0.8, "colors": [[245,215,255],[170,100,255]], "tilt": 7}]},
+ {"src": "pass7/00-flick-a.png", "out": "4-knockout.jpg", "cx": 0.5, "cy": 0.4,
+  "text": [{"text": "KNOCK 'EM OUT!", "font": "lucky", "size": 150, "x": 0.5, "y": 0.14, "colors": [[255,255,200],[255,140,60],[255,60,80]], "tilt": -4}]},
+ {"src": "../2026-11-16-page-shots/pass3/12-racehero-74-low.png", "out": "5-race.jpg", "cx": 0.5, "cy": 0.55,
+  "text": [{"text": "DOWNHILL RACE", "font": "lucky", "size": 155, "x": 0.5, "y": 0.13, "colors": [[255,255,210],[255,215,60],[255,150,20]], "tilt": -3}]},
+ {"src": "../2026-11-16-page-shots/pass3/17-jump-1-under.png", "out": "6-air.jpg", "cx": 0.5, "cy": 0.52,
+  "text": [{"text": "BIG AIR!", "font": "lucky", "size": 190, "x": 0.24, "y": 0.18, "colors": [[230,255,255],[120,220,255],[60,130,255]], "tilt": -8}]},
+ {"src": "../2026-11-16-page-shots/pass1/39-mid-ice-02-low.png", "out": "7-fields.jpg", "cx": 0.5, "cy": 0.5,
+  "text": [{"text": "7 FIELDS", "font": "lucky", "size": 180, "x": 0.5, "y": 0.15, "colors": [[255,255,255],[170,235,255],[90,170,255]], "tilt": -3}]},
+ {"src": "pass7/06-mythic-icon.png", "out": "icon.png", "size": [512, 512], "cx": 0.5, "cy": 0.55, "zoom": 1.05, "vignette": 0.18}
+]
