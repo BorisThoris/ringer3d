@@ -34,7 +34,10 @@ local function snap(label, from, at, fov, settle)
 	end
 	task.wait(0.6)
 end
+-- ONLY: render just these sections (nil renders all).
+local ONLY = nil -- e.g. { fields = true, race = true }
 local function step(name, fn)
+	if ONLY and not ONLY[name] then return end
 	local ok, err = pcall(fn)
 	log("section", name, ok, ok and "" or tostring(err))
 end
@@ -230,13 +233,19 @@ local function matte(label, keep: { Instance }, from, at, fov, floorY)
 		p.CFrame = CFrame.new(pos)
 		p.Parent = box
 	end
-	local c = Vector3.new(at.X, floorY + 0.25, at.Z) -- a hair above the grass surface
-	wall(Vector3.new(S, 1, S), c - Vector3.new(0, 0.5, 0)) -- floor, top at floorY
-	wall(Vector3.new(S, 1, S), c + Vector3.new(0, S / 2, 0))
-	wall(Vector3.new(1, S, S), c + Vector3.new(S / 2, 0, 0))
-	wall(Vector3.new(1, S, S), c - Vector3.new(S / 2, 0, 0))
-	wall(Vector3.new(S, S, 1), c + Vector3.new(0, 0, S / 2))
-	wall(Vector3.new(S, S, 1), c - Vector3.new(0, 0, S / 2))
+	-- Floor a hair above the grass; walls and ceiling reach above both the camera and the aim
+	-- (a race camera 40 studs over the floor was outside a box only S tall, looking at sky).
+	local fy = floorY + 0.25
+	local top = math.max(from.Y, at.Y) + S / 2
+	local hgt = top - fy
+	local mid = (fy + top) / 2
+	local c = Vector3.new(at.X, fy, at.Z)
+	wall(Vector3.new(S, 1, S), c - Vector3.new(0, 0.5, 0)) -- floor, top at fy
+	wall(Vector3.new(S, 1, S), Vector3.new(at.X, top, at.Z))
+	wall(Vector3.new(1, hgt, S), Vector3.new(at.X + S / 2, mid, at.Z))
+	wall(Vector3.new(1, hgt, S), Vector3.new(at.X - S / 2, mid, at.Z))
+	wall(Vector3.new(S, hgt, 1), Vector3.new(at.X, mid, at.Z + S / 2))
+	wall(Vector3.new(S, hgt, 1), Vector3.new(at.X, mid, at.Z - S / 2))
 	box.Parent = workspace
 	snap(label .. "-matte", from, at, fov, 1.5)
 	box:Destroy()
@@ -368,29 +377,98 @@ step("aura", function()
 	m:Destroy()
 end)
 
--- 4. THE RACE: a marble flying at the camera off a jump on Marble Mountain.
+-- 4. FIELDS: the avatar flicking on the ice field, marbles bursting from the ring.
+step("fields", function()
+	local Table = require(SSS.Server.Table)
+	local o = Vector3.new(3200, 0, 1500)
+	local ok, tbl = pcall(Table.new, {
+		seats = { { kind = "bot", bot = "expert", name = "A", marble = "ember" }, { kind = "bot", bot = "skilled", name = "B", marble = "tide" } },
+		arena = "ice", origin = o, mode = "bot", seed = 9,
+	})
+	log("ice table", ok)
+	task.wait(3)
+	if ok and tbl.parts then
+		for _, p in pairs(tbl.parts) do
+			if typeof(p) == "Instance" and p:IsA("BasePart") then p.Transparency = 1 end
+		end
+	end
+	local ids = { "ember", "tide", "aurora", "comet", "pumpkin", "volt", "rime", "ironside", "pip", "ember", "aurora" }
+	local burst = {}
+	for i, id in ipairs(ids) do
+		local a = (i / #ids) * math.pi * 2 + 0.4
+		local r = 1.5 + (i % 4) * 1.4
+		table.insert(burst, marble(id, 0.6, o + Vector3.new(math.cos(a) * r, 0.7 + ((i * 5) % 4) * 0.6, math.sin(a) * r)))
+	end
+	local m = avatar()
+	local at = o + Vector3.new(-5, 2.2, 5)
+	place(m, at, o)
+	pose(m, {
+		RightShoulder = CFrame.Angles(rad(80), 0, rad(-10)),
+		RightElbow = CFrame.Angles(rad(15), 0, 0),
+		LeftShoulder = CFrame.Angles(rad(-25), 0, rad(-35)),
+		Waist = CFrame.Angles(rad(-18), rad(10), 0),
+		RightHip = CFrame.Angles(rad(70), 0, 0),
+		RightKnee = CFrame.Angles(rad(-95), 0, 0),
+		LeftKnee = CFrame.Angles(rad(-80), 0, 0),
+	})
+	task.wait(2)
+	local face = at + Vector3.new(0, 1.5, 0)
+	local back = (o - at).Unit
+	local across = back:Cross(Vector3.yAxis)
+	local keep = { m }
+	for _, b in ipairs(burst) do table.insert(keep, b) end
+	-- Across the ring: marbles mid-distance, not blown up against the lens.
+	local cam, aim = o + back * 6 + across * 1.5 + Vector3.new(0, 2, 0), face:Lerp(o, 0.4) + Vector3.new(0, -0.3, 0)
+	snap("fields-a", cam, aim, 64, 3)
+	matte("fields-a", keep, cam, aim, 64, o.Y)
+	m:Destroy()
+	for _, b in ipairs(burst) do b:Destroy() end
+end)
+
+-- 5. THE RACE: the marble rushing at the camera with its ghosts, and one in mid-air over a jump.
+-- Marble Mountain is terrain, which a matte can't hide: both beauty shots first, then the
+-- terrain is cleared (this is a throwaway copy of the place), then both mattes.
 step("race", function()
 	local RaceWorld = require(RS.Ringer.RaceWorld)
 	local RaceTrack = require(RS.Ringer.RaceTrack)
+	local RaceSim = require(RS.Ringer.RaceSim)
 	local built = RaceWorld.build(workspace)
 	task.wait(5)
 	local main = built.course.paths.main
-	local jumps = 0
+	local R = RaceSim.R
+	local function v(f, k) return Vector3.new(f[k .. "x"], f[k .. "y"], f[k .. "z"]) end
+	local shots = {}
+	do
+		local s = main.length * 0.74
+		local f = RaceTrack.frame(main, s)
+		local p = RaceTrack.world(f, -1, R)
+		local t, up, rt = v(f, "t"), v(f, "u"), v(f, "r")
+		local me = marble("aurora", R, p)
+		local g1 = marble("ember", R, RaceTrack.world(RaceTrack.frame(main, s - 9), 3.5, R))
+		local g2 = marble("tide", R, RaceTrack.world(RaceTrack.frame(main, s - 18), -4, R))
+		table.insert(shots, { label = "race-ground", keep = { me, g1, g2 }, cam = p + t * 8 + up * 2 + rt * 1.5, aim = p - t * 6 + up * 0.5, fov = 68, floor = p.Y - 40 })
+	end
 	for i, f in ipairs(main.frames) do
-		if jumps < 2 and i > 1 and not f.floor and main.frames[i - 1].floor then
-			jumps += 1
-			local s = (i - 1) * RaceTrack.STEP + 10
+		if i > 1 and not f.floor and main.frames[i - 1].floor then
+			local s = (i - 1) * RaceTrack.STEP + 16
 			local fr = RaceTrack.frame(main, s)
-			local p = RaceTrack.world(fr, 0, 2 + 6)
-			local t = Vector3.new(fr.tx, fr.ty, fr.tz)
+			local p = RaceTrack.world(fr, 0, R + 9)
+			local t = v(fr, "t")
 			local side = t:Cross(Vector3.yAxis).Unit
-			local me = marble("aurora", 2, p)
-			local g1 = marble("ember", 2, p - t * 9 + side * 3 + Vector3.new(0, -1.5, 0))
-			local g2 = marble("tide", 2, p - t * 17 - side * 3 + Vector3.new(0, -2.5, 0))
-			snap(("race-%d-front"):format(jumps), p + t * 5.5 + side * 1.5 + Vector3.new(0, -1, 0), p - t * 6 + Vector3.new(0, -2, 0), 75, 2)
-			snap(("race-%d-low"):format(jumps), p + t * 6 - side * 5 + Vector3.new(0, -5, 0), p - t * 4 + Vector3.new(0, 1, 0), 78, 2)
-			me:Destroy() g1:Destroy() g2:Destroy()
+			local me = marble("aurora", R, p)
+			local g1 = marble("ember", R, RaceTrack.world(RaceTrack.frame(main, s - 14), 3, R + 6))
+			-- From behind and below the jump's lip: the marble high, the track looping beneath.
+			table.insert(shots, { label = "race-air", keep = { me, g1 }, cam = p - t * 20 + Vector3.new(0, -8, 0) + side * 6, aim = p + Vector3.new(0, 2, 0), fov = 60, floor = p.Y - 60 })
+			break
 		end
+	end
+	for _, sh in ipairs(shots) do
+		snap(sh.label, sh.cam, sh.aim, sh.fov, 2)
+	end
+	workspace.Terrain:Clear()
+	task.wait(1)
+	for _, sh in ipairs(shots) do
+		matte(sh.label, sh.keep, sh.cam, sh.aim, sh.fov, sh.floor)
 	end
 end)
 log("done")
