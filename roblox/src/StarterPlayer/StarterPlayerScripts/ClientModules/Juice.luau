@@ -499,22 +499,31 @@ end
 
 --- Aura gained or lost: "+250 AURA" rising on the right with the reason under it (one after
 --- another when several land at once), the new total, and a stamp when the rank goes up.
-local auraQueue = 0
+local auraSlots = { false, false, false } -- popups on screen, one per row, so none overlap
 function Juice.aura(gains: { { amount: number, reason: string } }, total: number, rank: string, rankUp: boolean?)
 	local g = Juice.gui
-	if not g then
+	if not g or #gains == 0 then
 		return
 	end
+	-- Gains that land together read as one: "+500 AURA", "FLAWLESS + Beat a real player + Win".
+	if #gains > 1 then
+		local sum, why = 0, {}
+		for _, x in ipairs(gains) do
+			sum += x.amount
+			table.insert(why, x.reason)
+		end
+		gains = { { amount = sum, reason = table.concat(why, " + ") } }
+	end
 	for k, gain in ipairs(gains) do
-		local wait = auraQueue * 0.55
-		auraQueue += 1
-		task.delay(wait, function()
-			auraQueue = math.max(0, auraQueue - 1)
+		local slot = table.find(auraSlots, false) or 1
+		auraSlots[slot] = true
+		do
+			local y = 0.38 + (slot - 1) * 0.12
 			local up = gain.amount > 0
 			local box = Instance.new("Frame")
 			box.Name = "AuraPop"
 			box.AnchorPoint = Vector2.new(1, 0.5)
-			box.Position = UDim2.fromScale(0.97, 0.38)
+			box.Position = UDim2.fromScale(0.97, y)
 			box.Size = UDim2.fromScale(0.3, 0.13)
 			box.BackgroundTransparency = 1
 			box.ZIndex = 85
@@ -560,19 +569,22 @@ function Juice.aura(gains: { { amount: number, reason: string } }, total: number
 				Juice.kick(0.25)
 			end
 			task.delay(1.4, function()
-				TweenService:Create(box, TweenInfo.new(0.6), { Position = UDim2.fromScale(0.97, 0.3) }):Play()
+				TweenService:Create(box, TweenInfo.new(0.6), { Position = UDim2.fromScale(0.97, y - 0.06) }):Play()
 				for _, l in ipairs({ amount, why }) do
 					TweenService:Create(l, TweenInfo.new(0.6), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
 				end
 				TweenService:Create(stroke, TweenInfo.new(0.6), { Transparency = 1 }):Play()
 			end)
 			Debris:AddItem(box, 2.2)
+			task.delay(2.2, function()
+				auraSlots[slot] = false
+			end)
 			if rankUp and k == #gains then
 				task.delay(0.7, function()
 					Juice.stamp(string.upper(rank) .. "!", Color3.fromRGB(255, 220, 110))
 				end)
 			end
-		end)
+		end
 	end
 end
 

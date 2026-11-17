@@ -129,9 +129,11 @@ function Flex.dress(character: Model, aura: string?, crown: boolean, main: boole
 	if not root then
 		return
 	end
-	local old = root:FindFirstChild("Aura")
-	if old then
-		old:Destroy()
+	for _, name in ipairs({ "Aura", "AuraPillarTop" }) do
+		local old = root:FindFirstChild(name)
+		if old then
+			old:Destroy()
+		end
 	end
 	if head and head:FindFirstChild("Crown") then
 		(head :: any).Crown:Destroy()
@@ -165,13 +167,35 @@ function Flex.dress(character: Model, aura: string?, crown: boolean, main: boole
 	end
 	-- The server's Main Character (most aura): a pillar of light and a title everyone can see.
 	if main then
-		emitter(at, { Color = seq(RGB(255, 255, 255), RGB(255, 230, 140)), Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.4), NumberSequenceKeypoint.new(1, 0) }), Transparency = NumberSequence.new(0.2, 1), Rate = 45, Lifetime = NumberRange.new(1.2, 1.8), Speed = NumberRange.new(10, 15), SpreadAngle = Vector2.new(5, 5), EmissionDirection = Enum.NormalId.Top })
-		light(at, RGB(255, 236, 170), 18, 4)
+		-- Saturated gold, little light emission: white additive sparks vanish against a bright sky
+		-- (seen in the first play-mode check).
+		emitter(at, { Color = seq(RGB(255, 214, 70), RGB(255, 140, 30)), LightEmission = 0.35, Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 2), NumberSequenceKeypoint.new(1, 0.4) }), Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.05), NumberSequenceKeypoint.new(0.7, 0.3), NumberSequenceKeypoint.new(1, 1) }), Rate = 70, Lifetime = NumberRange.new(1.3, 1.9), Speed = NumberRange.new(9, 14), SpreadAngle = Vector2.new(4, 4), EmissionDirection = Enum.NormalId.Top })
+		-- A gold ring round the feet.
+		emitter(at, { Color = seq(RGB(255, 225, 90)), LightEmission = 0.3, Size = NumberSequence.new(0.8, 0), Rate = 50, Lifetime = NumberRange.new(0.6, 0.9), Speed = NumberRange.new(5, 6), SpreadAngle = Vector2.new(0, 180), EmissionDirection = Enum.NormalId.Right, Acceleration = Vector3.new(0, 2, 0) })
+		light(at, RGB(255, 210, 110), 14, 1.5) -- brighter washed the whole lobby yellow
+		-- The pillar itself: a beam from the feet into the sky. Particle counts drop with graphics
+		-- quality (the play-mode check saw two sparks); a beam always draws.
+		local top = Instance.new("Attachment")
+		top.Name = "AuraPillarTop"
+		top.Position = Vector3.new(0, 32.5, 0)
+		top.Parent = root
+		local beam = Instance.new("Beam")
+		beam.Attachment0 = at
+		beam.Attachment1 = top
+		beam.FaceCamera = true
+		beam.Width0 = 3.2
+		beam.Width1 = 0.6
+		beam.LightEmission = 0.5
+		beam.LightInfluence = 0
+		beam.Color = seq(RGB(255, 225, 110), RGB(255, 160, 40))
+		beam.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.25), NumberSequenceKeypoint.new(0.6, 0.55), NumberSequenceKeypoint.new(1, 1) })
+		beam.Parent = at
 		if head then
 			local g = Instance.new("BillboardGui")
 			g.Name = "MainCharacter"
-			g.Size = UDim2.fromOffset(240, 34)
-			g.StudsOffset = Vector3.new(0, if crown then 7.4 else 5.4, 0)
+			-- In studs, so it reads as a sign over them at any screen size.
+			g.Size = UDim2.fromScale(11, 1.6)
+			g.StudsOffset = Vector3.new(0, if crown then 8 else 6.2, 0)
 			g.LightInfluence = 0
 			g.MaxDistance = 160
 			g.Parent = head
@@ -181,10 +205,16 @@ function Flex.dress(character: Model, aura: string?, crown: boolean, main: boole
 			t.TextScaled = true
 			t.Font = Enum.Font.FredokaOne
 			t.Text = "⭐ MAIN CHARACTER ⭐"
-			t.TextColor3 = RGB(255, 236, 150)
-			t.TextStrokeTransparency = 0
-			t.TextStrokeColor3 = RGB(90, 50, 0)
+			t.TextColor3 = RGB(255, 255, 255)
 			t.Parent = g
+			local grad = Instance.new("UIGradient")
+			grad.Rotation = 90
+			grad.Color = seq(RGB(255, 245, 170), RGB(255, 170, 40))
+			grad.Parent = t
+			local stroke = Instance.new("UIStroke")
+			stroke.Thickness = 3
+			stroke.Color = RGB(80, 40, 0)
+			stroke.Parent = t
 		end
 	end
 end
