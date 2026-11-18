@@ -6,7 +6,9 @@ import sys
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont, ImageChops
 
-FONTS = Path(r"C:\Users\Gaming PC\AppData\Local\Roblox\Versions\version-63eb6055af4e4688\content\fonts")
+# Roblox's own fonts, from whichever version is installed (a Studio update moves them).
+FONTS = max(Path(r"C:\Users\Gaming PC\AppData\Local\Roblox\Versions").glob("*/content/fonts/LuckiestGuy-Regular.ttf"),
+            key=lambda p: p.stat().st_mtime).parent
 FONT = {"lucky": FONTS / "LuckiestGuy-Regular.ttf", "fredoka": FONTS / "FredokaOne-Regular.ttf"}
 
 

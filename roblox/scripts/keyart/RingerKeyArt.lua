@@ -35,6 +35,7 @@ local function snap(label, from, at, fov, settle)
 	task.wait(0.6)
 end
 -- ONLY: render just these sections (nil renders all).
+local DUEL_SPRITES = true -- the marble sky shots (pass16 has them)
 local ONLY = nil -- e.g. { fields = true, race = true }
 local function step(name, fn)
 	if ONLY and not ONLY[name] then return end
@@ -43,7 +44,7 @@ local function step(name, fn)
 end
 
 local t0 = os.clock()
-while cam.ViewportSize.X < 1500 and os.clock() - t0 < 90 do task.wait(1) end
+while cam.ViewportSize.X < 1500 and os.clock() - t0 < 300 do task.wait(1) end
 log("viewport", cam.ViewportSize)
 RunService:Run()
 task.wait(12)
@@ -62,10 +63,13 @@ bloom.Parent = Lighting
 Lighting.ClockTime = 14.2
 
 -- The owner's avatar, anchored, ready to pose.
-local function avatar(): Model
-	local ok, desc = pcall(function() return Players:GetHumanoidDescriptionFromUserId(OWNER) end)
-	log("avatar description", ok)
-	if not ok then desc = Instance.new("HumanoidDescription") end
+local function avatar(given: HumanoidDescription?): Model
+	local ok, desc = true, given
+	if not desc then
+		ok, desc = pcall(function() return Players:GetHumanoidDescriptionFromUserId(OWNER) end)
+		log("avatar description", ok)
+		if not ok then desc = Instance.new("HumanoidDescription") end
+	end
 	-- The classic head and smile: a dynamic head ignores face decals and stays blank.
 	desc.Head = 0
 	desc.Face = 0
@@ -469,6 +473,96 @@ step("race", function()
 	task.wait(1)
 	for _, sh in ipairs(shots) do
 		matte(sh.label, sh.keep, sh.cam, sh.aim, sh.fov, sh.floor)
+	end
+end)
+-- 6. THE DUEL, in parts for the compositor: the ring with players kneeling round it (no marbles),
+-- then each marble alone against the sky with its matte. Marble shells read as pale bubbles
+-- against grass, but as the game's coloured glass against sky (like the Mythic shot), so the
+-- marbles are cut out from sky shots and composited big, smashing in the middle of the ring.
+step("duel", function()
+	local Table = require(SSS.Server.Table)
+	local o = Vector3.new(4000, 0, 1500)
+	local ok, tbl = pcall(Table.new, {
+		seats = { { kind = "bot", bot = "expert", name = "A", marble = "ember" }, { kind = "bot", bot = "skilled", name = "B", marble = "tide" } },
+		arena = "grass", origin = o, mode = "bot", seed = 11,
+	})
+	log("duel table", ok)
+	task.wait(3)
+	local hit = workspace:Raycast(o + Vector3.new(0, 20, 0), Vector3.new(0, -60, 0))
+	local fy = hit and hit.Position.Y or o.Y
+	local c = o + Vector3.new(0, fy - o.Y, 0)
+	-- Clear the table's own marbles (shell, the vanes inside and their sparkles): every small part
+	-- near the middle, the ring rope and floor being too big to match.
+	local hidden = 0
+	for _, d in ipairs(workspace:GetDescendants()) do
+		if d:IsA("BasePart") and d.Size.Magnitude < 4.5 then
+			local q = d.Position - c
+			if Vector3.new(q.X, 0, q.Z).Magnitude < 7 and q.Y < 4 and q.Y > -1 then
+				d.Transparency = 1
+				hidden += 1
+			end
+		elseif (d:IsA("ParticleEmitter") or d:IsA("Sparkles") or d:IsA("Trail") or d:IsA("Beam")) and d.Parent and d.Parent:IsA("BasePart") then
+			local q = (d.Parent :: BasePart).Position - c
+			if Vector3.new(q.X, 0, q.Z).Magnitude < 7 then d.Enabled = false end
+		end
+	end
+	log("duel hidden", hidden)
+	-- Players kneeling round the far side, sunk to the knee, leaning in.
+	local lean = {
+		RightShoulder = CFrame.Angles(rad(35), 0, rad(-8)),
+		LeftShoulder = CFrame.Angles(rad(35), 0, rad(8)),
+		Waist = CFrame.Angles(rad(-20), 0, 0),
+		Neck = CFrame.Angles(rad(-12), 0, 0),
+	}
+	-- Dressed in free Roblox-made catalog items (hair, classic shirt and pants), no real users' looks.
+	local looks = {
+		{ skin = Color3.fromRGB(255, 204, 153), hair = "63690008", shirt = 398635081, pants = 398635338 }, -- Pal Hair, Blue Plaid, Ripped Skater
+		{ skin = Color3.fromRGB(234, 184, 146), hair = "2956239660", shirt = 382537702, pants = 382537806 }, -- Long Red Hair, Teal Shirt, Jean Shorts
+		{ skin = Color3.fromRGB(124, 92, 70), hair = "1103003368", shirt = 382537085, pants = 382538503 }, -- Orange Beanie, I <3 Pizza, Black Jeans
+	}
+	local people = {}
+	for i, look in ipairs(looks) do
+		local hd = Instance.new("HumanoidDescription")
+		hd.HeadColor, hd.LeftArmColor, hd.RightArmColor, hd.TorsoColor = look.skin, look.skin, look.skin, look.skin
+		hd.LeftLegColor, hd.RightLegColor = look.skin, look.skin
+		hd.HairAccessory = look.hair
+		hd.Shirt = look.shirt
+		hd.Pants = look.pants
+		local m = avatar(hd)
+		local a = math.rad(25 + (i - 1) * 42)
+		place(m, c + Vector3.new(math.cos(a) * 6.5, 0.9, math.sin(a) * 6.5), c)
+		pose(m, lean)
+		table.insert(people, m)
+	end
+	-- The owner kneeling in the circle (far left), flicking toward the middle.
+	local me = avatar()
+	local ma = math.rad(155)
+	local mat = c + Vector3.new(math.cos(ma) * 6.2, 2.2, math.sin(ma) * 6.2)
+	place(me, mat, c)
+	pose(me, {
+		RightShoulder = CFrame.Angles(rad(80), 0, rad(-10)),
+		RightElbow = CFrame.Angles(rad(15), 0, 0),
+		LeftShoulder = CFrame.Angles(rad(-25), 0, rad(-35)),
+		Waist = CFrame.Angles(rad(-18), rad(-10), 0),
+		Neck = CFrame.Angles(rad(-15), 0, 0),
+		RightHip = CFrame.Angles(rad(70), 0, 0),
+		RightKnee = CFrame.Angles(rad(-95), 0, 0),
+		LeftHip = CFrame.Angles(rad(-10), 0, 0),
+		LeftKnee = CFrame.Angles(rad(-80), 0, 0),
+	})
+	table.insert(people, me)
+	task.wait(2.5)
+	snap("duel-ring", c + Vector3.new(-1.2, 3.6, -8.6), c + Vector3.new(-0.6, 1.6, 1.0), 64, 3)
+	for _, m in ipairs(people) do m:Destroy() end
+	-- Each marble alone, high over the field against the sky, then its matte.
+	local sky = c + Vector3.new(0, 70, 0)
+	for _, id in ipairs(DUEL_SPRITES and { "blackhole", "ember", "tide", "pumpkin", "aurora", "volt" } or {}) do
+		local b = marble(id, 1, sky)
+		task.wait(1)
+		local from = sky + Vector3.new(0, -1.2, -4.2)
+		snap("m-" .. id, from, sky, 50, 1.5)
+		matte("m-" .. id, { b }, from, sky, 50, sky.Y - 12)
+		b:Destroy()
 	end
 end)
 log("done")

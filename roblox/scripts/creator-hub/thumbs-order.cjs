@@ -2,7 +2,7 @@
 // Ids are upload ids as digit strings, written raw (they pass 2^53).
 const U = 10773508905;
 const ORDER = [
-  '7332489437186282', '6311916960185439', '6435997331567651', '5034640734460528', // round 5: duel, mythic, aura, knockout
+  '5853174476026513', '6311916960185439', '6435997331567651', '5034640734460528', // round 7 duel; round 5: mythic, aura, knockout
   '6130115191835091', '9436793176752201', '6064094803477492', // round 6: race, air, fields
 ];
 module.exports = async (ctx, page, out, log) => {
